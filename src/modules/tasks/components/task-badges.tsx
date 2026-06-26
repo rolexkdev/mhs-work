@@ -43,13 +43,13 @@ export function AssigneeChip({ name }: { name: string | null }) {
       <span className="text-xs italic text-muted-foreground">Chưa giao</span>
     );
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <Avatar className="h-5 w-5">
+    <span className="flex min-w-0 items-center gap-1.5">
+      <Avatar className="h-5 w-5 shrink-0">
         <AvatarFallback className="text-[10px]">
           {initials(name)}
         </AvatarFallback>
       </Avatar>
-      <span className="text-xs">{name}</span>
+      <span className="truncate text-xs">{name}</span>
     </span>
   );
 }

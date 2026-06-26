@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LayoutGrid, Table2, Plus, Filter } from "lucide-react";
+import { LayoutGrid, List, Plus, Filter, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -27,25 +27,34 @@ import {
   TASK_PRIORITY_ORDER,
 } from "@/modules/tasks/constants";
 import { TaskBoard } from "@/modules/tasks/components/task-board";
-import { TaskTable } from "@/modules/tasks/components/task-table";
+import {
+  TaskListView,
+  type GroupBy,
+} from "@/modules/tasks/components/task-list-view";
 import { TaskFormDialog } from "@/modules/tasks/components/task-form-dialog";
+import { TaskDetailPanel } from "@/modules/tasks/components/task-detail-panel";
 import type { Task, TaskStatus } from "@/types/database";
 
 const ALL = "__all__";
 
-export function TasksWorkspace({
-  meetingId,
-}: {
-  /** Khi truyền: chỉ hiển thị task của cuộc họp này, ẩn filter cuộc họp. */
-  meetingId?: string;
-}) {
-  const [view, setView] = useState<"board" | "table">("board");
+const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
+  { value: "none", label: "Bảng mặc định" },
+  { value: "department", label: "Phòng/Nhóm" },
+  { value: "assignee", label: "Người phụ trách" },
+  { value: "status", label: "Trạng thái" },
+  { value: "meeting", label: "Cuộc họp" },
+];
+
+export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
+  const [view, setView] = useState<"board" | "list">("list");
+  const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [statusFilter, setStatusFilter] = useState<string>(ALL);
   const [priorityFilter, setPriorityFilter] = useState<string>(ALL);
   const [assigneeFilter, setAssigneeFilter] = useState<string>(ALL);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<Task | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const { data: profiles = [] } = useProfiles();
   const { data: meetings = [] } = useMeetings();
@@ -69,16 +78,15 @@ export function TasksWorkspace({
   }, [profiles]);
   const nameOf = (id: string | null) => (id ? nameById.get(id) ?? null : null);
 
-  function openCreate() {
-    setEditing(null);
-    setDialogOpen(true);
-  }
-  function openEdit(t: Task) {
-    setEditing(t);
-    setDialogOpen(true);
+  function openDetail(t: Task) {
+    setDetailId(t.id);
+    setDetailOpen(true);
   }
   function handleStatusChange(id: string, status: TaskStatus) {
     updateTask.mutate({ id, status });
+  }
+  function handlePatch(id: string, patch: Partial<Task>) {
+    updateTask.mutate({ id, ...patch });
   }
   function handleDelete(t: Task) {
     if (confirm(`Xoá công việc "${t.title}"?`)) deleteTask.mutate(t.id);
@@ -89,14 +97,35 @@ export function TasksWorkspace({
       <div className="flex flex-wrap items-center gap-2">
         <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
           <TabsList>
-            <TabsTrigger value="board">
-              <LayoutGrid className="h-4 w-4" /> Bảng
+            <TabsTrigger value="list">
+              <List className="h-4 w-4" /> Danh sách
             </TabsTrigger>
-            <TabsTrigger value="table">
-              <Table2 className="h-4 w-4" /> Danh sách
+            <TabsTrigger value="board">
+              <LayoutGrid className="h-4 w-4" /> Kanban
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {view === "list" && (
+          <div className="flex items-center gap-1.5">
+            <Layers className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={groupBy}
+              onValueChange={(v) => setGroupBy(v as GroupBy)}
+            >
+              <SelectTrigger className="h-8 w-[150px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GROUP_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    Nhóm: {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
@@ -127,16 +156,16 @@ export function TasksWorkspace({
               label: p.full_name ?? p.email,
             }))}
           />
-          <Button onClick={openCreate}>
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" /> Tạo công việc
           </Button>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full" />
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-11 w-full" />
           ))}
         </div>
       ) : tasks.length === 0 ? (
@@ -150,26 +179,34 @@ export function TasksWorkspace({
         <TaskBoard
           tasks={tasks}
           nameOf={nameOf}
-          onEdit={openEdit}
+          onEdit={openDetail}
           onStatusChange={handleStatusChange}
         />
       ) : (
-        <TaskTable
+        <TaskListView
           tasks={tasks}
+          groupBy={groupBy}
+          profiles={profiles}
+          meetings={meetings}
           nameOf={nameOf}
-          onEdit={openEdit}
+          onOpen={openDetail}
           onDelete={handleDelete}
-          onStatusChange={handleStatusChange}
+          onPatch={handlePatch}
         />
       )}
 
       <TaskFormDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        task={editing}
+        open={createOpen}
+        onOpenChange={setCreateOpen}
         meetings={meetings}
         defaultMeetingId={meetingId}
         lockMeeting={!!meetingId}
+      />
+      <TaskDetailPanel
+        taskId={detailId}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        meetings={meetings}
       />
     </div>
   );

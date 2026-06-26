@@ -22,8 +22,8 @@ import {
 import {
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
-  TASK_PRIORITY_META,
-  TASK_PRIORITY_ORDER,
+  DEPARTMENTS,
+  CATEGORIES,
 } from "@/modules/tasks/constants";
 import { useCreateTask, useUpdateTask } from "@/modules/tasks/hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
@@ -31,6 +31,8 @@ import type { Task, Meeting } from "@/types/database";
 
 const UNASSIGNED = "__none__";
 const NO_MEETING = "__none__";
+const NO_DEPT = "__none__";
+const NO_CAT = "__none__";
 
 function toDateInput(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
@@ -64,7 +66,8 @@ export function TaskFormDialog({
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState<string>(UNASSIGNED);
   const [meetingId, setMeetingId] = useState<string>(NO_MEETING);
-  const [priority, setPriority] = useState<Task["priority"]>("medium");
+  const [department, setDepartment] = useState<string>(NO_DEPT);
+  const [category, setCategory] = useState<string>(NO_CAT);
   const [status, setStatus] = useState<Task["status"]>("todo");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -76,7 +79,8 @@ export function TaskFormDialog({
     setDescription(task?.description ?? "");
     setAssignee(task?.assignee_id ?? UNASSIGNED);
     setMeetingId(task?.meeting_id ?? defaultMeetingId ?? NO_MEETING);
-    setPriority(task?.priority ?? "medium");
+    setDepartment(task?.department ?? NO_DEPT);
+    setCategory(task?.category ?? NO_CAT);
     setStatus(task?.status ?? "todo");
     setStartDate(toDateInput(task?.start_date ?? null));
     setDueDate(toDateInput(task?.due_date ?? null));
@@ -93,7 +97,8 @@ export function TaskFormDialog({
       description: description.trim() || null,
       assignee_id: assignee === UNASSIGNED ? null : assignee,
       meeting_id: meetingId === NO_MEETING ? null : meetingId,
-      priority,
+      department: department === NO_DEPT ? null : department,
+      category: category === NO_CAT ? null : category,
       status,
       start_date: toIso(startDate),
       due_date: toIso(dueDate),
@@ -179,18 +184,33 @@ export function TaskFormDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label>Độ ưu tiên</Label>
-              <Select
-                value={priority}
-                onValueChange={(v) => setPriority(v as Task["priority"])}
-              >
+              <Label>Phòng/Nhóm</Label>
+              <Select value={department} onValueChange={setDepartment}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TASK_PRIORITY_ORDER.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {TASK_PRIORITY_META[p].label}
+                  <SelectItem value={NO_DEPT}>Chưa phân phòng</SelectItem>
+                  {DEPARTMENTS.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>
+                      {d.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Hạng mục</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CAT}>—</SelectItem>
+                  {CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.value}
                     </SelectItem>
                   ))}
                 </SelectContent>

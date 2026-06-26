@@ -39,6 +39,23 @@ export function useTasks(filters: TaskQueryFilters = {}) {
   });
 }
 
+export function useTask(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.task(id ?? ""),
+    queryFn: async (): Promise<Task | null> => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("id", id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
 export interface CreateTaskInput {
   title: string;
   description?: string | null;
@@ -48,6 +65,10 @@ export interface CreateTaskInput {
   status?: Task["status"];
   start_date?: string | null;
   due_date?: string | null;
+  department?: string | null;
+  category?: string | null;
+  latest_update?: string | null;
+  note?: string | null;
 }
 
 export function useCreateTask() {
@@ -69,6 +90,10 @@ export function useCreateTask() {
         status: input.status ?? "todo",
         start_date: input.start_date ?? null,
         due_date: input.due_date ?? null,
+        department: input.department ?? null,
+        category: input.category ?? null,
+        latest_update: input.latest_update ?? null,
+        note: input.note ?? null,
         created_by: user.id,
       };
       const { data, error } = await supabase

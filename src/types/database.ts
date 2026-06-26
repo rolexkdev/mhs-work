@@ -48,6 +48,11 @@ export type Task = Timestamps & {
   progress: number;
   start_date: string | null;
   due_date: string | null;
+  // Trường theo "Công việc KCN" (Notion)
+  department: string | null;
+  category: string | null;
+  latest_update: string | null;
+  note: string | null;
   updated_at: string;
 };
 
@@ -128,6 +133,10 @@ export interface Database {
           | "progress"
           | "start_date"
           | "due_date"
+          | "department"
+          | "category"
+          | "latest_update"
+          | "note"
         >;
         Update: Update<Task>;
         Relationships: Rel[];
