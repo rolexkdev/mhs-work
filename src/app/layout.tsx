@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "TaskApp — Quản lý công việc nội bộ",
+  title: "Minh Hưng Sikico — Quản lý công việc nội bộ",
   description: "Meeting → Task → Progress → Review → Done",
 };
 

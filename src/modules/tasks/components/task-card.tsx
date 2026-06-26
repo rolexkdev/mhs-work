@@ -21,11 +21,13 @@ const DUE_TONE: Record<string, string> = {
 export function TaskCard({
   task,
   assigneeName,
+  assigneeAvatar,
   onClick,
   dragging,
 }: {
   task: Task;
   assigneeName: string | null;
+  assigneeAvatar?: string | null;
   onClick?: () => void;
   dragging?: boolean;
 }) {
@@ -53,7 +55,7 @@ export function TaskCard({
       )}
 
       <div className="flex items-center justify-between">
-        <AssigneeChip name={assigneeName} />
+        <AssigneeChip name={assigneeName} avatarUrl={assigneeAvatar} />
         {task.due_date && (
           <span
             className={cn(

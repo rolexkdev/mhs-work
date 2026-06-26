@@ -72,11 +72,12 @@ export const TASK_STATUS_META: Record<TaskStatus, Meta> = {
   },
 };
 
-/** Thứ tự trạng thái hiển thị (theo Notion, bỏ review). */
+/** Thứ tự trạng thái hiển thị (Chưa bắt đầu → Đang làm → Dừng → Chờ duyệt → Xong). */
 export const TASK_STATUS_ORDER: TaskStatus[] = [
   "todo",
   "in_progress",
   "blocked",
+  "review",
   "done",
 ];
 

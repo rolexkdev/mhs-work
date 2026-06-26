@@ -127,16 +127,23 @@ export function useUpdateTask() {
       if (error) throw error;
       return data;
     },
-    // Optimistic update để Kanban kéo-thả mượt
+    // Optimistic update để Kanban kéo-thả / dial tiến độ mượt.
+    // Khớp cả query danh sách (mảng Task) lẫn query chi tiết (1 Task).
     onMutate: async ({ id, ...patch }) => {
       await qc.cancelQueries({ queryKey: ["tasks"] });
-      const snapshots = qc.getQueriesData<Task[]>({ queryKey: ["tasks"] });
-      for (const [key, list] of snapshots) {
-        if (!list) continue;
-        qc.setQueryData<Task[]>(
-          key,
-          list.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-        );
+      const snapshots = qc.getQueriesData({ queryKey: ["tasks"] });
+      for (const [key, data] of snapshots) {
+        if (!data) continue;
+        if (Array.isArray(data)) {
+          qc.setQueryData<Task[]>(
+            key,
+            (data as Task[]).map((t) =>
+              t.id === id ? { ...t, ...patch } : t,
+            ),
+          );
+        } else if ((data as Task).id === id) {
+          qc.setQueryData<Task>(key, { ...(data as Task), ...patch });
+        }
       }
       return { snapshots };
     },

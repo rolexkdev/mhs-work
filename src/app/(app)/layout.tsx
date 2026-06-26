@@ -17,7 +17,7 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, email, role")
+    .select("full_name, email, role, avatar_url")
     .eq("id", user.id)
     .single();
 
@@ -26,6 +26,7 @@ export default async function AppLayout({
       fullName={profile?.full_name ?? null}
       email={profile?.email ?? user.email ?? ""}
       role={(profile?.role ?? "member") as UserRole}
+      avatarUrl={profile?.avatar_url ?? null}
     >
       {children}
     </AppShell>

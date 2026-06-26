@@ -3,6 +3,7 @@
 import { useFormState, useFormStatus } from "react-dom";
 import { signIn } from "@/modules/auth/actions";
 import { Button } from "@/components/ui/button";
+import { Brand } from "@/components/brand";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -22,8 +23,8 @@ export default function LoginPage() {
         action={formAction}
         className="w-full max-w-sm space-y-4 rounded-lg border bg-card p-6 shadow-sm"
       >
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">TaskApp</h1>
+        <div className="space-y-3">
+          <Brand size={44} />
           <p className="text-sm text-muted-foreground">
             Đăng nhập để quản lý công việc nội bộ.
           </p>

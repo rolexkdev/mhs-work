@@ -20,10 +20,12 @@ import type { Task, TaskStatus } from "@/types/database";
 function DraggableCard({
   task,
   assigneeName,
+  assigneeAvatar,
   onEdit,
 }: {
   task: Task;
   assigneeName: string | null;
+  assigneeAvatar: string | null;
   onEdit: (t: Task) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -34,6 +36,7 @@ function DraggableCard({
       <TaskCard
         task={task}
         assigneeName={assigneeName}
+        assigneeAvatar={assigneeAvatar}
         dragging={isDragging}
         onClick={() => onEdit(task)}
       />
@@ -45,11 +48,13 @@ function Column({
   status,
   tasks,
   nameOf,
+  avatarOf,
   onEdit,
 }: {
   status: TaskStatus;
   tasks: Task[];
   nameOf: (id: string | null) => string | null;
+  avatarOf: (id: string | null) => string | null;
   onEdit: (t: Task) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
@@ -75,6 +80,7 @@ function Column({
             key={t.id}
             task={t}
             assigneeName={nameOf(t.assignee_id)}
+            assigneeAvatar={avatarOf(t.assignee_id)}
             onEdit={onEdit}
           />
         ))}
@@ -91,11 +97,13 @@ function Column({
 export function TaskBoard({
   tasks,
   nameOf,
+  avatarOf,
   onEdit,
   onStatusChange,
 }: {
   tasks: Task[];
   nameOf: (id: string | null) => string | null;
+  avatarOf: (id: string | null) => string | null;
   onEdit: (t: Task) => void;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
 }) {
@@ -133,6 +141,7 @@ export function TaskBoard({
             status={status}
             tasks={tasks.filter((t) => t.status === status)}
             nameOf={nameOf}
+            avatarOf={avatarOf}
             onEdit={onEdit}
           />
         ))}
@@ -143,6 +152,7 @@ export function TaskBoard({
           <TaskCard
             task={activeTask}
             assigneeName={nameOf(activeTask.assignee_id)}
+            assigneeAvatar={avatarOf(activeTask.assignee_id)}
           />
         ) : null}
       </DragOverlay>

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/format";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   TASK_STATUS_META,
   TASK_PRIORITY_META,
@@ -37,7 +37,13 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
   );
 }
 
-export function AssigneeChip({ name }: { name: string | null }) {
+export function AssigneeChip({
+  name,
+  avatarUrl,
+}: {
+  name: string | null;
+  avatarUrl?: string | null;
+}) {
   if (!name)
     return (
       <span className="text-xs italic text-muted-foreground">Chưa giao</span>
@@ -45,6 +51,7 @@ export function AssigneeChip({ name }: { name: string | null }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <Avatar className="h-5 w-5 shrink-0">
+        {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
         <AvatarFallback className="text-[10px]">
           {initials(name)}
         </AvatarFallback>

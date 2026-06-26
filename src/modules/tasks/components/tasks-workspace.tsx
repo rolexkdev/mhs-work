@@ -33,6 +33,7 @@ import {
 } from "@/modules/tasks/components/task-list-view";
 import { TaskFormDialog } from "@/modules/tasks/components/task-form-dialog";
 import { TaskDetailPanel } from "@/modules/tasks/components/task-detail-panel";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { Task, TaskStatus } from "@/types/database";
 
 const ALL = "__all__";
@@ -55,6 +56,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
 
   const { data: profiles = [] } = useProfiles();
   const { data: meetings = [] } = useMeetings();
@@ -78,6 +80,14 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   }, [profiles]);
   const nameOf = (id: string | null) => (id ? nameById.get(id) ?? null : null);
 
+  const avatarById = useMemo(() => {
+    const m = new Map<string, string | null>();
+    profiles.forEach((p) => m.set(p.id, p.avatar_url));
+    return m;
+  }, [profiles]);
+  const avatarOf = (id: string | null) =>
+    id ? avatarById.get(id) ?? null : null;
+
   function openDetail(t: Task) {
     setDetailId(t.id);
     setDetailOpen(true);
@@ -89,7 +99,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
     updateTask.mutate({ id, ...patch });
   }
   function handleDelete(t: Task) {
-    if (confirm(`Xoá công việc "${t.title}"?`)) deleteTask.mutate(t.id);
+    setPendingDelete(t);
   }
 
   return (
@@ -179,6 +189,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         <TaskBoard
           tasks={tasks}
           nameOf={nameOf}
+          avatarOf={avatarOf}
           onEdit={openDetail}
           onStatusChange={handleStatusChange}
         />
@@ -207,6 +218,21 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         meetings={meetings}
+      />
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(v) => !v && setPendingDelete(null)}
+        title="Xoá công việc?"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.title}" sẽ bị xoá vĩnh viễn cùng việc con, bình luận và tệp đính kèm.`
+            : undefined
+        }
+        confirmLabel="Xoá"
+        destructive
+        onConfirm={() => {
+          if (pendingDelete) deleteTask.mutate(pendingDelete.id);
+        }}
       />
     </div>
   );

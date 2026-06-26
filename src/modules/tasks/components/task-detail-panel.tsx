@@ -24,7 +24,7 @@ import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -39,6 +39,7 @@ import {
   DEPARTMENTS,
   CATEGORIES,
 } from "@/modules/tasks/constants";
+import { ProgressDial } from "@/modules/tasks/components/progress-dial";
 import { useTask, useUpdateTask } from "@/modules/tasks/hooks";
 import {
   useChecklists,
@@ -136,6 +137,8 @@ export function TaskDetailPanel({
 
   const nameOf = (id: string | null) =>
     id ? profiles.find((p) => p.id === id)?.full_name ?? null : null;
+  const avatarOf = (id: string | null) =>
+    id ? profiles.find((p) => p.id === id)?.avatar_url ?? null : null;
 
   const isDone = task?.status === "done";
 
@@ -154,7 +157,7 @@ export function TaskDetailPanel({
                 variant={isDone ? "secondary" : "outline"}
                 size="sm"
                 onClick={() =>
-                  patch({ status: isDone ? "todo" : "done" })
+                  patch({ status: isDone ? "in_progress" : "done" })
                 }
               >
                 {isDone ? (
@@ -183,6 +186,20 @@ export function TaskDetailPanel({
                 className="w-full resize-none border-0 bg-transparent text-lg font-semibold leading-snug outline-none placeholder:text-muted-foreground"
                 placeholder="Tiêu đề công việc"
               />
+
+              {/* Tiến độ báo cáo (thủ công) */}
+              <div className="flex items-center gap-4 rounded-lg border bg-muted/20 p-4">
+                <ProgressDial
+                  value={task.manual_progress}
+                  onChange={(v) => patch({ manual_progress: v })}
+                />
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-sm font-medium">Tiến độ báo cáo</p>
+                  <p className="text-xs text-muted-foreground">
+                    Chủ task kéo vòng tròn để cập nhật % hoàn thành.
+                  </p>
+                </div>
+              </div>
 
               <div className="divide-y">
                 <Row icon={CalendarClock} label="Hạn chót">
@@ -358,7 +375,11 @@ export function TaskDetailPanel({
 
               <ChecklistSection taskId={task.id} progress={task.progress} />
               <AttachmentSection taskId={task.id} />
-              <CommentSection taskId={task.id} nameOf={nameOf} />
+              <CommentSection
+                taskId={task.id}
+                nameOf={nameOf}
+                avatarOf={avatarOf}
+              />
             </div>
           </div>
         )}
@@ -533,9 +554,11 @@ function AttachmentSection({ taskId }: { taskId: string }) {
 function CommentSection({
   taskId,
   nameOf,
+  avatarOf,
 }: {
   taskId: string;
   nameOf: (id: string | null) => string | null;
+  avatarOf: (id: string | null) => string | null;
 }) {
   const { data: comments = [] } = useComments(taskId);
   const add = useAddComment(taskId);
@@ -548,9 +571,11 @@ function CommentSection({
       <div className="space-y-3">
         {comments.map((c) => {
           const name = nameOf(c.user_id) ?? "Người dùng";
+          const avatar = avatarOf(c.user_id);
           return (
             <div key={c.id} className="flex gap-2">
               <Avatar className="h-7 w-7">
+                {avatar && <AvatarImage src={avatar} alt={name} />}
                 <AvatarFallback className="text-[10px]">
                   {initials(name)}
                 </AvatarFallback>

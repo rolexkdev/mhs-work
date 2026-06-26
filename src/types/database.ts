@@ -24,6 +24,7 @@ export type Profile = Timestamps & {
   id: string;
   email: string;
   full_name: string | null;
+  avatar_url: string | null;
   role: UserRole;
 };
 
@@ -45,7 +46,10 @@ export type Task = Timestamps & {
   created_by: string;
   priority: TaskPriority;
   status: TaskStatus;
+  /** Tiến độ tự tính từ checklist (việc con). */
   progress: number;
+  /** Tiến độ thủ công do chủ task báo cáo (dial tròn). */
+  manual_progress: number;
   start_date: string | null;
   due_date: string | null;
   // Trường theo "Công việc KCN" (Notion)
@@ -105,7 +109,10 @@ export interface Database {
     Tables: {
       profiles: {
         Row: Row<Profile>;
-        Insert: Insert<Profile, "created_at" | "full_name" | "role">;
+        Insert: Insert<
+          Profile,
+          "created_at" | "full_name" | "avatar_url" | "role"
+        >;
         Update: Update<Profile>;
         Relationships: Rel[];
       };
@@ -131,6 +138,7 @@ export interface Database {
           | "priority"
           | "status"
           | "progress"
+          | "manual_progress"
           | "start_date"
           | "due_date"
           | "department"

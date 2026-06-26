@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { dueLabel, initials } from "@/lib/format";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,8 +39,7 @@ export type GroupBy =
   | "department"
   | "assignee"
   | "status"
-  | "meeting"
-  | "priority";
+  | "meeting";
 
 const DUE_TONE: Record<string, string> = {
   overdue: "text-red-600 font-medium",
@@ -175,11 +174,13 @@ export function TaskListView({
 
   const gridStyle = { gridTemplateColumns: template };
 
-  const assigneeOptions: CellOption[] = profiles.map((p) => ({
+  const assigneeOptions: AssigneeOption[] = profiles.map((p) => ({
     value: p.id,
     label: p.full_name ?? p.email,
-    className: "bg-slate-100 text-slate-700 border-slate-200",
+    avatarUrl: p.avatar_url,
   }));
+  const avatarOf = (id: string | null) =>
+    id ? profiles.find((p) => p.id === id)?.avatar_url ?? null : null;
 
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
@@ -240,7 +241,7 @@ export function TaskListView({
                         <button
                           onClick={() =>
                             onPatch(t.id, {
-                              status: isDone ? "todo" : "done",
+                              status: isDone ? "in_progress" : "done",
                             })
                           }
                           title={isDone ? "Bỏ hoàn thành" : "Đánh dấu xong"}
@@ -288,6 +289,7 @@ export function TaskListView({
                         <AssigneeCell
                           assigneeId={t.assignee_id}
                           name={nameOf(t.assignee_id)}
+                          avatarUrl={avatarOf(t.assignee_id)}
                           options={assigneeOptions}
                           onChange={(v) =>
                             onPatch(t.id, { assignee_id: v })
@@ -370,15 +372,19 @@ export function TaskListView({
   );
 }
 
+type AssigneeOption = { value: string; label: string; avatarUrl: string | null };
+
 function AssigneeCell({
   assigneeId,
   name,
+  avatarUrl,
   options,
   onChange,
 }: {
   assigneeId: string | null;
   name: string | null;
-  options: CellOption[];
+  avatarUrl: string | null;
+  options: AssigneeOption[];
   onChange: (value: string | null) => void;
 }) {
   return (
@@ -388,6 +394,7 @@ function AssigneeCell({
           {assigneeId && name ? (
             <>
               <Avatar className="h-5 w-5 shrink-0">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
                 <AvatarFallback className="text-[10px]">
                   {initials(name)}
                 </AvatarFallback>
@@ -409,6 +416,7 @@ function AssigneeCell({
         {options.map((o) => (
           <DropdownMenuItem key={o.value} onClick={() => onChange(o.value)}>
             <Avatar className="h-5 w-5">
+              {o.avatarUrl && <AvatarImage src={o.avatarUrl} alt={o.label} />}
               <AvatarFallback className="text-[10px]">
                 {initials(o.label)}
               </AvatarFallback>
