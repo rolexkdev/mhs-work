@@ -8,6 +8,8 @@
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
     /* Maroon thương hiệu Minh Hưng Sikico */
     --primary: 356 64% 30%;
     --primary-foreground: 0 0% 100%;
@@ -30,6 +32,8 @@
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
     --primary: 356 70% 45%;
     --primary-foreground: 0 0% 100%;
     --secondary: 217.2 32.6% 17.5%;
