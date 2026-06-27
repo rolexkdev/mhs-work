@@ -58,7 +58,7 @@ import {
   getAttachmentUrl,
 } from "@/modules/tasks/attachment-hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
-import type { Meeting, Task } from "@/types/database";
+import type { Meeting, Task, TaskAttachment } from "@/types/database";
 
 const UNASSIGNED = "__none__";
 const NO_MEETING = "__none__";
@@ -477,6 +477,63 @@ function ChecklistSection({
   );
 }
 
+const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
+const isImage = (name: string) => IMAGE_RE.test(name);
+
+/** Ảnh đính kèm hiển thị trực tiếp (lazy tải signed URL), tỉ lệ vừa khung. */
+function AttachmentImage({
+  att,
+  onOpen,
+  onDelete,
+}: {
+  att: TaskAttachment;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getAttachmentUrl(att.file_url).then((u) => {
+      if (active) setUrl(u);
+    });
+    return () => {
+      active = false;
+    };
+  }, [att.file_url]);
+
+  return (
+    <div className="group relative overflow-hidden rounded-md border bg-muted/40">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={att.file_name}
+          onClick={onOpen}
+          className="max-h-72 w-full cursor-zoom-in object-contain"
+        />
+      ) : (
+        <div className="flex h-40 items-center justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      <div className="flex items-center gap-2 border-t bg-background/80 px-2 py-1.5">
+        <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="flex-1 truncate text-xs">{att.file_name}</span>
+        <button onClick={onOpen} title="Mở ảnh">
+          <Download className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="opacity-0 transition-opacity group-hover:opacity-100"
+        >
+          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AttachmentSection({ taskId }: { taskId: string }) {
   const { data: items = [] } = useAttachments(taskId);
   const upload = useUploadAttachment(taskId);
@@ -487,6 +544,9 @@ function AttachmentSection({ taskId }: { taskId: string }) {
     const url = await getAttachmentUrl(path);
     if (url) window.open(url, "_blank");
   }
+
+  const images = items.filter((a) => isImage(a.file_name));
+  const files = items.filter((a) => !isImage(a.file_name));
 
   return (
     <div className="space-y-2 pt-5">
@@ -519,8 +579,23 @@ function AttachmentSection({ taskId }: { taskId: string }) {
         />
       </div>
 
+      {/* Ảnh — hiển thị trực tiếp */}
+      {images.length > 0 && (
+        <div className="space-y-2">
+          {images.map((a) => (
+            <AttachmentImage
+              key={a.id}
+              att={a}
+              onOpen={() => openFile(a.file_url)}
+              onDelete={() => del.mutate(a)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Tệp khác — dạng dòng */}
       <div className="space-y-1">
-        {items.map((a) => (
+        {files.map((a) => (
           <div
             key={a.id}
             className="group flex items-center gap-2 rounded-md border px-2 py-1.5"

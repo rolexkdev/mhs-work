@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Thương hiệu Minh Hưng Sikico.
- * Hiển thị logo từ /public/logo.png; nếu chưa có file thì tự fallback
+ * Hiển thị logo từ /public/logo.jpg; nếu chưa có file thì tự fallback
  * sang ô chữ "MH" màu maroon để giao diện không bị vỡ.
  */
 export function Brand({
@@ -23,7 +23,7 @@ export function Brand({
       {ok ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src="/logo.png"
+          src="/logo.jpg"
           alt="Minh Hưng Sikico"
           width={size}
           height={size}

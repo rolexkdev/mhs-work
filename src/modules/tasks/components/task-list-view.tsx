@@ -11,7 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { dueLabel, initials } from "@/lib/format";
+import { dueLabel, formatDate, initials } from "@/lib/format";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,6 @@ import {
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
   DEPARTMENTS,
-  CATEGORIES,
   TAG_COLOR_CLASS,
 } from "@/modules/tasks/constants";
 import type { Task, TaskStatus, Profile, Meeting } from "@/types/database";
@@ -53,11 +52,6 @@ const DEPT_OPTIONS: CellOption[] = DEPARTMENTS.map((d) => ({
   value: d.value,
   label: d.value,
   className: TAG_COLOR_CLASS[d.color],
-}));
-const CAT_OPTIONS: CellOption[] = CATEGORIES.map((c) => ({
-  value: c.value,
-  label: c.value,
-  className: TAG_COLOR_CLASS[c.color],
 }));
 const STATUS_OPTIONS: CellOption[] = TASK_STATUS_ORDER.map((s) => ({
   value: s,
@@ -161,10 +155,10 @@ export function TaskListView({
   const template = [
     "minmax(220px,1.6fr)", // Công việc
     showDept ? "150px" : null, // Phòng/Nhóm
-    "110px", // Hạng mục
     "170px", // Người phụ trách
     "160px", // Trạng thái
     "130px", // Tiến độ
+    "120px", // Ngày bắt đầu
     "120px", // Ngày kết thúc
     "minmax(170px,1fr)", // Cập nhật mới nhất
     "44px", // actions
@@ -192,10 +186,10 @@ export function TaskListView({
         >
           <span className="truncate">Công việc</span>
           {showDept && <span className="truncate">Phòng/Nhóm</span>}
-          <span className="truncate">Hạng mục</span>
           <span className="truncate">Người phụ trách</span>
           <span className="truncate">Trạng thái</span>
           <span className="truncate">Tiến độ</span>
+          <span className="truncate">Ngày bắt đầu</span>
           <span className="truncate">Ngày kết thúc</span>
           <span className="truncate">Cập nhật mới nhất</span>
           <span />
@@ -275,15 +269,6 @@ export function TaskListView({
                         </div>
                       )}
 
-                      {/* Hạng mục */}
-                      <div className="min-w-0">
-                        <InlineSelectCell
-                          value={t.category}
-                          options={CAT_OPTIONS}
-                          onChange={(v) => onPatch(t.id, { category: v })}
-                        />
-                      </div>
-
                       {/* Người phụ trách */}
                       <div className="min-w-0">
                         <AssigneeCell
@@ -316,6 +301,11 @@ export function TaskListView({
                           {t.progress}%
                         </span>
                       </div>
+
+                      {/* Ngày bắt đầu */}
+                      <span className="truncate text-xs text-muted-foreground">
+                        {t.start_date ? formatDate(t.start_date) : "—"}
+                      </span>
 
                       {/* Ngày kết thúc */}
                       <span
