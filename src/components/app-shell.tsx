@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ListChecks,
   LogOut,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/format";
@@ -45,7 +46,21 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [profileOpen, setProfileOpen] = useState(false);
+  // Highlight tab được bấm ngay lập tức, không chờ điều hướng xong.
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const displayName = fullName ?? email;
+
+  // Khi điều hướng hoàn tất (pathname đổi), bỏ trạng thái pending.
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  const effectivePath = pendingHref ?? pathname;
+  const isActive = (href: string, exact?: boolean) =>
+    exact ? effectivePath === href : effectivePath.startsWith(href);
+  const handleNavClick = (href: string) => {
+    if (href !== pathname) setPendingHref(href);
+  };
 
   return (
     <div className="flex min-h-screen bg-muted/30">
@@ -57,13 +72,13 @@ export function AppShell({
 
         <nav className="flex-1 space-y-1 p-3">
           {NAV.map(({ href, label, icon: Icon, exact }) => {
-            const active = exact
-              ? pathname === href
-              : pathname.startsWith(href);
+            const active = isActive(href, exact);
+            const pending = pendingHref === href;
             return (
               <Link
                 key={href}
                 href={href}
+                onClick={() => handleNavClick(href)}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   active
@@ -71,7 +86,11 @@ export function AppShell({
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
               >
-                <Icon className="h-4 w-4" />
+                {pending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Icon className="h-4 w-4" />
+                )}
                 {label}
               </Link>
             );
@@ -123,14 +142,14 @@ export function AppShell({
           </button>
           <nav className="ml-auto flex gap-1">
             {NAV.map(({ href, label, icon: Icon, exact }) => {
-              const active = exact
-                ? pathname === href
-                : pathname.startsWith(href);
+              const active = isActive(href, exact);
+              const pending = pendingHref === href;
               return (
                 <Link
                   key={href}
                   href={href}
                   title={label}
+                  onClick={() => handleNavClick(href)}
                   className={cn(
                     "rounded-md p-2",
                     active
@@ -138,7 +157,11 @@ export function AppShell({
                       : "text-muted-foreground",
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  {pending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Icon className="h-4 w-4" />
+                  )}
                 </Link>
               );
             })}

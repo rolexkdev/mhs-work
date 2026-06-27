@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   ListTodo,
@@ -9,6 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   StatusDonut,
   DeptProgressBars,
@@ -36,7 +38,24 @@ type Row = {
   due_date: string | null;
 };
 
-export default async function DashboardPage() {
+export default function DashboardPage() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
+          Tổng quan tiến độ công việc của nhóm.
+        </p>
+      </div>
+
+      <Suspense fallback={<DashboardSkeleton />}>
+        <DashboardContent />
+      </Suspense>
+    </div>
+  );
+}
+
+async function DashboardContent() {
   const supabase = await createClient();
   const now = Date.now();
   const weekEnd = now + 7 * 86400_000;
@@ -121,13 +140,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Tổng quan tiến độ công việc của nhóm.
-        </p>
-      </div>
-
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {widgets.map((w) => (
           <Card key={w.label}>
@@ -181,6 +193,23 @@ export default async function DashboardPage() {
           </p>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-[72px] w-full" />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Skeleton className="h-56 w-full" />
+        <Skeleton className="h-56 w-full" />
+      </div>
+      <Skeleton className="h-28 w-full" />
     </div>
   );
 }
