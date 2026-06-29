@@ -28,6 +28,7 @@ export function RealtimeSync() {
         () => {
           qc.invalidateQueries({ queryKey: ["tasks"] });
           qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
+          qc.invalidateQueries({ queryKey: ["task-logs"] }); // task đổi → có log mới
         },
       )
       .on(

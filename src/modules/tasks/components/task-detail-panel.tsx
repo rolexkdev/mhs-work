@@ -17,9 +17,10 @@ import {
   Download,
   Send,
   RefreshCw,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDateTime, initials } from "@/lib/format";
+import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ import {
 import {
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
+  TASK_PRIORITY_META,
   DEPARTMENTS,
   CATEGORIES,
 } from "@/modules/tasks/constants";
@@ -57,8 +59,16 @@ import {
   useDeleteAttachment,
   getAttachmentUrl,
 } from "@/modules/tasks/attachment-hooks";
+import { useTaskLogs } from "@/modules/tasks/log-hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
-import type { Meeting, Task, TaskAttachment } from "@/types/database";
+import type {
+  Meeting,
+  Task,
+  TaskAttachment,
+  TaskLog,
+  TaskStatus,
+  TaskPriority,
+} from "@/types/database";
 
 const UNASSIGNED = "__none__";
 const NO_MEETING = "__none__";
@@ -380,6 +390,11 @@ export function TaskDetailPanel({
                 nameOf={nameOf}
                 avatarOf={avatarOf}
               />
+              <HistorySection
+                taskId={task.id}
+                nameOf={nameOf}
+                avatarOf={avatarOf}
+              />
             </div>
           </div>
         )}
@@ -622,6 +637,148 @@ function AttachmentSection({ taskId }: { taskId: string }) {
           <p className="text-xs text-muted-foreground">Chưa có tệp nào.</p>
         )}
       </div>
+    </div>
+  );
+}
+
+function statusLabel(v: unknown) {
+  return typeof v === "string"
+    ? TASK_STATUS_META[v as TaskStatus]?.label ?? v
+    : "—";
+}
+function priorityLabel(v: unknown) {
+  return typeof v === "string"
+    ? TASK_PRIORITY_META[v as TaskPriority]?.label ?? v
+    : "—";
+}
+const B = ({ children }: { children: React.ReactNode }) => (
+  <span className="font-medium text-foreground">{children}</span>
+);
+
+/** Mô tả 1 dòng log thành câu tiếng Việt dễ đọc. */
+function describeLog(
+  log: TaskLog,
+  nameOf: (id: string | null) => string | null,
+): React.ReactNode {
+  const oldV = log.old_value;
+  const newV = log.new_value;
+  const txt = (v: unknown) =>
+    v === null || v === undefined || v === "" ? "trống" : String(v);
+  const date = (v: unknown) =>
+    typeof v === "string" && v ? formatDate(v) : "trống";
+  const person = (v: unknown) =>
+    typeof v === "string" && v ? nameOf(v) ?? "—" : "trống";
+
+  switch (log.action) {
+    case "created":
+      return <>đã tạo công việc</>;
+    case "status":
+      return (
+        <>
+          đổi trạng thái <B>{statusLabel(oldV)}</B> → <B>{statusLabel(newV)}</B>
+        </>
+      );
+    case "assignee":
+      return (
+        <>
+          đổi người thực hiện <B>{person(oldV)}</B> → <B>{person(newV)}</B>
+        </>
+      );
+    case "priority":
+      return (
+        <>
+          đổi ưu tiên <B>{priorityLabel(oldV)}</B> → <B>{priorityLabel(newV)}</B>
+        </>
+      );
+    case "due_date":
+      return (
+        <>
+          đổi hạn chót <B>{date(oldV)}</B> → <B>{date(newV)}</B>
+        </>
+      );
+    case "start_date":
+      return (
+        <>
+          đổi ngày bắt đầu <B>{date(oldV)}</B> → <B>{date(newV)}</B>
+        </>
+      );
+    case "department":
+      return (
+        <>
+          đổi phòng/nhóm <B>{txt(oldV)}</B> → <B>{txt(newV)}</B>
+        </>
+      );
+    case "category":
+      return (
+        <>
+          đổi hạng mục <B>{txt(oldV)}</B> → <B>{txt(newV)}</B>
+        </>
+      );
+    case "manual_progress":
+      return (
+        <>
+          cập nhật tiến độ <B>{txt(oldV)}%</B> → <B>{txt(newV)}%</B>
+        </>
+      );
+    case "title":
+      return (
+        <>
+          đổi tiêu đề thành <B>“{txt(newV)}”</B>
+        </>
+      );
+    case "latest_update":
+      return <>cập nhật tình hình mới nhất</>;
+    case "description":
+      return <>sửa mô tả</>;
+    default:
+      return <>cập nhật công việc</>;
+  }
+}
+
+function HistorySection({
+  taskId,
+  nameOf,
+  avatarOf,
+}: {
+  taskId: string;
+  nameOf: (id: string | null) => string | null;
+  avatarOf: (id: string | null) => string | null;
+}) {
+  const { data: logs = [] } = useTaskLogs(taskId);
+
+  return (
+    <div className="space-y-3 pt-5">
+      <h3 className="flex items-center gap-2 text-sm font-medium">
+        <History className="h-4 w-4" /> Lịch sử
+      </h3>
+
+      {logs.length === 0 ? (
+        <p className="text-xs text-muted-foreground">Chưa có hoạt động nào.</p>
+      ) : (
+        <ol className="space-y-3">
+          {logs.map((log) => {
+            const name = nameOf(log.created_by) ?? "Hệ thống";
+            const avatar = avatarOf(log.created_by);
+            return (
+              <li key={log.id} className="flex gap-2">
+                <Avatar className="mt-0.5 h-6 w-6 shrink-0">
+                  {avatar && <AvatarImage src={avatar} alt={name} />}
+                  <AvatarFallback className="text-[9px]">
+                    {initials(name)}
+                  </AvatarFallback>
+                </Avatar>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  <span className="font-medium text-foreground">{name}</span>{" "}
+                  {describeLog(log, nameOf)}{" "}
+                  <span className="whitespace-nowrap">
+                    · {formatDateTime(log.created_at)}
+                  </span>
+                </p>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </div>
   );
 }
