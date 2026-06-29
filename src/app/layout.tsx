@@ -5,6 +5,11 @@ import { Providers } from "@/components/providers";
 export const metadata: Metadata = {
   title: "Minh Hưng Sikico — Quản lý công việc nội bộ",
   description: "Meeting → Task → Progress → Review → Done",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({
