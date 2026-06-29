@@ -12,7 +12,7 @@ export function useDebouncedCallback<A extends unknown[]>(
     cbRef.current = callback;
   }, [callback]);
 
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const debounced = useMemo(
     () =>

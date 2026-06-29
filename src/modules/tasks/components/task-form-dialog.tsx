@@ -114,150 +114,173 @@ export function TaskFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Chỉnh sửa công việc" : "Tạo công việc"}
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="border-b px-6 py-4">
+          <DialogTitle className="text-lg">
+            {isEdit ? "Chỉnh sửa công việc" : "Tạo công việc mới"}
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {isEdit
+              ? "Cập nhật thông tin và phân loại công việc."
+              : "Điền tiêu đề và phân loại để giao việc cho thành viên."}
+          </p>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="title">Tiêu đề *</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="VD: Hoàn thiện API đăng nhập"
-              autoFocus
-              required
-            />
+        <form
+          onSubmit={handleSubmit}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+            {/* --- Nội dung --- */}
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <FieldLabel htmlFor="title">Tiêu đề công việc *</FieldLabel>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="VD: Hoàn thiện API đăng nhập"
+                  className="h-11 text-base font-medium"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <FieldLabel htmlFor="desc">Mô tả</FieldLabel>
+                <Textarea
+                  id="desc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Chi tiết công việc, yêu cầu cần đạt..."
+                  className="min-h-[88px] resize-none"
+                />
+              </div>
+            </div>
+
+            {/* --- Phân loại --- */}
+            <Section title="Phân loại & phân công">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <FieldLabel>Người thực hiện</FieldLabel>
+                  <Select value={assignee} onValueChange={setAssignee}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNASSIGNED}>Chưa giao</SelectItem>
+                      {profiles.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.full_name ?? p.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel>Trạng thái</FieldLabel>
+                  <Select
+                    value={status}
+                    onValueChange={(v) => setStatus(v as Task["status"])}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TASK_STATUS_ORDER.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {TASK_STATUS_META[s].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel>Phòng/Nhóm</FieldLabel>
+                  <Select value={department} onValueChange={setDepartment}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_DEPT}>Chưa phân phòng</SelectItem>
+                      {DEPARTMENTS.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>
+                          {d.value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel>Hạng mục</FieldLabel>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_CAT}>—</SelectItem>
+                      {CATEGORIES.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>
+                          {c.value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <FieldLabel>Cuộc họp</FieldLabel>
+                  <Select
+                    value={meetingId}
+                    onValueChange={setMeetingId}
+                    disabled={lockMeeting}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_MEETING}>Không gắn họp</SelectItem>
+                      {meetings.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </Section>
+
+            {/* --- Thời gian --- */}
+            <Section title="Thời gian">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <FieldLabel htmlFor="start">Ngày bắt đầu</FieldLabel>
+                  <Input
+                    id="start"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel htmlFor="due">Hạn chót</FieldLabel>
+                  <Input
+                    id="due"
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            </Section>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="desc">Mô tả</Label>
-            <Textarea
-              id="desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Chi tiết công việc, yêu cầu..."
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Người thực hiện</Label>
-              <Select value={assignee} onValueChange={setAssignee}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNASSIGNED}>Chưa giao</SelectItem>
-                  {profiles.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.full_name ?? p.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Cuộc họp</Label>
-              <Select
-                value={meetingId}
-                onValueChange={setMeetingId}
-                disabled={lockMeeting}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_MEETING}>Không gắn họp</SelectItem>
-                  {meetings.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Phòng/Nhóm</Label>
-              <Select value={department} onValueChange={setDepartment}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_DEPT}>Chưa phân phòng</SelectItem>
-                  {DEPARTMENTS.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.value}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Hạng mục</Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_CAT}>—</SelectItem>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>
-                      {c.value}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Trạng thái</Label>
-              <Select
-                value={status}
-                onValueChange={(v) => setStatus(v as Task["status"])}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TASK_STATUS_ORDER.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {TASK_STATUS_META[s].label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="start">Ngày bắt đầu</Label>
-              <Input
-                id="start"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="due">Hạn chót</Label>
-              <Input
-                id="due"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
+          <DialogFooter className="border-t bg-muted/30 px-6 py-4">
             <Button
               type="button"
               variant="outline"
@@ -266,11 +289,50 @@ export function TaskFormDialog({
               Huỷ
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? "Đang lưu..." : isEdit ? "Lưu thay đổi" : "Tạo"}
+              {pending ? "Đang lưu..." : isEdit ? "Lưu thay đổi" : "Tạo công việc"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Label nhỏ, đồng nhất cho mọi trường trong form. */
+function FieldLabel({
+  children,
+  htmlFor,
+}: {
+  children: React.ReactNode;
+  htmlFor?: string;
+}) {
+  return (
+    <Label
+      htmlFor={htmlFor}
+      className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+    >
+      {children}
+    </Label>
+  );
+}
+
+/** Nhóm trường có tiêu đề + đường kẻ phân cách. */
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wide text-foreground/70">
+          {title}
+        </span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+      {children}
+    </div>
   );
 }
