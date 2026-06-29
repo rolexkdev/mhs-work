@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -246,16 +246,12 @@ export function TaskListView({
                             <Circle className="h-4 w-4 shrink-0 text-muted-foreground hover:text-foreground" />
                           )}
                         </button>
-                        <button
-                          onClick={() => onOpen(t)}
-                          className={cn(
-                            "truncate text-left text-sm font-medium hover:underline",
-                            isDone &&
-                              "text-muted-foreground line-through",
-                          )}
-                        >
-                          {t.title}
-                        </button>
+                        <EditableTitle
+                          value={t.title}
+                          isDone={isDone}
+                          onOpen={() => onOpen(t)}
+                          onRename={(title) => onPatch(t.id, { title })}
+                        />
                       </div>
 
                       {/* Phòng/Nhóm */}
@@ -303,19 +299,20 @@ export function TaskListView({
                       </div>
 
                       {/* Ngày bắt đầu */}
-                      <span className="truncate text-xs text-muted-foreground">
-                        {t.start_date ? formatDate(t.start_date) : "—"}
-                      </span>
+                      <InlineDateCell
+                        value={t.start_date}
+                        label={t.start_date ? formatDate(t.start_date) : "—"}
+                        className="text-muted-foreground"
+                        onChange={(iso) => onPatch(t.id, { start_date: iso })}
+                      />
 
                       {/* Ngày kết thúc */}
-                      <span
-                        className={cn(
-                          "truncate text-xs",
-                          DUE_TONE[due.tone],
-                        )}
-                      >
-                        {due.text}
-                      </span>
+                      <InlineDateCell
+                        value={t.due_date}
+                        label={due.text}
+                        className={DUE_TONE[due.tone]}
+                        onChange={(iso) => onPatch(t.id, { due_date: iso })}
+                      />
 
                       {/* Cập nhật mới nhất */}
                       <button
@@ -359,6 +356,115 @@ export function TaskListView({
         })}
       </div>
     </div>
+  );
+}
+
+/** Tiêu đề: click mở chi tiết, double-click để đổi tên ngay tại dòng. */
+function EditableTitle({
+  value,
+  isDone,
+  onOpen,
+  onRename,
+}: {
+  value: string;
+  isDone: boolean;
+  onOpen: () => void;
+  onRename: (title: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select();
+  }, [editing]);
+
+  function commit() {
+    const v = draft.trim();
+    if (v && v !== value) onRename(v);
+    else setDraft(value);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Escape") {
+            setDraft(value);
+            setEditing(false);
+          }
+        }}
+        className="w-full rounded border border-input bg-background px-1.5 py-0.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={onOpen}
+      onDoubleClick={() => {
+        setDraft(value);
+        setEditing(true);
+      }}
+      title="Bấm để mở chi tiết · bấm đúp để đổi tên"
+      className={cn(
+        "truncate text-left text-sm font-medium hover:underline",
+        isDone && "text-muted-foreground line-through",
+      )}
+    >
+      {value}
+    </button>
+  );
+}
+
+/** Ngày: hiển thị nhãn, click để chọn ngày qua input date. */
+function InlineDateCell({
+  value,
+  label,
+  className,
+  onChange,
+}: {
+  value: string | null;
+  label: string;
+  className?: string;
+  onChange: (iso: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  if (editing) {
+    return (
+      <input
+        type="date"
+        autoFocus
+        defaultValue={value ? value.slice(0, 10) : ""}
+        onBlur={() => setEditing(false)}
+        onChange={(e) =>
+          onChange(e.target.value ? new Date(e.target.value).toISOString() : null)
+        }
+        className="w-full rounded border border-input bg-background px-1 py-0.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      title="Bấm để đổi ngày"
+      className={cn(
+        "truncate rounded px-1 py-0.5 text-left text-xs hover:bg-muted/60",
+        className,
+      )}
+    >
+      {label}
+    </button>
   );
 }
 

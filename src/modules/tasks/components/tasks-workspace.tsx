@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { LayoutGrid, List, Plus, Filter, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,6 +58,16 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
+
+  // Mở chi tiết khi điều hướng kèm ?task=<id> (vd từ Cmd-K).
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const tid = searchParams.get("task");
+    if (tid) {
+      setDetailId(tid);
+      setDetailOpen(true);
+    }
+  }, [searchParams]);
 
   const { data: profiles = [] } = useProfiles();
   const { data: meetings = [] } = useMeetings();

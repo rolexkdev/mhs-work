@@ -9,12 +9,15 @@ import {
   ListChecks,
   LogOut,
   Loader2,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/format";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Brand } from "@/components/brand";
+import { CommandPalette } from "@/components/command-palette";
+import { RealtimeSync } from "@/components/realtime-sync";
 import { ProfileDialog } from "@/modules/auth/profile-dialog";
 import { signOut } from "@/modules/auth/actions";
 import type { UserRole } from "@/types/database";
@@ -68,6 +71,21 @@ export function AppShell({
       <aside className="hidden w-60 shrink-0 flex-col border-r bg-background md:flex">
         <div className="flex h-14 items-center border-b px-5">
           <Brand />
+        </div>
+
+        <div className="px-3 pt-3">
+          <button
+            onClick={() =>
+              window.dispatchEvent(new Event("command-palette:open"))
+            }
+            className="flex w-full items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            <Search className="h-4 w-4" />
+            <span>Tìm kiếm...</span>
+            <kbd className="ml-auto rounded border bg-background px-1.5 text-xs font-medium">
+              Ctrl K
+            </kbd>
+          </button>
         </div>
 
         <nav className="flex-1 space-y-1 p-3">
@@ -170,6 +188,9 @@ export function AppShell({
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
+
+      <CommandPalette />
+      <RealtimeSync />
 
       <ProfileDialog
         open={profileOpen}
