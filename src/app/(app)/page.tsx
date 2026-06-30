@@ -1,4 +1,6 @@
-import { Suspense } from "react";
+"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ListTodo,
@@ -7,10 +9,12 @@ import {
   AlertTriangle,
   CalendarClock,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PeriodPicker } from "@/components/period-picker";
+import { type Period, currentPeriod, isTaskInPeriod } from "@/lib/period";
+import { useTasks } from "@/modules/tasks/hooks";
 import {
   StatusDonut,
   DeptProgressBars,
@@ -22,7 +26,7 @@ import {
   TASK_STATUS_ORDER,
   DEPARTMENTS,
 } from "@/modules/tasks/constants";
-import type { TaskStatus } from "@/types/database";
+import type { Task, TaskStatus } from "@/types/database";
 
 const STATUS_COLOR: Record<TaskStatus, string> = {
   todo: "#94a3b8",
@@ -32,40 +36,36 @@ const STATUS_COLOR: Record<TaskStatus, string> = {
   done: "#10b981",
 };
 
-type Row = {
-  status: TaskStatus;
-  department: string | null;
-  due_date: string | null;
-};
-
 export default function DashboardPage() {
+  const [period, setPeriod] = useState<Period>(currentPeriod);
+  const { data: allTasks = [], isLoading } = useTasks();
+
+  const rows = useMemo(
+    () => allTasks.filter((t) => isTaskInPeriod(t, period)),
+    [allTasks, period],
+  );
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Tổng quan tiến độ công việc của nhóm.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Tổng quan tiến độ công việc của nhóm.
+          </p>
+        </div>
+        <PeriodPicker value={period} onChange={setPeriod} />
       </div>
 
-      <Suspense fallback={<DashboardSkeleton />}>
-        <DashboardContent />
-      </Suspense>
+      {isLoading ? <DashboardSkeleton /> : <DashboardStats rows={rows} />}
     </div>
   );
 }
 
-async function DashboardContent() {
-  const supabase = await createClient();
+function DashboardStats({ rows }: { rows: Task[] }) {
   const now = Date.now();
   const weekEnd = now + 7 * 86400_000;
 
-  const { data } = await supabase
-    .from("tasks")
-    .select("status, department, due_date");
-  const rows = (data ?? []) as Row[];
-
-  // ----- Tổng hợp -----
   const totalN = rows.length;
   const byStatus = (s: TaskStatus) => rows.filter((r) => r.status === s).length;
   const doneN = byStatus("done");
@@ -88,7 +88,6 @@ async function DashboardContent() {
     color: STATUS_COLOR[s],
   }));
 
-  // ----- Theo phòng/nhóm -----
   const deptOrder = [...DEPARTMENTS.map((d) => d.value), "__none__"];
   const deptRows: DeptRow[] = deptOrder
     .map((key) => {
@@ -161,7 +160,6 @@ async function DashboardContent() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Phân bố trạng thái */}
         <Card>
           <CardContent className="space-y-4 p-5">
             <p className="text-sm font-medium">Phân bố theo trạng thái</p>
@@ -169,7 +167,6 @@ async function DashboardContent() {
           </CardContent>
         </Card>
 
-        {/* Tiến độ theo phòng */}
         <Card>
           <CardContent className="space-y-4 p-5">
             <p className="text-sm font-medium">Tiến độ hoàn thành theo phòng</p>

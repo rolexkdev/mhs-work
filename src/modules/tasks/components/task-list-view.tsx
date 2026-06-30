@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { dueLabel, formatDate, initials } from "@/lib/format";
@@ -127,6 +128,8 @@ export function TaskListView({
   onOpen,
   onDelete,
   onPatch,
+  canHideWeek = false,
+  onToggleWeekHidden,
 }: {
   tasks: Task[];
   groupBy: GroupBy;
@@ -136,6 +139,8 @@ export function TaskListView({
   onOpen: (t: Task) => void;
   onDelete: (t: Task) => void;
   onPatch: (taskId: string, patch: Partial<Task>) => void;
+  canHideWeek?: boolean;
+  onToggleWeekHidden?: (t: Task) => void;
 }) {
   const groups = useMemo(
     () => buildGroups(tasks, groupBy, profiles, meetings),
@@ -342,6 +347,13 @@ export function TaskListView({
                           <DropdownMenuItem onClick={() => onOpen(t)}>
                             <Pencil className="h-4 w-4" /> Mở chi tiết
                           </DropdownMenuItem>
+                          {canHideWeek && onToggleWeekHidden && (
+                            <DropdownMenuItem
+                              onClick={() => onToggleWeekHidden(t)}
+                            >
+                              <EyeOff className="h-4 w-4" /> Ẩn khỏi tuần này
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             onClick={() => onDelete(t)}
                             className="text-red-600 focus:text-red-600"

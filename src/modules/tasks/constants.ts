@@ -1,6 +1,7 @@
 import type {
   TaskStatus,
   TaskPriority,
+  TaskRecurrence,
   MeetingStatus,
 } from "@/types/database";
 
@@ -136,6 +137,14 @@ export const TASK_PRIORITY_ORDER: TaskPriority[] = [
   "medium",
   "low",
 ];
+
+// ----- Lặp lại -----
+export const RECURRENCE_LABEL: Record<TaskRecurrence, string> = {
+  none: "Không lặp",
+  daily: "Hàng ngày",
+  weekly: "Hàng tuần",
+};
+export const RECURRENCE_ORDER: TaskRecurrence[] = ["none", "daily", "weekly"];
 
 export const MEETING_STATUS_META: Record<MeetingStatus, Meta> = {
   planned: {

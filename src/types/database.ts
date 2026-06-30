@@ -57,8 +57,16 @@ export type Task = Timestamps & {
   category: string | null;
   latest_update: string | null;
   note: string | null;
+  /** Việc lặp lại: luôn hiện ở mọi tuần. */
+  recurrence: TaskRecurrence;
+  /** Mốc hoàn thành (set khi status = done). */
+  completed_at: string | null;
+  /** Các tuần (yyyy-mm-dd của Thứ 2) admin ẩn task thủ công. */
+  hidden_weeks: string[];
   updated_at: string;
 };
+
+export type TaskRecurrence = "none" | "daily" | "weekly";
 
 export type TaskComment = Timestamps & {
   id: string;
@@ -145,6 +153,9 @@ export interface Database {
           | "category"
           | "latest_update"
           | "note"
+          | "recurrence"
+          | "completed_at"
+          | "hidden_weeks"
         >;
         Update: Update<Task>;
         Relationships: Rel[];

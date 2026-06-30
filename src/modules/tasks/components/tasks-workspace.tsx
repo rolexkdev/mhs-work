@@ -35,6 +35,14 @@ import {
 import { TaskFormDialog } from "@/modules/tasks/components/task-form-dialog";
 import { TaskDetailPanel } from "@/modules/tasks/components/task-detail-panel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PeriodPicker } from "@/components/period-picker";
+import {
+  type Period,
+  currentPeriod,
+  isTaskInPeriod,
+  periodRange,
+  weekKey,
+} from "@/lib/period";
 import type { Task, TaskStatus } from "@/types/database";
 
 const ALL = "__all__";
@@ -50,6 +58,10 @@ const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
 export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const [view, setView] = useState<"board" | "list">("list");
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
+  // Trong trang chi tiết cuộc họp: xem tất cả task của họp, không lọc theo tuần.
+  const [period, setPeriod] = useState<Period>(() =>
+    meetingId ? { mode: "all", anchor: new Date().toISOString() } : currentPeriod(),
+  );
   const [statusFilter, setStatusFilter] = useState<string>(ALL);
   const [priorityFilter, setPriorityFilter] = useState<string>(ALL);
   const [assigneeFilter, setAssigneeFilter] = useState<string>(ALL);
@@ -80,6 +92,12 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
     assigneeId: assigneeFilter === ALL ? null : assigneeFilter,
   };
   const { data: tasks = [], isLoading } = useTasks(filters);
+
+  // Lọc theo kỳ (tuần/tháng) — bỏ qua khi đang ở trong 1 cuộc họp.
+  const visibleTasks = useMemo(
+    () => tasks.filter((t) => isTaskInPeriod(t, period)),
+    [tasks, period],
+  );
 
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -112,10 +130,22 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   function handleDelete(t: Task) {
     setPendingDelete(t);
   }
+  function handleToggleWeekHidden(t: Task) {
+    const { start } = periodRange(period);
+    if (!start) return;
+    const wk = weekKey(start);
+    const has = t.hidden_weeks?.includes(wk);
+    const hidden_weeks = has
+      ? t.hidden_weeks.filter((w) => w !== wk)
+      : [...(t.hidden_weeks ?? []), wk];
+    updateTask.mutate({ id: t.id, hidden_weeks });
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
+        {!meetingId && <PeriodPicker value={period} onChange={setPeriod} />}
+
         <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
           <TabsList>
             <TabsTrigger value="list">
@@ -189,16 +219,17 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
             <Skeleton key={i} className="h-11 w-full" />
           ))}
         </div>
-      ) : tasks.length === 0 ? (
+      ) : visibleTasks.length === 0 ? (
         <div className="rounded-lg border border-dashed py-16 text-center">
           <p className="text-sm text-muted-foreground">
-            Chưa có công việc nào. Bấm{" "}
-            <span className="font-medium">Tạo công việc</span> để bắt đầu.
+            {tasks.length === 0
+              ? "Chưa có công việc nào. Bấm Tạo công việc để bắt đầu."
+              : "Không có công việc nào trong kỳ này. Đổi bộ lọc kỳ để xem thêm."}
           </p>
         </div>
       ) : view === "board" ? (
         <TaskBoard
-          tasks={tasks}
+          tasks={visibleTasks}
           nameOf={nameOf}
           avatarOf={avatarOf}
           onEdit={openDetail}
@@ -206,7 +237,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         />
       ) : (
         <TaskListView
-          tasks={tasks}
+          tasks={visibleTasks}
           groupBy={groupBy}
           profiles={profiles}
           meetings={meetings}
@@ -214,6 +245,8 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           onOpen={openDetail}
           onDelete={handleDelete}
           onPatch={handlePatch}
+          canHideWeek={period.mode === "week"}
+          onToggleWeekHidden={handleToggleWeekHidden}
         />
       )}
 

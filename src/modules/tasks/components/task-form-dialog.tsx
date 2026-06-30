@@ -24,6 +24,8 @@ import {
   TASK_STATUS_ORDER,
   DEPARTMENTS,
   CATEGORIES,
+  RECURRENCE_LABEL,
+  RECURRENCE_ORDER,
 } from "@/modules/tasks/constants";
 import { useCreateTask, useUpdateTask } from "@/modules/tasks/hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
@@ -69,6 +71,7 @@ export function TaskFormDialog({
   const [department, setDepartment] = useState<string>(NO_DEPT);
   const [category, setCategory] = useState<string>(NO_CAT);
   const [status, setStatus] = useState<Task["status"]>("todo");
+  const [recurrence, setRecurrence] = useState<Task["recurrence"]>("none");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
 
@@ -82,6 +85,7 @@ export function TaskFormDialog({
     setDepartment(task?.department ?? NO_DEPT);
     setCategory(task?.category ?? NO_CAT);
     setStatus(task?.status ?? "todo");
+    setRecurrence(task?.recurrence ?? "none");
     setStartDate(toDateInput(task?.start_date ?? null));
     setDueDate(toDateInput(task?.due_date ?? null));
   }, [open, task, defaultMeetingId]);
@@ -100,6 +104,7 @@ export function TaskFormDialog({
       department: department === NO_DEPT ? null : department,
       category: category === NO_CAT ? null : category,
       status,
+      recurrence,
       start_date: toIso(startDate),
       due_date: toIso(dueDate),
     };
@@ -256,6 +261,29 @@ export function TaskFormDialog({
 
             {/* --- Thời gian --- */}
             <Section title="Thời gian">
+              <div className="mb-4 space-y-1.5">
+                <FieldLabel>Lặp lại</FieldLabel>
+                <Select
+                  value={recurrence}
+                  onValueChange={(v) =>
+                    setRecurrence(v as Task["recurrence"])
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RECURRENCE_ORDER.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {RECURRENCE_LABEL[r]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Việc lặp lại sẽ luôn hiển thị ở mọi tuần.
+                </p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <FieldLabel htmlFor="start">Ngày bắt đầu</FieldLabel>

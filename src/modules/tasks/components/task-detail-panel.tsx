@@ -17,6 +17,7 @@ import {
   Send,
   RefreshCw,
   History,
+  Repeat,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
@@ -44,6 +45,8 @@ import {
   TASK_STATUS_ORDER,
   TASK_PRIORITY_META,
   DEPARTMENTS,
+  RECURRENCE_LABEL,
+  RECURRENCE_ORDER,
 } from "@/modules/tasks/constants";
 import { ProgressDial } from "@/modules/tasks/components/progress-dial";
 import { useTask, useUpdateTask } from "@/modules/tasks/hooks";
@@ -311,6 +314,26 @@ export function TaskDetailPanel({
                       {TASK_STATUS_ORDER.map((s) => (
                         <SelectItem key={s} value={s}>
                           {TASK_STATUS_META[s].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Row>
+
+                <Row icon={Repeat} label="Lặp lại">
+                  <Select
+                    value={task.recurrence}
+                    onValueChange={(v) =>
+                      patch({ recurrence: v as Task["recurrence"] })
+                    }
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RECURRENCE_ORDER.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {RECURRENCE_LABEL[r]}
                         </SelectItem>
                       ))}
                     </SelectContent>
