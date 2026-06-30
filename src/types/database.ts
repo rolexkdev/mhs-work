@@ -50,6 +50,8 @@ export type Task = Timestamps & {
   progress: number;
   /** Tiến độ thủ công do chủ task báo cáo (dial tròn). */
   manual_progress: number;
+  /** Lưu tiến độ trước khi hoàn thành, để khôi phục khi bỏ 'done'. */
+  manual_progress_prev: number | null;
   start_date: string | null;
   due_date: string | null;
   // Trường theo "Công việc KCN" (Notion)
@@ -147,6 +149,7 @@ export interface Database {
           | "status"
           | "progress"
           | "manual_progress"
+          | "manual_progress_prev"
           | "start_date"
           | "due_date"
           | "department"
