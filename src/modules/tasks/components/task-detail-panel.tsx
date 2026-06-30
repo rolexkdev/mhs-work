@@ -7,7 +7,6 @@ import {
   CalendarClock,
   User,
   Building2,
-  Tag,
   CalendarDays,
   ListChecks,
   Paperclip,
@@ -39,7 +38,6 @@ import {
   TASK_STATUS_ORDER,
   TASK_PRIORITY_META,
   DEPARTMENTS,
-  CATEGORIES,
 } from "@/modules/tasks/constants";
 import { ProgressDial } from "@/modules/tasks/components/progress-dial";
 import { useTask, useUpdateTask } from "@/modules/tasks/hooks";
@@ -263,27 +261,6 @@ export function TaskDetailPanel({
                       {DEPARTMENTS.map((d) => (
                         <SelectItem key={d.value} value={d.value}>
                           {d.value}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Row>
-
-                <Row icon={Tag} label="Hạng mục">
-                  <Select
-                    value={task.category ?? "__none__"}
-                    onValueChange={(v) =>
-                      patch({ category: v === "__none__" ? null : v })
-                    }
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">—</SelectItem>
-                      {CATEGORIES.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>
-                          {c.value}
                         </SelectItem>
                       ))}
                     </SelectContent>
