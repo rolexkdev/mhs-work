@@ -13,8 +13,8 @@ import {
 import { cn } from "@/lib/utils";
 import { dueLabel, formatDate, initials } from "@/lib/format";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { ProgressDial } from "@/modules/tasks/components/progress-dial";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -157,7 +157,7 @@ export function TaskListView({
     showDept ? "150px" : null, // Phòng/Nhóm
     "170px", // Người phụ trách
     "160px", // Trạng thái
-    "130px", // Tiến độ
+    "90px", // Tiến độ
     "120px", // Ngày bắt đầu
     "120px", // Ngày kết thúc
     "minmax(170px,1fr)", // Cập nhật mới nhất
@@ -291,11 +291,13 @@ export function TaskListView({
                       </div>
 
                       {/* Tiến độ */}
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Progress value={t.progress} className="h-1.5" />
-                        <span className="w-9 shrink-0 text-right text-xs text-muted-foreground">
-                          {t.progress}%
-                        </span>
+                      <div className="flex min-w-0 items-center">
+                        <ProgressDial
+                          value={t.manual_progress}
+                          readOnly
+                          size={36}
+                          strokeWidth={4}
+                        />
                       </div>
 
                       {/* Ngày bắt đầu */}
