@@ -22,6 +22,12 @@ import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -182,7 +188,31 @@ export function TaskDetailPanel({
               )}
             </div>
 
-            <div className="flex-1 space-y-1 px-5 py-4">
+            <Tabs
+              defaultValue="detail"
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="border-b px-5">
+                <TabsList className="h-10 justify-start gap-1 rounded-none bg-transparent p-0">
+                  <TabsTrigger
+                    value="detail"
+                    className="rounded-none border-b-2 border-transparent bg-transparent px-1 pb-2 pt-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                  >
+                    Chi tiết
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="history"
+                    className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-1 pb-2 pt-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                  >
+                    <History className="h-3.5 w-3.5" /> Lịch sử
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent
+                value="detail"
+                className="mt-0 flex-1 space-y-1 overflow-y-auto px-5 py-4"
+              >
               {/* Title */}
               <textarea
                 value={title}
@@ -367,12 +397,19 @@ export function TaskDetailPanel({
                 nameOf={nameOf}
                 avatarOf={avatarOf}
               />
-              <HistorySection
-                taskId={task.id}
-                nameOf={nameOf}
-                avatarOf={avatarOf}
-              />
-            </div>
+              </TabsContent>
+
+              <TabsContent
+                value="history"
+                className="mt-0 flex-1 overflow-y-auto px-5 py-4"
+              >
+                <HistorySection
+                  taskId={task.id}
+                  nameOf={nameOf}
+                  avatarOf={avatarOf}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         )}
       </SheetContent>
@@ -724,11 +761,7 @@ function HistorySection({
   const { data: logs = [] } = useTaskLogs(taskId);
 
   return (
-    <div className="space-y-3 pt-5">
-      <h3 className="flex items-center gap-2 text-sm font-medium">
-        <History className="h-4 w-4" /> Lịch sử
-      </h3>
-
+    <div className="space-y-3">
       {logs.length === 0 ? (
         <p className="text-xs text-muted-foreground">Chưa có hoạt động nào.</p>
       ) : (
