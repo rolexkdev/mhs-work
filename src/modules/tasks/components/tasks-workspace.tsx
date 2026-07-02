@@ -132,6 +132,12 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   function openDetail(t: Task) {
     setDetailId(t.id);
     setDetailOpen(true);
+    // Đưa ?task=<id> lên thanh địa chỉ để có thể copy link chia sẻ.
+    window.history.replaceState(null, "", `${window.location.pathname}?task=${t.id}`);
+  }
+  function handleDetailOpenChange(v: boolean) {
+    setDetailOpen(v);
+    if (!v) window.history.replaceState(null, "", window.location.pathname);
   }
   function handleStatusChange(id: string, status: TaskStatus) {
     updateTask.mutate({ id, status });
@@ -317,7 +323,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
       <TaskDetailPanel
         taskId={detailId}
         open={detailOpen}
-        onOpenChange={setDetailOpen}
+        onOpenChange={handleDetailOpenChange}
         meetings={meetings}
       />
       <ConfirmDialog

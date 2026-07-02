@@ -18,7 +18,9 @@ import {
   RefreshCw,
   History,
   Repeat,
+  Link2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { useDebouncedCallback } from "@/lib/use-debounced-callback";
@@ -151,6 +153,14 @@ export function TaskDetailPanel({
   function patch(p: Partial<Task>) {
     if (task) update.mutate({ id: task.id, ...p });
   }
+  function copyLink() {
+    if (!task) return;
+    const url = `${window.location.origin}/tasks?task=${task.id}`;
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success("Đã chép liên kết công việc"))
+      .catch(() => toast.error("Không chép được liên kết"));
+  }
 
   const nameOf = (id: string | null) =>
     id ? profiles.find((p) => p.id === id)?.full_name ?? null : null;
@@ -189,6 +199,15 @@ export function TaskDetailPanel({
                   <Loader2 className="h-3 w-3 animate-spin" /> Đang lưu
                 </span>
               )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto text-muted-foreground"
+                onClick={copyLink}
+                title="Chép liên kết công việc để gửi cho người khác"
+              >
+                <Link2 className="h-4 w-4" /> Chép liên kết
+              </Button>
             </div>
 
             <Tabs
