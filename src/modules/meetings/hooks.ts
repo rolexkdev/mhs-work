@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/query-keys";
+import { friendlyError } from "@/lib/errors";
 import type { Meeting } from "@/types/database";
 import type { Database } from "@/types/database";
 
@@ -89,7 +90,7 @@ export function useCreateMeeting() {
       qc.invalidateQueries({ queryKey: queryKeys.meetings });
       toast.success("Đã tạo cuộc họp");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }
 
@@ -112,6 +113,6 @@ export function useUpdateMeeting() {
       qc.invalidateQueries({ queryKey: queryKeys.meeting(m.id) });
       toast.success("Đã cập nhật cuộc họp");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }

@@ -2,8 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { LayoutGrid, List, Plus, Filter, Layers } from "lucide-react";
+import {
+  LayoutGrid,
+  List,
+  Plus,
+  Filter,
+  Layers,
+  FileSpreadsheet,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { exportWeeklyReport } from "@/lib/export-report";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -43,7 +54,7 @@ import {
   periodRange,
   weekKey,
 } from "@/lib/period";
-import type { Task, TaskStatus } from "@/types/database";
+import type { Task, TaskStatus, TaskLog } from "@/types/database";
 
 const ALL = "__all__";
 
@@ -70,6 +81,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Mở chi tiết khi điều hướng kèm ?task=<id> (vd từ Cmd-K).
   const searchParams = useSearchParams();
@@ -129,6 +141,37 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   }
   function handleDelete(t: Task) {
     setPendingDelete(t);
+  }
+  async function handleExport() {
+    if (visibleTasks.length === 0) {
+      toast.info("Không có công việc nào trong kỳ để xuất.");
+      return;
+    }
+    setExporting(true);
+    try {
+      // Lấy log "cập nhật mới nhất" TRƯỚC đầu tuần → cột "Tiến độ đến đầu tuần".
+      let logs: TaskLog[] = [];
+      const { start } = periodRange(period);
+      if (period.mode === "week" && start) {
+        const supabase = createClient();
+        const ids = visibleTasks.map((t) => t.id);
+        const { data } = await supabase
+          .from("task_logs")
+          .select("*")
+          .eq("action", "latest_update")
+          .in("task_id", ids)
+          .lt("created_at", start.toISOString())
+          .order("created_at", { ascending: true });
+        logs = data ?? [];
+      }
+      await exportWeeklyReport({ tasks: visibleTasks, logs, nameOf, period });
+      toast.success("Đã xuất báo cáo Excel");
+    } catch (e) {
+      toast.error("Xuất báo cáo thất bại");
+      console.error(e);
+    } finally {
+      setExporting(false);
+    }
   }
   function handleToggleWeekHidden(t: Task) {
     const { start } = periodRange(period);
@@ -207,6 +250,20 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
               label: p.full_name ?? p.email,
             }))}
           />
+          {!meetingId && (
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4" />
+              )}
+              Xuất Excel
+            </Button>
+          )}
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" /> Tạo công việc
           </Button>

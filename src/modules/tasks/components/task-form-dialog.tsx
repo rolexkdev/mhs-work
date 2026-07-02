@@ -144,7 +144,7 @@ export function TaskFormDialog({
                   id="title"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="VD: Hoàn thiện API đăng nhập"
+                  placeholder="VD: Mua CPU để kết nối TV phòng họp"
                   className="h-11 text-base font-medium"
                   autoFocus
                   required

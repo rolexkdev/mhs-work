@@ -10,6 +10,7 @@ import {
   LogOut,
   Loader2,
   Search,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/format";
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/meetings", label: "Họp giao ban", icon: CalendarDays },
   { href: "/tasks", label: "Công việc", icon: ListChecks },
+  { href: "/updates", label: "Báo cáo công việc", icon: ClipboardCheck },
 ];
 
 const ROLE_LABEL: Record<UserRole, string> = {

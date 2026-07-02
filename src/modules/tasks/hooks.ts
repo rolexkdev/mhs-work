@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/query-keys";
+import { friendlyError } from "@/lib/errors";
 import type { Task, Database } from "@/types/database";
 
 type TaskInsert = Database["public"]["Tables"]["tasks"]["Insert"];
@@ -109,7 +110,7 @@ export function useCreateTask() {
       qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
       toast.success("Đã tạo công việc");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }
 
@@ -149,7 +150,7 @@ export function useUpdateTask() {
     },
     onError: (e: Error, _vars, ctx) => {
       ctx?.snapshots.forEach(([key, list]) => qc.setQueryData(key, list));
-      toast.error(e.message);
+      toast.error(friendlyError(e));
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
@@ -170,6 +171,6 @@ export function useDeleteTask() {
       qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
       toast.success("Đã xoá công việc");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }

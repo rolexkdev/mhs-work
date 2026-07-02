@@ -8,7 +8,7 @@ export default function MeetingsPage() {
           Họp giao ban
         </h1>
         <p className="text-sm text-muted-foreground">
-          Mỗi cuộc họp tuần/tháng là nơi giao việc — task phát sinh từ đây.
+          Danh sách cuộc họp giao ban.
         </p>
       </div>
       <MeetingsList />
