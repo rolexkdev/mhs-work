@@ -68,7 +68,7 @@ const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
 
 export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const [view, setView] = useState<"board" | "list">("list");
-  const [groupBy, setGroupBy] = useState<GroupBy>("none");
+  const [groupBy, setGroupBy] = useState<GroupBy>("department");
   // Trong trang chi tiết cuộc họp: xem tất cả task của họp, không lọc theo tuần.
   const [period, setPeriod] = useState<Period>(() =>
     meetingId ? { mode: "all", anchor: new Date().toISOString() } : currentPeriod(),
