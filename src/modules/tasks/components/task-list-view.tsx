@@ -183,7 +183,7 @@ export function TaskListView({
 
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
-      <div className="min-w-max">
+      <div className="min-w-[1400px]">
         {/* Header */}
         <div
           className="grid items-center gap-x-4 border-b bg-muted/50 px-4 py-2.5 text-xs font-medium text-muted-foreground"
@@ -324,7 +324,7 @@ export function TaskListView({
                       {/* Cập nhật mới nhất */}
                       <button
                         onClick={() => onOpen(t)}
-                        className="truncate text-left text-xs text-muted-foreground hover:text-foreground"
+                        className="block min-w-0 max-w-full truncate text-left text-xs text-muted-foreground hover:text-foreground"
                         title={t.latest_update ?? ""}
                       >
                         {t.latest_update || (
@@ -430,7 +430,7 @@ function EditableTitle({
       }}
       title="Bấm để mở chi tiết · bấm đúp để đổi tên"
       className={cn(
-        "truncate text-left text-sm font-medium hover:underline",
+        "block min-w-0 max-w-full truncate text-left text-sm font-medium hover:underline",
         isDone && "text-muted-foreground line-through",
       )}
     >
@@ -509,7 +509,7 @@ function AssigneeCell({
                   {initials(name)}
                 </AvatarFallback>
               </Avatar>
-              <span className="truncate text-xs">{name}</span>
+              <span className="min-w-0 truncate text-xs">{name}</span>
             </>
           ) : (
             <span className="text-xs text-muted-foreground/60">+ Trống</span>

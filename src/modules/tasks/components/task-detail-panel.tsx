@@ -122,6 +122,16 @@ export function TaskDetailPanel({
   const [latestUpdate, setLatestUpdate] = useState("");
   const [note, setNote] = useState("");
   const loadedId = useRef<string | null>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+
+  // Tiêu đề tự giãn chiều cao theo nội dung (không cuộn bên trong ô).
+  useEffect(() => {
+    const el = titleRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [title, open]);
 
   useEffect(() => {
     if (task && task.id !== loadedId.current) {
@@ -237,13 +247,14 @@ export function TaskDetailPanel({
               >
               {/* Title */}
               <textarea
+                ref={titleRef}
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value);
                   saveTitle(e.target.value);
                 }}
                 rows={1}
-                className="w-full resize-none border-0 bg-transparent text-lg font-semibold leading-snug outline-none placeholder:text-muted-foreground"
+                className="w-full resize-none overflow-hidden border-0 bg-transparent text-lg font-semibold leading-snug outline-none placeholder:text-muted-foreground"
                 placeholder="Tiêu đề công việc"
               />
 
