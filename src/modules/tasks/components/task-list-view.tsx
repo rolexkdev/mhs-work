@@ -31,6 +31,8 @@ import {
   TASK_STATUS_ORDER,
   DEPARTMENTS,
   TAG_COLOR_CLASS,
+  colorOf,
+  type TagColor,
 } from "@/modules/tasks/constants";
 import type { Task, TaskStatus, Profile, Meeting } from "@/types/database";
 
@@ -59,6 +61,36 @@ const STATUS_OPTIONS: CellOption[] = TASK_STATUS_ORDER.map((s) => ({
   label: TASK_STATUS_META[s].label,
   className: TASK_STATUS_META[s].badge,
 }));
+
+// Màu chấm tròn đậm theo màu pill (để dấu hiệu màu ở thanh nhóm rõ hơn).
+const DOT_CLASS: Record<TagColor, string> = {
+  gray: "bg-slate-400",
+  blue: "bg-blue-500",
+  green: "bg-emerald-500",
+  orange: "bg-orange-500",
+  red: "bg-red-500",
+  purple: "bg-purple-500",
+  brown: "bg-amber-600",
+  pink: "bg-pink-500",
+  sky: "bg-sky-500",
+  yellow: "bg-yellow-500",
+};
+
+/** Lớp màu cho thanh header của từng nhóm (nền nhạt + chấm màu). */
+function groupAccent(
+  groupBy: GroupBy,
+  key: string,
+): { bar: string; dot: string } {
+  if (groupBy === "department" && key !== "__none__") {
+    const c = colorOf(DEPARTMENTS, key);
+    return { bar: cn(TAG_COLOR_CLASS[c], "hover:brightness-95"), dot: DOT_CLASS[c] };
+  }
+  if (groupBy === "status") {
+    const meta = TASK_STATUS_META[key as TaskStatus];
+    return { bar: cn(meta.badge, "hover:brightness-95"), dot: meta.dot };
+  }
+  return { bar: "bg-muted/20 hover:bg-muted/40", dot: "bg-muted-foreground/40" };
+}
 
 type Group = { key: string; label: string; tasks: Task[] };
 
@@ -203,25 +235,28 @@ export function TaskListView({
         {groups.map((g) => {
           const isCollapsed = collapsed.has(g.key);
           const done = g.tasks.filter((t) => t.status === "done").length;
+          const accent = groupAccent(groupBy, g.key);
           return (
             <div key={g.key}>
               {groupBy !== "none" && (
                 <button
                   onClick={() => toggle(g.key)}
-                  className="flex w-full items-center gap-2 border-b bg-muted/20 px-3 py-2 text-left hover:bg-muted/40"
+                  className={cn(
+                    "flex w-full items-center gap-2 border-b px-3 py-2 text-left transition",
+                    accent.bar,
+                  )}
                 >
                   {isCollapsed ? (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <ChevronRight className="h-4 w-4 opacity-70" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <ChevronDown className="h-4 w-4 opacity-70" />
                   )}
+                  <span className={cn("h-2 w-2 shrink-0 rounded-full", accent.dot)} />
                   <span className="text-sm font-semibold">{g.label}</span>
-                  <span className="rounded bg-muted px-1.5 text-xs text-muted-foreground">
+                  <span className="rounded bg-black/5 px-1.5 text-xs opacity-80">
                     {g.tasks.length}
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    · {done} xong
-                  </span>
+                  <span className="text-xs opacity-70">· {done} xong</span>
                 </button>
               )}
 
