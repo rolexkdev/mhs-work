@@ -11,6 +11,8 @@ import {
   Loader2,
   Search,
   ClipboardCheck,
+  UserCog,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/format";
@@ -23,12 +25,26 @@ import { ProfileDialog } from "@/modules/auth/profile-dialog";
 import { signOut } from "@/modules/auth/actions";
 import type { UserRole } from "@/types/database";
 
-const NAV = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  exact?: boolean;
+};
+
+const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/meetings", label: "Họp giao ban", icon: CalendarDays },
   { href: "/tasks", label: "Công việc", icon: ListChecks },
   { href: "/updates", label: "Báo cáo công việc", icon: ClipboardCheck },
 ];
+
+/** Chỉ hiện với role 'admin' — trang /accounts cũng tự chặn lại ở server. */
+const ADMIN_NAV: NavItem = {
+  href: "/accounts",
+  label: "Quản lý tài khoản",
+  icon: UserCog,
+};
 
 const ROLE_LABEL: Record<UserRole, string> = {
   admin: "Quản trị",
@@ -50,6 +66,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const navItems = role === "admin" ? [...NAV, ADMIN_NAV] : NAV;
   const [profileOpen, setProfileOpen] = useState(false);
   // Highlight tab được bấm ngay lập tức, không chờ điều hướng xong.
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -91,7 +108,7 @@ export function AppShell({
         </div>
 
         <nav className="flex-1 space-y-1 p-3">
-          {NAV.map(({ href, label, icon: Icon, exact }) => {
+          {navItems.map(({ href, label, icon: Icon, exact }) => {
             const active = isActive(href, exact);
             const pending = pendingHref === href;
             return (
@@ -161,7 +178,7 @@ export function AppShell({
             </Avatar>
           </button>
           <nav className="ml-auto flex gap-1">
-            {NAV.map(({ href, label, icon: Icon, exact }) => {
+            {navItems.map(({ href, label, icon: Icon, exact }) => {
               const active = isActive(href, exact);
               const pending = pendingHref === href;
               return (

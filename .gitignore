@@ -9,3 +9,5 @@ npm-debug.log*
 .env*.local
 .vercel
 next-env.d.ts
+backup-*.json
+tai-khoan-nhan-vien.csv

@@ -2,6 +2,7 @@ import type { TaskFilters } from "@/store/ui-store";
 
 export const queryKeys = {
   profiles: ["profiles"] as const,
+  accounts: ["accounts"] as const,
   meetings: ["meetings"] as const,
   meeting: (id: string) => ["meetings", id] as const,
   tasks: (filters?: Partial<TaskFilters> & { meetingId?: string | null }) =>

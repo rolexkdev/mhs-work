@@ -30,12 +30,17 @@ Stack: **Next.js (App Router) + Supabase**, không cần backend server riêng.
    - `supabase/migrations/0001_init.sql` — schema, triggers, RLS, realtime
    - `supabase/migrations/0002_storage.sql` — bucket file đính kèm
 
-4. Tạo user đầu tiên: **Authentication → Users → Add user** (trigger sẽ tự tạo
-   profile với role `member`). Nâng quyền admin bằng SQL:
+4. Tạo user **đầu tiên**: **Authentication → Users → Add user** (trigger sẽ tự
+   tạo profile với role `member`). Nâng quyền admin bằng SQL:
 
    ```sql
    update public.profiles set role = 'admin' where email = 'you@example.com';
    ```
+
+   Từ user admin đầu tiên trở đi, dùng trang **Quản lý tài khoản** (`/accounts`,
+   chỉ hiện với role `admin`) để tạo tài khoản cho nhân viên, đặt lại mật khẩu
+   và khoá đăng nhập — không cần vào Supabase Dashboard nữa. Trang này cần
+   `SUPABASE_SERVICE_ROLE_KEY` trong `.env.local`.
 
 5. Chạy dev:
 
@@ -47,10 +52,10 @@ Stack: **Next.js (App Router) + Supabase**, không cần backend server riêng.
 
 ```
 src/
- ├── app/                # routes (login, dashboard, ...)
+ ├── app/                # routes (login, dashboard, accounts, ...)
  ├── components/         # ui/ (shadcn) + providers
- ├── modules/            # auth, dashboard, meetings, tasks, reports
- ├── lib/                # supabase clients, utils
+ ├── modules/            # auth, admin, dashboard, meetings, tasks, reports
+ ├── lib/                # supabase clients (client/server/admin), utils
  ├── store/              # zustand stores
  └── types/              # database types
 supabase/migrations/     # SQL: schema + storage

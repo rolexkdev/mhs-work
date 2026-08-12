@@ -1,0 +1,37 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { AccountsManager } from "@/modules/admin/accounts-manager";
+
+/**
+ * Trang chỉ dành cho quản trị viên. Chặn ngay ở server để người không đủ
+ * quyền không tải được nội dung, kể cả khi gõ thẳng URL.
+ */
+export default async function AccountsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (profile?.role !== "admin") redirect("/");
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Quản lý tài khoản
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Tạo tài khoản cho nhân viên trong ban, đặt lại mật khẩu khi quên, khoá
+          đăng nhập khi nghỉ việc.
+        </p>
+      </div>
+      <AccountsManager currentUserId={user.id} />
+    </div>
+  );
+}
