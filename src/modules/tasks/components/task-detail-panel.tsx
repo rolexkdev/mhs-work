@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import { useDebouncedCallback } from "@/lib/use-debounced-callback";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import {
   Tabs,
   TabsList,
@@ -397,15 +398,16 @@ export function TaskDetailPanel({
                 <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <RefreshCw className="h-3.5 w-3.5" /> Báo cáo mới nhất
                 </label>
-                <textarea
+                <AutoGrowTextarea
                   value={latestUpdate}
                   onChange={(e) => {
                     setLatestUpdate(e.target.value);
                     saveUpdate(e.target.value);
                   }}
-                  rows={2}
+                  minRows={2}
+                  recalcKey={open}
                   placeholder="Tình hình mới nhất của công việc..."
-                  className="w-full resize-none rounded-md border bg-transparent p-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full rounded-md border bg-transparent p-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
 
@@ -414,15 +416,16 @@ export function TaskDetailPanel({
                 <label className="text-xs font-medium text-muted-foreground">
                   Lý do / Ghi chú
                 </label>
-                <textarea
+                <AutoGrowTextarea
                   value={note}
                   onChange={(e) => {
                     setNote(e.target.value);
                     saveNote(e.target.value);
                   }}
-                  rows={2}
+                  minRows={2}
+                  recalcKey={open}
                   placeholder="Ghi chú thêm..."
-                  className="w-full resize-none rounded-md border bg-transparent p-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full rounded-md border bg-transparent p-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
 
@@ -431,15 +434,16 @@ export function TaskDetailPanel({
                 <label className="text-xs font-medium text-muted-foreground">
                   Mô tả
                 </label>
-                <textarea
+                <AutoGrowTextarea
                   value={description}
                   onChange={(e) => {
                     setDescription(e.target.value);
                     saveDesc(e.target.value);
                   }}
-                  rows={3}
+                  minRows={3}
+                  recalcKey={open}
                   placeholder="Thêm mô tả..."
-                  className="w-full resize-none rounded-md border bg-transparent p-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full rounded-md border bg-transparent p-3 text-sm outline-none focus:ring-1 focus:ring-ring"
                 />
               </div>
 

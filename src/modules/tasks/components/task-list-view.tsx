@@ -357,15 +357,10 @@ export function TaskListView({
                       />
 
                       {/* Báo cáo mới nhất */}
-                      <button
-                        onClick={() => onOpen(t)}
-                        className="block min-w-0 max-w-full truncate text-left text-xs text-muted-foreground hover:text-foreground"
-                        title={t.latest_update ?? ""}
-                      >
-                        {t.latest_update || (
-                          <span className="text-muted-foreground/50">—</span>
-                        )}
-                      </button>
+                      <LatestUpdateCell
+                        value={t.latest_update}
+                        onOpen={() => onOpen(t)}
+                      />
 
                       {/* Actions */}
                       <DropdownMenu>
@@ -471,6 +466,53 @@ function EditableTitle({
     >
       {value}
     </button>
+  );
+}
+
+/**
+ * Báo cáo mới nhất: người dùng hay gõ danh sách nhiều dòng ("1. ... 2. ...")
+ * nên hiển thị 2 dòng đầu (giữ nguyên xuống dòng), có nút mở rộng tại chỗ để
+ * đọc hết mà không phải mở panel chi tiết.
+ */
+function LatestUpdateCell({
+  value,
+  onOpen,
+}: {
+  value: string | null;
+  onOpen: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!value) {
+    return <span className="text-xs text-muted-foreground/50">—</span>;
+  }
+
+  const lineCount = value.split("\n").filter((l) => l.trim()).length;
+  // Ước lượng: nhiều dòng, hoặc một dòng dài quá 2 hàng của ô ~170px.
+  const isLong = lineCount > 2 || value.length > 90;
+
+  return (
+    <div className="min-w-0">
+      <button
+        onClick={() => onOpen()}
+        className={cn(
+          // `line-clamp-2` tự đặt display là -webkit-box nên không kèm `block`
+          // ở đây, tránh hai utility display đè nhau.
+          "w-full whitespace-pre-line break-words text-left text-xs text-muted-foreground hover:text-foreground",
+          expanded ? "block" : "line-clamp-2",
+        )}
+      >
+        {value}
+      </button>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-0.5 text-[11px] font-medium text-primary hover:underline"
+        >
+          {expanded ? "Thu gọn" : `Xem thêm (${lineCount} dòng)`}
+        </button>
+      )}
+    </div>
   );
 }
 
