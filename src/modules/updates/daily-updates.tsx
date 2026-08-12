@@ -56,8 +56,13 @@ export function DailyUpdates() {
 
   const rows = useMemo(() => {
     const list = activeTasks.map((t) => ({ task: t, log: updateByTask.get(t.id) }));
-    // Chưa cập nhật lên trước để dễ nhắc nhở.
-    return list.sort((a, b) => Number(!!a.log) - Number(!!b.log));
+    // Việc vừa báo cáo lên đầu (mới nhất trước), việc chưa cập nhật xuống dưới.
+    // sort ổn định nên nhóm chưa cập nhật giữ nguyên thứ tự sẵn có.
+    return list.sort((a, b) => {
+      if (!!a.log !== !!b.log) return a.log ? -1 : 1;
+      if (a.log && b.log) return b.log.created_at.localeCompare(a.log.created_at);
+      return 0;
+    });
   }, [activeTasks, updateByTask]);
 
   const updatedN = rows.filter((r) => r.log).length;
