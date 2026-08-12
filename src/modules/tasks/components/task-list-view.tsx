@@ -197,7 +197,7 @@ export function TaskListView({
     "90px", // Tiến độ
     "120px", // Ngày bắt đầu
     "120px", // Ngày kết thúc
-    "minmax(170px,1fr)", // Cập nhật mới nhất
+    "minmax(170px,1fr)", // Báo cáo mới nhất
     "44px", // actions
   ]
     .filter(Boolean)
@@ -228,7 +228,7 @@ export function TaskListView({
           <span className="truncate">Tiến độ</span>
           <span className="truncate">Ngày bắt đầu</span>
           <span className="truncate">Ngày kết thúc</span>
-          <span className="truncate">Cập nhật mới nhất</span>
+          <span className="truncate">Báo cáo mới nhất</span>
           <span />
         </div>
 
@@ -356,7 +356,7 @@ export function TaskListView({
                         onChange={(iso) => onPatch(t.id, { due_date: iso })}
                       />
 
-                      {/* Cập nhật mới nhất */}
+                      {/* Báo cáo mới nhất */}
                       <button
                         onClick={() => onOpen(t)}
                         className="block min-w-0 max-w-full truncate text-left text-xs text-muted-foreground hover:text-foreground"

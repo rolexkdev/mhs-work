@@ -13,7 +13,7 @@ const ALL_BORDERS = {
   right: BORDER,
 };
 
-/** Giá trị "Cập nhật mới nhất" của task tính đến trước mốc `beforeMs`. */
+/** Giá trị "Báo cáo mới nhất" của task tính đến trước mốc `beforeMs`. */
 function snapshotBefore(logs: TaskLog[], taskId: string): string {
   // logs đã lọc created_at < đầu tuần & sắp tăng dần → phần tử cuối là mới nhất.
   let value = "";

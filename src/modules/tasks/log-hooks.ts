@@ -23,7 +23,7 @@ export function useTaskLogs(taskId: string | null) {
   });
 }
 
-/** Các lần cập nhật "Cập nhật mới nhất" trong 1 ngày (mọi task). */
+/** Các lần cập nhật "Báo cáo mới nhất" trong 1 ngày (mọi task). */
 export function useDailyUpdates(dateISO: string) {
   return useQuery({
     queryKey: ["daily-updates", dateISO.slice(0, 10)],
