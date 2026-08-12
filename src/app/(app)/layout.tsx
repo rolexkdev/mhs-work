@@ -9,22 +9,22 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() xác minh JWT cục bộ, không tốn một vòng gọi mạng như getUser().
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = claims?.claims.sub;
 
-  if (!user) redirect("/login");
+  if (!userId) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name, email, role, avatar_url")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   return (
     <AppShell
       fullName={profile?.full_name ?? null}
-      email={profile?.email ?? user.email ?? ""}
+      email={profile?.email ?? (claims?.claims.email as string) ?? ""}
       role={(profile?.role ?? "member") as UserRole}
       avatarUrl={profile?.avatar_url ?? null}
     >

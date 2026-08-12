@@ -26,15 +26,16 @@ type Guard =
 
 async function requireAdmin(): Promise<Guard> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn." };
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = claims?.claims.sub;
+  if (!userId) return { ok: false, error: "Phiên đăng nhập đã hết hạn." };
 
+  // Vai trò luôn đọc từ DB chứ không lấy trong JWT: hạ quyền một người phải có
+  // tác dụng ngay, không đợi token của họ hết hạn.
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (profile?.role !== "admin") {
@@ -42,7 +43,7 @@ async function requireAdmin(): Promise<Guard> {
   }
 
   try {
-    return { ok: true, callerId: user.id, admin: createAdminClient() };
+    return { ok: true, callerId: userId, admin: createAdminClient() };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

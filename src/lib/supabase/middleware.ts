@@ -34,9 +34,14 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Dùng getClaims() thay getUser(): khoá JWT của project là ES256 (bất đối
+  // xứng) nên chữ ký được xác minh ngay tại chỗ bằng JWKS đã cache — 1ms thay
+  // vì ~300ms gọi sang Supabase, mà middleware thì chạy ở MỌI request.
+  // Bắt buộc gọi không truyền token: khi đó nó đi qua getSession(), vốn tự gia
+  // hạn token sắp hết hạn và ghi lại cookie. Đây là việc middleware phải làm,
+  // bỏ đi là user bị đăng xuất sau mỗi giờ.
+  const { data: claims } = await supabase.auth.getClaims();
+  const user = claims?.claims ?? null;
 
   const { pathname } = request.nextUrl;
   const isPublic = PUBLIC_ROUTES.some((p) => pathname.startsWith(p));

@@ -76,20 +76,55 @@ const DOT_CLASS: Record<TagColor, string> = {
   yellow: "bg-yellow-500",
 };
 
-/** Lớp màu cho thanh header của từng nhóm (nền nhạt + chấm màu). */
+// Viền dọc bên trái: kéo màu của nhóm chạy suốt các hàng thuộc nhóm đó, để
+// nhìn là biết ngay khối này thuộc phòng nào mà không phải dò ngược lên header.
+const BORDER_CLASS: Record<TagColor, string> = {
+  gray: "border-l-slate-400",
+  blue: "border-l-blue-500",
+  green: "border-l-emerald-500",
+  orange: "border-l-orange-500",
+  red: "border-l-red-500",
+  purple: "border-l-purple-500",
+  brown: "border-l-amber-600",
+  pink: "border-l-pink-500",
+  sky: "border-l-sky-500",
+  yellow: "border-l-yellow-500",
+};
+
+const STATUS_BORDER: Record<TaskStatus, string> = {
+  todo: "border-l-slate-400",
+  in_progress: "border-l-blue-500",
+  blocked: "border-l-orange-500",
+  review: "border-l-amber-500",
+  done: "border-l-emerald-500",
+};
+
+/** Lớp màu cho thanh header và viền trái của từng nhóm. */
 function groupAccent(
   groupBy: GroupBy,
   key: string,
-): { bar: string; dot: string } {
+): { bar: string; dot: string; border: string } {
   if (groupBy === "department" && key !== "__none__") {
     const c = colorOf(DEPARTMENTS, key);
-    return { bar: cn(TAG_COLOR_CLASS[c], "hover:brightness-95"), dot: DOT_CLASS[c] };
+    return {
+      bar: cn(TAG_COLOR_CLASS[c], "hover:brightness-95"),
+      dot: DOT_CLASS[c],
+      border: BORDER_CLASS[c],
+    };
   }
   if (groupBy === "status") {
     const meta = TASK_STATUS_META[key as TaskStatus];
-    return { bar: cn(meta.badge, "hover:brightness-95"), dot: meta.dot };
+    return {
+      bar: cn(meta.badge, "hover:brightness-95"),
+      dot: meta.dot,
+      border: STATUS_BORDER[key as TaskStatus],
+    };
   }
-  return { bar: "bg-muted/20 hover:bg-muted/40", dot: "bg-muted-foreground/40" };
+  return {
+    bar: "bg-muted/20 hover:bg-muted/40",
+    dot: "bg-muted-foreground/40",
+    border: "border-l-muted-foreground/30",
+  };
 }
 
 type Group = { key: string; label: string; tasks: Task[] };
@@ -237,26 +272,43 @@ export function TaskListView({
           const done = g.tasks.filter((t) => t.status === "done").length;
           const accent = groupAccent(groupBy, g.key);
           return (
-            <div key={g.key}>
+            <div
+              key={g.key}
+              className={cn(groupBy !== "none" && cn("border-l-4", accent.border))}
+            >
               {groupBy !== "none" && (
                 <button
                   onClick={() => toggle(g.key)}
                   className={cn(
-                    "flex w-full items-center gap-2 border-b px-3 py-2 text-left transition",
+                    "flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left transition",
                     accent.bar,
                   )}
                 >
                   {isCollapsed ? (
-                    <ChevronRight className="h-4 w-4 opacity-70" />
+                    <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 opacity-70" />
+                    <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
                   )}
-                  <span className={cn("h-2 w-2 shrink-0 rounded-full", accent.dot)} />
-                  <span className="text-sm font-semibold">{g.label}</span>
-                  <span className="rounded bg-black/5 px-1.5 text-xs opacity-80">
-                    {g.tasks.length}
+                  <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", accent.dot)} />
+                  <span className="text-sm font-bold uppercase tracking-wide">
+                    {g.label}
                   </span>
-                  <span className="text-xs opacity-70">· {done} xong</span>
+                  <span className="rounded-full bg-black/10 px-2 py-0.5 text-[11px] font-semibold">
+                    {g.tasks.length} việc
+                  </span>
+
+                  {/* Tỷ lệ hoàn thành của nhóm — nhìn thanh là biết phòng nào đang đuối */}
+                  <span className="ml-auto flex shrink-0 items-center gap-2 text-xs font-medium">
+                    <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-black/10 sm:block">
+                      <span
+                        className="block h-full rounded-full bg-current opacity-50"
+                        style={{
+                          width: `${Math.round((done / g.tasks.length) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    {done}/{g.tasks.length} xong
+                  </span>
                 </button>
               )}
 

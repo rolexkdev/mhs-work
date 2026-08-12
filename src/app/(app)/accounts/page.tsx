@@ -8,15 +8,14 @@ import { AccountsManager } from "@/modules/admin/accounts-manager";
  */
 export default async function AccountsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = claims?.claims.sub;
+  if (!userId) redirect("/login");
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
   if (profile?.role !== "admin") redirect("/");
 
@@ -31,7 +30,7 @@ export default async function AccountsPage() {
           đăng nhập khi nghỉ việc.
         </p>
       </div>
-      <AccountsManager currentUserId={user.id} />
+      <AccountsManager currentUserId={userId} />
     </div>
   );
 }
