@@ -5,6 +5,49 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/query-keys";
 
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/**
+ * Đổi mật khẩu của chính người dùng.
+ *
+ * Supabase cho phép đổi mật khẩu chỉ bằng session đang có, nhưng ở đây bắt
+ * nhập lại mật khẩu hiện tại rồi đăng nhập kiểm chứng trước — tránh việc ai đó
+ * ngồi vào máy bỏ quên phiên đăng nhập là đổi được mật khẩu của người khác.
+ */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: async ({ currentPassword, newPassword }: ChangePasswordInput) => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user?.email) throw new Error("Chưa đăng nhập");
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (signInError) throw new Error("Mật khẩu hiện tại không đúng");
+
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (error) {
+        throw new Error(
+          error.message.includes("should be different")
+            ? "Mật khẩu mới phải khác mật khẩu hiện tại."
+            : error.message,
+        );
+      }
+    },
+    onSuccess: () => toast.success("Đã đổi mật khẩu"),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export interface UpdateProfileInput {
   fullName: string;
   avatarFile?: File | null;
