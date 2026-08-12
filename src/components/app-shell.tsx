@@ -86,8 +86,8 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-muted/30">
-      {/* Sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r bg-background md:flex">
+      {/* Sidebar — đứng yên khi nội dung bên phải cuộn dài */}
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-background md:flex">
         <div className="flex h-14 items-center border-b px-5">
           <Brand />
         </div>
@@ -107,7 +107,7 @@ export function AppShell({
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {navItems.map(({ href, label, icon: Icon, exact }) => {
             const active = isActive(href, exact);
             const pending = pendingHref === href;
@@ -167,7 +167,7 @@ export function AppShell({
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar (mobile nav) */}
-        <header className="flex h-14 items-center gap-2 border-b bg-background px-4 md:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background px-4 md:hidden">
           <Brand size={26} showText={false} />
           <button onClick={() => setProfileOpen(true)} className="rounded-full">
             <Avatar className="h-7 w-7">
