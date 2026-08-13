@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProgressDial } from "@/modules/tasks/components/progress-dial";
 import { useTasks } from "@/modules/tasks/hooks";
 import { useDailyUpdates } from "@/modules/tasks/log-hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
@@ -50,7 +51,26 @@ export function DailyUpdates() {
   // Log cập nhật mới nhất trong ngày theo từng task (logs đã sắp giảm dần).
   const updateByTask = useMemo(() => {
     const m = new Map<string, (typeof logs)[number]>();
-    for (const l of logs) if (!m.has(l.task_id)) m.set(l.task_id, l);
+    for (const l of logs)
+      if (l.action === "latest_update" && !m.has(l.task_id)) m.set(l.task_id, l);
+    return m;
+  }, [logs]);
+
+  /**
+   * Tiến độ đã nhích bao nhiêu trong ngày, theo từng task.
+   * Log giảm dần nên lần gặp đầu tiên là mốc cuối ngày; những lần gặp sau lùi
+   * dần về đầu ngày, cứ ghi đè `from` là ra mốc đầu ngày.
+   */
+  const progressByTask = useMemo(() => {
+    const m = new Map<string, { from: number; to: number }>();
+    for (const l of logs) {
+      if (l.action !== "manual_progress") continue;
+      const from = Number(l.old_value ?? 0);
+      const to = Number(l.new_value ?? 0);
+      const seen = m.get(l.task_id);
+      if (seen) seen.from = from;
+      else m.set(l.task_id, { from, to });
+    }
     return m;
   }, [logs]);
 
@@ -133,6 +153,8 @@ export function DailyUpdates() {
             const content =
               typeof log?.new_value === "string" ? log.new_value : null;
             const updater = nameOf(log?.created_by ?? null);
+            const moved = progressByTask.get(task.id);
+            const delta = moved ? moved.to - moved.from : 0;
             return (
               <Card key={task.id} className={cn(!log && "border-dashed")}>
                 <CardContent className="flex items-start gap-3 p-3">
@@ -194,6 +216,26 @@ export function DailyUpdates() {
                       <p className="mt-2 text-xs font-medium text-amber-600">
                         Chưa cập nhật hôm nay
                       </p>
+                    )}
+                  </div>
+
+                  {/* Tiến độ hiện tại + mức nhích được trong ngày */}
+                  <div className="flex shrink-0 flex-col items-center gap-1">
+                    <ProgressDial
+                      value={task.manual_progress}
+                      readOnly
+                      size={46}
+                      strokeWidth={5}
+                    />
+                    {delta !== 0 && moved && (
+                      <span
+                        className={cn(
+                          "whitespace-nowrap text-[11px] font-semibold",
+                          delta > 0 ? "text-emerald-600" : "text-amber-600",
+                        )}
+                      >
+                        {moved.from}% → {moved.to}%
+                      </span>
                     )}
                   </div>
                 </CardContent>

@@ -4,7 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 import type { Database } from "@/types/database";
 
-const PUBLIC_ROUTES = ["/login"];
+// `/opengraph-image` là ảnh xem trước link do Next sinh ra. Bot của Zalo /
+// Messenger / Teams không có phiên đăng nhập, chặn nó lại là thẻ preview trống.
+const PUBLIC_ROUTES = ["/login", "/opengraph-image"];
 
 /**
  * Refresh Supabase session và bảo vệ route.

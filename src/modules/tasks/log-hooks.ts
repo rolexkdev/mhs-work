@@ -23,7 +23,11 @@ export function useTaskLogs(taskId: string | null) {
   });
 }
 
-/** Các lần cập nhật "Báo cáo mới nhất" trong 1 ngày (mọi task). */
+/**
+ * Diễn biến trong 1 ngày của mọi task, phục vụ trang Báo cáo công việc:
+ * nội dung báo cáo (`latest_update`) và thay đổi % tiến độ (`manual_progress`).
+ * Lấy cả hai trong một truy vấn để đỡ một vòng gọi mạng.
+ */
 export function useDailyUpdates(dateISO: string) {
   return useQuery({
     queryKey: ["daily-updates", dateISO.slice(0, 10)],
@@ -33,7 +37,7 @@ export function useDailyUpdates(dateISO: string) {
       const { data, error } = await supabase
         .from("task_logs")
         .select("*")
-        .eq("action", "latest_update")
+        .in("action", ["latest_update", "manual_progress"])
         .gte("created_at", startOfDay(day).toISOString())
         .lte("created_at", endOfDay(day).toISOString())
         .order("created_at", { ascending: false });
