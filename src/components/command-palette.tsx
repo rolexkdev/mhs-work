@@ -47,10 +47,11 @@ export function CommandPalette() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
+      {/* Mobile: đẩy hộp lên gần đỉnh để bàn phím ảo không che mất kết quả */}
+      <DialogContent className="top-[8%] translate-y-0 gap-0 overflow-hidden p-0 sm:top-[50%] sm:max-w-xl sm:translate-y-[-50%]">
         <DialogTitle className="sr-only">Tìm kiếm nhanh</DialogTitle>
         <Command className="flex flex-col" loop>
-          <div className="flex items-center gap-2 border-b px-3">
+          <div className="flex items-center gap-2 border-b px-3 pr-11">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <Command.Input
               autoFocus

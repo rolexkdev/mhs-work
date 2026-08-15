@@ -248,8 +248,89 @@ export function TaskListView({
   const avatarOf = (id: string | null) =>
     id ? profiles.find((p) => p.id === id)?.avatar_url ?? null : null;
 
+  const renderGroupHeader = (g: Group) => {
+    const isCollapsed = collapsed.has(g.key);
+    const done = g.tasks.filter((t) => t.status === "done").length;
+    const accent = groupAccent(groupBy, g.key);
+    return (
+      <button
+        onClick={() => toggle(g.key)}
+        className={cn(
+          "flex w-full items-center gap-2 border-b px-3 py-2.5 text-left transition sm:gap-2.5",
+          accent.bar,
+        )}
+      >
+        {isCollapsed ? (
+          <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+        )}
+        <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", accent.dot)} />
+        <span className="min-w-0 truncate text-sm font-bold uppercase tracking-wide">
+          {g.label}
+        </span>
+        <span className="shrink-0 rounded-full bg-black/10 px-2 py-0.5 text-[11px] font-semibold">
+          {g.tasks.length} việc
+        </span>
+
+        {/* Tỷ lệ hoàn thành của nhóm — nhìn thanh là biết phòng nào đang đuối */}
+        <span className="ml-auto flex shrink-0 items-center gap-2 text-xs font-medium">
+          <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-black/10 sm:block">
+            <span
+              className="block h-full rounded-full bg-current opacity-50"
+              style={{
+                width: `${Math.round((done / g.tasks.length) * 100)}%`,
+              }}
+            />
+          </span>
+          {done}/{g.tasks.length} xong
+        </span>
+      </button>
+    );
+  };
+
   return (
-    <div className="overflow-x-auto rounded-lg border bg-card">
+    <>
+      {/* ── Điện thoại: mỗi việc là một thẻ, chạm để mở chi tiết ── */}
+      <div className="space-y-3 md:hidden">
+        {groups.map((g) => {
+          const accent = groupAccent(groupBy, g.key);
+          return (
+            <div
+              key={g.key}
+              className={cn(
+                "overflow-hidden rounded-lg border bg-card",
+                groupBy !== "none" && cn("border-l-4", accent.border),
+              )}
+            >
+              {groupBy !== "none" && renderGroupHeader(g)}
+              {!collapsed.has(g.key) && (
+                <div className="divide-y">
+                  {g.tasks.map((t) => (
+                    <MobileTaskRow
+                      key={t.id}
+                      task={t}
+                      showDept={showDept}
+                      assigneeName={nameOf(t.assignee_id)}
+                      assigneeAvatar={avatarOf(t.assignee_id)}
+                      onOpen={() => onOpen(t)}
+                      onPatch={(p) => onPatch(t.id, p)}
+                      onDelete={() => onDelete(t)}
+                      canHideWeek={canHideWeek}
+                      onToggleWeekHidden={
+                        onToggleWeekHidden ? () => onToggleWeekHidden(t) : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Máy tính: bảng đầy đủ, sửa nhanh ngay trên dòng ── */}
+      <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
       <div className="min-w-[1400px]">
         {/* Header */}
         <div
@@ -269,48 +350,13 @@ export function TaskListView({
 
         {groups.map((g) => {
           const isCollapsed = collapsed.has(g.key);
-          const done = g.tasks.filter((t) => t.status === "done").length;
           const accent = groupAccent(groupBy, g.key);
           return (
             <div
               key={g.key}
               className={cn(groupBy !== "none" && cn("border-l-4", accent.border))}
             >
-              {groupBy !== "none" && (
-                <button
-                  onClick={() => toggle(g.key)}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-left transition",
-                    accent.bar,
-                  )}
-                >
-                  {isCollapsed ? (
-                    <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
-                  )}
-                  <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", accent.dot)} />
-                  <span className="text-sm font-bold uppercase tracking-wide">
-                    {g.label}
-                  </span>
-                  <span className="rounded-full bg-black/10 px-2 py-0.5 text-[11px] font-semibold">
-                    {g.tasks.length} việc
-                  </span>
-
-                  {/* Tỷ lệ hoàn thành của nhóm — nhìn thanh là biết phòng nào đang đuối */}
-                  <span className="ml-auto flex shrink-0 items-center gap-2 text-xs font-medium">
-                    <span className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-black/10 sm:block">
-                      <span
-                        className="block h-full rounded-full bg-current opacity-50"
-                        style={{
-                          width: `${Math.round((done / g.tasks.length) * 100)}%`,
-                        }}
-                      />
-                    </span>
-                    {done}/{g.tasks.length} xong
-                  </span>
-                </button>
-              )}
+              {groupBy !== "none" && renderGroupHeader(g)}
 
               {!isCollapsed &&
                 g.tasks.map((t) => {
@@ -450,6 +496,149 @@ export function TaskListView({
             </div>
           );
         })}
+      </div>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Một công việc trên điện thoại.
+ *
+ * Bảng ngang 1400px không cuộn nổi bằng ngón tay, nên mobile xếp mọi thông tin
+ * theo chiều dọc: chạm vào thẻ là mở chi tiết (nơi sửa được mọi trường), chỉ
+ * giữ lại nút đánh dấu xong ngay tại thẻ vì đó là thao tác dùng nhiều nhất.
+ */
+function MobileTaskRow({
+  task: t,
+  showDept,
+  assigneeName,
+  assigneeAvatar,
+  onOpen,
+  onPatch,
+  onDelete,
+  canHideWeek,
+  onToggleWeekHidden,
+}: {
+  task: Task;
+  showDept: boolean;
+  assigneeName: string | null;
+  assigneeAvatar: string | null;
+  onOpen: () => void;
+  onPatch: (patch: Partial<Task>) => void;
+  onDelete: () => void;
+  canHideWeek?: boolean;
+  onToggleWeekHidden?: () => void;
+}) {
+  const due = dueLabel(t.due_date);
+  const isDone = t.status === "done";
+  const status = TASK_STATUS_META[t.status];
+  const deptColor = t.department ? colorOf(DEPARTMENTS, t.department) : null;
+
+  return (
+    <div className="flex items-start gap-2 px-3 py-3 active:bg-muted/40">
+      {/* Đánh dấu xong — vùng chạm 44px theo khuyến nghị của iOS/Android */}
+      <button
+        onClick={() => onPatch({ status: isDone ? "in_progress" : "done" })}
+        aria-label={isDone ? "Bỏ hoàn thành" : "Đánh dấu xong"}
+        className="-m-2 flex h-11 w-11 shrink-0 items-center justify-center"
+      >
+        {isDone ? (
+          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+        ) : (
+          <Circle className="h-5 w-5 text-muted-foreground" />
+        )}
+      </button>
+
+      <button onClick={onOpen} className="min-w-0 flex-1 space-y-1.5 text-left">
+        <p
+          className={cn(
+            "line-clamp-2 text-[15px] font-medium leading-snug",
+            isDone && "text-muted-foreground line-through",
+          )}
+        >
+          {t.title}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            className={cn(
+              "rounded border px-1.5 py-0.5 text-[11px] font-medium",
+              status.badge,
+            )}
+          >
+            {status.label}
+          </span>
+          {showDept && t.department && deptColor && (
+            <span
+              className={cn(
+                "max-w-[45%] truncate rounded px-1.5 py-0.5 text-[11px] font-medium",
+                TAG_COLOR_CLASS[deptColor],
+              )}
+            >
+              {t.department}
+            </span>
+          )}
+          <span className={cn("text-[11px]", DUE_TONE[due.tone])}>
+            {due.text}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {assigneeName ? (
+            <>
+              <Avatar className="h-4 w-4 shrink-0">
+                {assigneeAvatar && (
+                  <AvatarImage src={assigneeAvatar} alt={assigneeName} />
+                )}
+                <AvatarFallback className="text-[8px]">
+                  {initials(assigneeName)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="truncate">{assigneeName}</span>
+            </>
+          ) : (
+            <span className="italic">Chưa giao</span>
+          )}
+        </div>
+
+        {t.latest_update && (
+          <p className="line-clamp-2 whitespace-pre-line rounded bg-muted/50 px-2 py-1 text-xs text-muted-foreground">
+            {t.latest_update}
+          </p>
+        )}
+      </button>
+
+      <div className="flex shrink-0 flex-col items-center gap-1">
+        <ProgressDial
+          value={t.manual_progress}
+          readOnly
+          size={38}
+          strokeWidth={4}
+        />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onOpen}>
+              <Pencil className="h-4 w-4" /> Mở chi tiết
+            </DropdownMenuItem>
+            {canHideWeek && onToggleWeekHidden && (
+              <DropdownMenuItem onClick={onToggleWeekHidden}>
+                <EyeOff className="h-4 w-4" /> Ẩn khỏi tuần này
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="text-red-600 focus:text-red-600"
+            >
+              <Trash2 className="h-4 w-4" /> Xoá
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

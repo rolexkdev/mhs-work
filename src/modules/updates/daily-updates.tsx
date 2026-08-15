@@ -91,30 +91,31 @@ export function DailyUpdates() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center rounded-md border">
+        {/* Mobile: bộ chọn ngày chiếm trọn bề ngang, nhãn ngày co giãn ở giữa */}
+        <div className="flex w-full items-center rounded-md border sm:w-auto">
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-8"
+            className="h-10 w-10 shrink-0 sm:h-9 sm:w-8"
             onClick={() => setDate((d) => addDays(d, -1))}
             title="Ngày trước"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="min-w-[190px] px-2 text-center text-sm font-medium">
+          <span className="min-w-0 flex-1 truncate px-2 text-center text-sm font-medium sm:min-w-[190px] sm:flex-none">
             {format(date, "EEEE, dd/MM/yyyy", { locale: vi })}
           </span>
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-8"
+            className="h-10 w-10 shrink-0 sm:h-9 sm:w-8"
             onClick={() => setDate((d) => addDays(d, 1))}
             title="Ngày sau"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
           {!isLoading && (
             <span className="text-sm text-muted-foreground">
               Đã cập nhật{" "}

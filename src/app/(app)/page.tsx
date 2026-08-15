@@ -48,7 +48,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="hidden sm:block">
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
             Tổng quan tiến độ công việc của nhóm.
@@ -139,7 +139,8 @@ function DashboardStats({ rows }: { rows: Task[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* 2 cột trên điện thoại: 5 thẻ số liệu xếp dọc thì phải cuộn quá dài */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         {widgets.map((w) => (
           <Card key={w.label}>
             <CardContent className="flex items-center gap-3 p-4">
@@ -197,7 +198,8 @@ function DashboardStats({ rows }: { rows: Task[] }) {
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* 2 cột trên điện thoại: 5 thẻ số liệu xếp dọc thì phải cuộn quá dài */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="h-[72px] w-full" />
         ))}

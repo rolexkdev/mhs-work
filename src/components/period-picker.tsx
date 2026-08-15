@@ -26,12 +26,13 @@ export function PeriodPicker({
 }) {
   const isAll = value.mode === "all";
   return (
-    <div className="flex items-center gap-1.5">
+    // Mobile: chiếm trọn bề ngang, ô nhãn kỳ co giãn phần còn lại.
+    <div className="flex w-full items-center gap-1.5 sm:w-auto">
       <Select
         value={value.mode}
         onValueChange={(m) => onChange({ ...value, mode: m as PeriodMode })}
       >
-        <SelectTrigger className="h-8 w-[112px] text-xs">
+        <SelectTrigger className="h-9 w-[104px] shrink-0 text-xs sm:h-8 sm:w-[112px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -43,23 +44,23 @@ export function PeriodPicker({
 
       {!isAll && (
         <>
-          <div className="flex items-center rounded-md border">
+          <div className="flex min-w-0 flex-1 items-center rounded-md border sm:flex-none">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-7"
+              className="h-9 w-9 shrink-0 sm:h-8 sm:w-7"
               onClick={() => onChange(shiftPeriod(value, -1))}
               title="Kỳ trước"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="min-w-[128px] px-1 text-center text-xs font-medium">
+            <span className="min-w-0 flex-1 truncate px-1 text-center text-xs font-medium sm:min-w-[128px] sm:flex-none">
               {periodLabel(value)}
             </span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-7"
+              className="h-9 w-9 shrink-0 sm:h-8 sm:w-7"
               onClick={() => onChange(shiftPeriod(value, 1))}
               title="Kỳ sau"
             >
@@ -69,7 +70,7 @@ export function PeriodPicker({
           <Button
             variant="outline"
             size="sm"
-            className="h-8"
+            className="h-9 shrink-0 px-2.5 sm:h-8 sm:px-3"
             onClick={() =>
               onChange({ ...value, anchor: new Date().toISOString() })
             }

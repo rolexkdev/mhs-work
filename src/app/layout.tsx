@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   },
   description: DESCRIPTION,
   applicationName: "Quản lý công việc Minh Hưng Sikico",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "MHS Work", statusBarStyle: "default" },
   // Trang nội bộ — không cho công cụ tìm kiếm lập chỉ mục.
   robots: { index: false, follow: false },
   openGraph: {
@@ -48,6 +50,18 @@ export const metadata: Metadata = {
     shortcut: "/icon.png",
     apple: "/icon.png",
   },
+};
+
+/**
+ * Cấu hình cho điện thoại: khớp bề ngang máy, cho phép người dùng vẫn phóng to
+ * được (không khoá zoom), và `viewportFit: cover` để nội dung chạm mép màn hình
+ * tai thỏ — phần an toàn được bù lại bằng `env(safe-area-inset-*)` trong CSS.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#7D1C22",
 };
 
 export default function RootLayout({

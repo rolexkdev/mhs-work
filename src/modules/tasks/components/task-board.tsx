@@ -60,7 +60,8 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const meta = TASK_STATUS_META[status];
   return (
-    <div className="flex w-72 shrink-0 flex-col">
+    // Mobile: mỗi cột rộng gần hết màn hình và "bám" mép khi vuốt ngang.
+    <div className="flex w-[82vw] max-w-72 shrink-0 snap-start flex-col sm:w-72">
       <div className="mb-2 flex items-center gap-2 px-1">
         <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
         <span className="text-sm font-medium">{meta.label}</span>
@@ -134,7 +135,7 @@ export function TaskBoard({
       onDragStart={handleStart}
       onDragEnd={handleEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 sm:snap-none">
         {TASK_STATUS_ORDER.map((status) => (
           <Column
             key={status}

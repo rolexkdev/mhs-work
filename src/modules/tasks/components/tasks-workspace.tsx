@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import { useMeetings } from "@/modules/meetings/hooks";
 import {
@@ -82,6 +83,8 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
   const [exporting, setExporting] = useState(false);
+  // Trên điện thoại các bộ lọc nằm trong một tấm kéo từ đáy, không bày ra hàng ngang.
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
   // Mở chi tiết khi điều hướng kèm ?task=<id> (vd từ Cmd-K).
   const searchParams = useSearchParams();
@@ -190,9 +193,67 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
     updateTask.mutate({ id: t.id, hidden_weeks });
   }
 
+  const activeFilterCount = [statusFilter, priorityFilter, assigneeFilter].filter(
+    (v) => v !== ALL,
+  ).length;
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ── Thanh công cụ trên điện thoại ── */}
+      <div className="space-y-2 md:hidden">
+        {!meetingId && <PeriodPicker value={period} onChange={setPeriod} />}
+
+        <div className="flex items-center gap-2">
+          <Tabs
+            value={view}
+            onValueChange={(v) => setView(v as typeof view)}
+            className="shrink-0"
+          >
+            <TabsList className="h-9">
+              <TabsTrigger value="list" className="px-2.5">
+                <List className="h-4 w-4" />
+              </TabsTrigger>
+              <TabsTrigger value="board" className="px-2.5">
+                <LayoutGrid className="h-4 w-4" />
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Button
+            variant="outline"
+            className="h-9 flex-1 justify-start px-3"
+            onClick={() => setFilterSheetOpen(true)}
+          >
+            <Filter className="h-4 w-4" />
+            <span className="truncate">Lọc & nhóm</span>
+            {activeFilterCount > 0 && (
+              <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+
+          {!meetingId && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0"
+              aria-label="Xuất Excel"
+              onClick={handleExport}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Thanh công cụ trên máy tính ── */}
+      <div className="hidden flex-wrap items-center gap-2 md:flex">
         {!meetingId && <PeriodPicker value={period} onChange={setPeriod} />}
 
         <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
@@ -313,6 +374,106 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         />
       )}
 
+      {/*
+        Nút tạo việc nổi trên điện thoại — đặt trên thanh tab đáy (56px + phần
+        an toàn của máy tai thỏ) để không đè lên nhau.
+      */}
+      <Button
+        onClick={() => setCreateOpen(true)}
+        aria-label="Tạo công việc"
+        className="fixed right-4 z-40 h-14 w-14 rounded-full shadow-lg md:hidden"
+        style={{ bottom: "calc(env(safe-area-inset-bottom) + 4.5rem)" }}
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+
+      {/* Bộ lọc trên điện thoại */}
+      <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+        <SheetContent side="bottom" className="pb-safe">
+          <SheetTitle className="shrink-0 px-4 pb-3 pt-3">
+            Lọc &amp; nhóm
+          </SheetTitle>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-6">
+            {view === "list" && (
+              <MobileFilterField label="Nhóm theo">
+                <Select
+                  value={groupBy}
+                  onValueChange={(v) => setGroupBy(v as GroupBy)}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GROUP_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </MobileFilterField>
+            )}
+
+            <MobileFilterField label="Trạng thái">
+              <MobileFilterSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                allLabel="Tất cả trạng thái"
+                options={TASK_STATUS_ORDER.map((s) => ({
+                  value: s,
+                  label: TASK_STATUS_META[s].label,
+                }))}
+              />
+            </MobileFilterField>
+
+            <MobileFilterField label="Ưu tiên">
+              <MobileFilterSelect
+                value={priorityFilter}
+                onChange={setPriorityFilter}
+                allLabel="Tất cả ưu tiên"
+                options={TASK_PRIORITY_ORDER.map((p) => ({
+                  value: p,
+                  label: TASK_PRIORITY_META[p].label,
+                }))}
+              />
+            </MobileFilterField>
+
+            <MobileFilterField label="Người làm">
+              <MobileFilterSelect
+                value={assigneeFilter}
+                onChange={setAssigneeFilter}
+                allLabel="Tất cả người làm"
+                options={profiles.map((p) => ({
+                  value: p.id,
+                  label: p.full_name ?? p.email,
+                }))}
+              />
+            </MobileFilterField>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                className="h-11 flex-1"
+                disabled={activeFilterCount === 0}
+                onClick={() => {
+                  setStatusFilter(ALL);
+                  setPriorityFilter(ALL);
+                  setAssigneeFilter(ALL);
+                }}
+              >
+                Xoá lọc
+              </Button>
+              <Button
+                className="h-11 flex-1"
+                onClick={() => setFilterSheetOpen(false)}
+              >
+                Xem {visibleTasks.length} việc
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <TaskFormDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -342,6 +503,50 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         }}
       />
     </div>
+  );
+}
+
+function MobileFilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+/** Giống FilterSelect nhưng cao 40px cho vừa đầu ngón tay. */
+function MobileFilterSelect({
+  value,
+  onChange,
+  allLabel,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  allLabel: string;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-10">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ALL}>{allLabel}</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 

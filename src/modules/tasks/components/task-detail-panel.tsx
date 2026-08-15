@@ -92,9 +92,10 @@ function Row({
   label: string;
   children: React.ReactNode;
 }) {
+  // Màn hình hẹp: nhãn nằm trên, ô nhập xuống dòng chiếm trọn bề ngang.
   return (
-    <div className="flex items-center gap-3 py-1.5">
-      <div className="flex w-32 shrink-0 items-center gap-2 text-sm text-muted-foreground">
+    <div className="flex flex-col gap-1 py-2 sm:flex-row sm:items-center sm:gap-3 sm:py-1.5">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground sm:w-32 sm:shrink-0">
         <Icon className="h-4 w-4" />
         {label}
       </div>
@@ -189,35 +190,40 @@ export function TaskDetailPanel({
           </div>
         ) : (
           <div className="flex h-full flex-col">
-            {/* Header */}
-            <div className="flex items-center gap-2 border-b px-5 py-3">
+            {/* Header — chừa 3rem bên phải cho nút đóng của tấm trượt */}
+            <div className="flex items-center gap-2 border-b px-4 py-3 pr-12 sm:px-5">
               <Button
                 variant={isDone ? "secondary" : "outline"}
                 size="sm"
+                className="min-w-0"
                 onClick={() =>
                   patch({ status: isDone ? "in_progress" : "done" })
                 }
               >
                 {isDone ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                 ) : (
-                  <Circle className="h-4 w-4" />
+                  <Circle className="h-4 w-4 shrink-0" />
                 )}
-                {isDone ? "Đã hoàn thành" : "Đánh dấu hoàn thành"}
+                <span className="truncate">
+                  {isDone ? "Đã hoàn thành" : "Đánh dấu hoàn thành"}
+                </span>
               </Button>
               {update.isPending && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Đang lưu
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span className="hidden sm:inline">Đang lưu</span>
                 </span>
               )}
               <Button
                 variant="ghost"
                 size="sm"
-                className="ml-auto text-muted-foreground"
+                className="ml-auto shrink-0 text-muted-foreground"
                 onClick={copyLink}
                 title="Chép liên kết công việc để gửi cho người khác"
               >
-                <Link2 className="h-4 w-4" /> Chép liên kết
+                <Link2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Chép liên kết</span>
               </Button>
             </div>
 
@@ -225,7 +231,7 @@ export function TaskDetailPanel({
               defaultValue="detail"
               className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="border-b px-5">
+              <div className="border-b px-4 sm:px-5">
                 <TabsList className="h-10 justify-start gap-1 rounded-none bg-transparent p-0">
                   <TabsTrigger
                     value="detail"
@@ -244,7 +250,7 @@ export function TaskDetailPanel({
 
               <TabsContent
                 value="detail"
-                className="mt-0 flex-1 space-y-1 overflow-y-auto px-5 py-4"
+                className="mt-0 flex-1 space-y-1 overflow-y-auto px-4 py-4 pb-safe sm:px-5"
               >
               {/* Title */}
               <textarea
@@ -458,7 +464,7 @@ export function TaskDetailPanel({
 
               <TabsContent
                 value="history"
-                className="mt-0 flex-1 overflow-y-auto px-5 py-4"
+                className="mt-0 flex-1 overflow-y-auto px-4 py-4 pb-safe sm:px-5"
               >
                 <HistorySection
                   taskId={task.id}
@@ -533,7 +539,7 @@ function ChecklistSection({
             </span>
             <button
               onClick={() => del.mutate(item.id)}
-              className="opacity-0 transition-opacity group-hover:opacity-100"
+              className="transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
             >
               <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" />
             </button>
@@ -611,7 +617,7 @@ function AttachmentImage({
         </button>
         <button
           onClick={onDelete}
-          className="opacity-0 transition-opacity group-hover:opacity-100"
+          className="transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
         >
           <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" />
         </button>
@@ -698,7 +704,7 @@ function AttachmentSection({ taskId }: { taskId: string }) {
             </button>
             <button
               onClick={() => del.mutate(a)}
-              className="opacity-0 transition-opacity group-hover:opacity-100"
+              className="transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
             >
               <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" />
             </button>

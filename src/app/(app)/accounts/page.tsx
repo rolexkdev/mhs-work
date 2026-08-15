@@ -22,10 +22,10 @@ export default async function AccountsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
           Quản lý tài khoản
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="hidden text-sm text-muted-foreground sm:block">
           Tạo tài khoản cho nhân viên trong ban, đặt lại mật khẩu khi quên, khoá
           đăng nhập khi nghỉ việc.
         </p>

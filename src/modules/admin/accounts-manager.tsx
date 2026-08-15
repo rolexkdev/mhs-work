@@ -80,10 +80,62 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
     );
   }
 
+  /** Menu thao tác — dùng chung cho bảng (máy tính) và thẻ (điện thoại). */
+  const accountActions = (
+    account: AccountRow,
+    isSelf: boolean,
+    locked: boolean,
+  ) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          onClick={() => {
+            setEditing(account);
+            setFormOpen(true);
+          }}
+        >
+          <Pencil className="h-4 w-4" /> Sửa tên &amp; vai trò
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setResetting(account)}>
+          <KeyRound className="h-4 w-4" /> Đặt lại mật khẩu
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={isSelf || setLocked.isPending}
+          onClick={() =>
+            setLocked.mutate({ userId: account.id, locked: !locked })
+          }
+        >
+          {locked ? (
+            <>
+              <Unlock className="h-4 w-4" /> Mở khoá đăng nhập
+            </>
+          ) : (
+            <>
+              <Lock className="h-4 w-4" /> Khoá đăng nhập
+            </>
+          )}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={isSelf}
+          className="text-destructive focus:text-destructive"
+          onClick={() => setDeleting(account)}
+        >
+          <Trash2 className="h-4 w-4" /> Xoá tài khoản
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-56 flex-1">
+        <div className="relative min-w-0 flex-1 basis-full sm:basis-auto">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -92,10 +144,15 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
             className="pl-9"
           />
         </div>
-        <Button variant="outline" onClick={() => setBulkOpen(true)}>
+        <Button
+          variant="outline"
+          className="flex-1 sm:flex-none"
+          onClick={() => setBulkOpen(true)}
+        >
           <Users className="h-4 w-4" /> Tạo hàng loạt
         </Button>
         <Button
+          className="flex-1 sm:flex-none"
           onClick={() => {
             setEditing(null);
             setFormOpen(true);
@@ -117,7 +174,77 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
           ))}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border bg-background">
+        <>
+        {/* ── Điện thoại: mỗi tài khoản là một thẻ ── */}
+        <div className="divide-y rounded-lg border bg-background md:hidden">
+          {filtered.map((account) => {
+            const locked = isLocked(account);
+            const isSelf = account.id === currentUserId;
+            const displayName = account.fullName ?? account.email;
+            return (
+              <div key={account.id} className="flex items-start gap-3 p-3">
+                <Avatar className="h-9 w-9 shrink-0">
+                  {account.avatarUrl && (
+                    <AvatarImage src={account.avatarUrl} alt={displayName} />
+                  )}
+                  <AvatarFallback className="text-xs">
+                    {initials(displayName)}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium leading-tight">
+                    <span className="truncate">{displayName}</span>
+                    {isSelf && (
+                      <span className="text-xs font-normal text-muted-foreground">
+                        (bạn)
+                      </span>
+                    )}
+                    {locked && (
+                      <Badge
+                        variant="outline"
+                        className="border-destructive/40 text-destructive"
+                      >
+                        Đã khoá
+                      </Badge>
+                    )}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {account.email}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <span
+                      className={cn(
+                        "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
+                        ROLE_BADGE[account.role],
+                      )}
+                    >
+                      {ROLE_LABEL[account.role]}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {account.lastSignInAt
+                        ? `Đăng nhập ${formatDateTime(account.lastSignInAt)}`
+                        : "Chưa đăng nhập lần nào"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  {accountActions(account, isSelf, locked)}
+                </div>
+              </div>
+            );
+          })}
+
+          {filtered.length === 0 && (
+            <p className="px-4 py-12 text-center text-sm text-muted-foreground">
+              Không tìm thấy tài khoản nào khớp &ldquo;{search}&rdquo;.
+            </p>
+          )}
+        </div>
+
+        {/* ── Máy tính: bảng đầy đủ ── */}
+        <div className="hidden overflow-x-auto rounded-lg border bg-background md:block">
           <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
               <tr>
@@ -204,55 +331,7 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
                     </td>
 
                     <td className="px-4 py-2.5">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setEditing(account);
-                              setFormOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" /> Sửa tên & vai trò
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => setResetting(account)}
-                          >
-                            <KeyRound className="h-4 w-4" /> Đặt lại mật khẩu
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            disabled={isSelf || setLocked.isPending}
-                            onClick={() =>
-                              setLocked.mutate({
-                                userId: account.id,
-                                locked: !locked,
-                              })
-                            }
-                          >
-                            {locked ? (
-                              <>
-                                <Unlock className="h-4 w-4" /> Mở khoá đăng nhập
-                              </>
-                            ) : (
-                              <>
-                                <Lock className="h-4 w-4" /> Khoá đăng nhập
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={isSelf}
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setDeleting(account)}
-                          >
-                            <Trash2 className="h-4 w-4" /> Xoá tài khoản
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {accountActions(account, isSelf, locked)}
                     </td>
                   </tr>
                 );
@@ -271,6 +350,7 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <AccountFormDialog
