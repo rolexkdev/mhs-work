@@ -1,196 +1,176 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
-import {
-  ListTodo,
-  Loader2,
-  CircleCheck,
-  AlertTriangle,
-  CalendarClock,
-} from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { useEffect, useMemo, useState } from "react";
+import { CircleCheckBig, LayoutDashboard, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PeriodPicker } from "@/components/period-picker";
-import { type Period, currentPeriod, isTaskInPeriod } from "@/lib/period";
+import { type Period, periodLabel } from "@/lib/period";
 import { useTasks } from "@/modules/tasks/hooks";
+import { useProfiles } from "@/modules/auth/use-profiles";
+import { DEPARTMENTS } from "@/modules/tasks/constants";
 import {
-  StatusDonut,
-  DeptProgressBars,
-  type DonutSegment,
-  type DeptRow,
-} from "@/modules/dashboard/charts";
-import {
-  TASK_STATUS_META,
-  TASK_STATUS_ORDER,
-  DEPARTMENTS,
-} from "@/modules/tasks/constants";
-import type { Task, TaskStatus } from "@/types/database";
+  UNASSIGNED,
+  computeScope,
+  personStats,
+} from "@/modules/dashboard/metrics";
+import { OverviewView } from "@/modules/dashboard/overview-view";
+import { PeopleView } from "@/modules/dashboard/people-view";
+import { CompletedView } from "@/modules/dashboard/completed-view";
+import { PersonSheet } from "@/modules/dashboard/person";
 
-const STATUS_COLOR: Record<TaskStatus, string> = {
-  todo: "#94a3b8",
-  in_progress: "#3b82f6",
-  blocked: "#f97316",
-  review: "#f59e0b",
-  done: "#10b981",
-};
+type View = "overview" | "people" | "completed";
+const VIEWS: { value: View; label: string; icon: typeof Users }[] = [
+  { value: "overview", label: "Tổng quan", icon: LayoutDashboard },
+  { value: "people", label: "Nhân viên", icon: Users },
+  { value: "completed", label: "Hoàn thành", icon: CircleCheckBig },
+];
+const VIEW_KEY = "dashboard:view";
+const ALL = "__all__";
 
 export default function DashboardPage() {
-  const [period, setPeriod] = useState<Period>(currentPeriod);
+  // Dashboard mặc định xem theo quý hiện tại.
+  const [period, setPeriod] = useState<Period>(() => ({
+    mode: "quarter",
+    anchor: new Date().toISOString(),
+  }));
+  const [dept, setDept] = useState<string>(ALL);
+  const [view, setView] = useState<View>("overview");
+  const [openPerson, setOpenPerson] = useState<string | null>(null);
   const { data: allTasks = [], isLoading } = useTasks();
+  const { data: profiles = [] } = useProfiles();
 
-  const rows = useMemo(
-    () => allTasks.filter((t) => isTaskInPeriod(t, period)),
-    [allTasks, period],
+  // Nhớ tab xem lần trước — sếp hay mở lại đúng tab quen dùng.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(VIEW_KEY) as View | null;
+      if (saved && VIEWS.some((v) => v.value === saved)) setView(saved);
+    } catch {}
+  }, []);
+  const changeView = (v: string) => {
+    setView(v as View);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {}
+  };
+
+  const tasks = useMemo(
+    () =>
+      dept === ALL
+        ? allTasks
+        : allTasks.filter((t) => (t.department ?? "") === dept),
+    [allTasks, dept],
+  );
+  const scope = useMemo(() => computeScope(tasks, period), [tasks, period]);
+  // Số liệu theo nhân viên — việc chưa giao không tính cho ai.
+  const people = useMemo(
+    () => personStats(scope, profiles).filter((p) => p.id !== UNASSIGNED),
+    [scope, profiles],
+  );
+  const staff = useMemo(
+    () => profiles.filter((p) => p.role !== "admin"),
+    [profiles],
   );
 
+  const nameOf = useMemo(() => {
+    const m = new Map(profiles.map((p) => [p.id, p.full_name || p.email]));
+    return (id: string | null) => (id ? (m.get(id) ?? "") : "Chưa giao");
+  }, [profiles]);
+
+  const selected = people.find((p) => p.id === openPerson) ?? null;
+
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-5 sm:space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="hidden sm:block">
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Tổng quan tiến độ công việc của nhóm.
+            Tiến độ công việc của nhóm · {periodLabel(period)}
+            {dept !== ALL && ` · ${dept}`}
           </p>
         </div>
-        <PeriodPicker value={period} onChange={setPeriod} />
+        {/* Một hàng bộ lọc duy nhất, áp cho mọi tab bên dưới */}
+        <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
+          <Select value={dept} onValueChange={setDept}>
+            <SelectTrigger className="h-9 w-full text-xs sm:h-8 sm:w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Tất cả phòng/nhóm</SelectItem>
+              {DEPARTMENTS.map((d) => (
+                <SelectItem key={d.value} value={d.value}>
+                  {d.value}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <PeriodPicker value={period} onChange={setPeriod} />
+        </div>
       </div>
 
-      {isLoading ? <DashboardSkeleton /> : <DashboardStats rows={rows} />}
-    </div>
-  );
-}
+      <Tabs value={view} onValueChange={changeView}>
+        <TabsList className="grid h-auto w-full grid-cols-3 sm:inline-flex sm:w-auto">
+          {VIEWS.map((v) => (
+            <TabsTrigger
+              key={v.value}
+              value={v.value}
+              className="py-1.5 sm:px-4"
+            >
+              <v.icon className="hidden h-4 w-4 sm:block" />
+              {v.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
-function DashboardStats({ rows }: { rows: Task[] }) {
-  const now = Date.now();
-  const weekEnd = now + 7 * 86400_000;
+      {isLoading ? (
+        <DashboardSkeleton />
+      ) : (
+        <div
+          key={view}
+          className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
+        >
+          {view === "overview" ? (
+            <OverviewView
+              scope={scope}
+              people={people}
+              mode={period.mode}
+              nameOf={nameOf}
+              onOpenPerson={setOpenPerson}
+              onShowPeople={() => changeView("people")}
+            />
+          ) : view === "people" ? (
+            <PeopleView
+              scope={scope}
+              people={people}
+              profiles={staff}
+              onOpenPerson={setOpenPerson}
+            />
+          ) : (
+            <CompletedView
+              tasks={tasks}
+              scope={scope}
+              people={people}
+              period={period}
+              onPeriodChange={setPeriod}
+              nameOf={nameOf}
+            />
+          )}
+        </div>
+      )}
 
-  const totalN = rows.length;
-  const byStatus = (s: TaskStatus) => rows.filter((r) => r.status === s).length;
-  const doneN = byStatus("done");
-  const inProgressN = byStatus("in_progress");
-  const completion = totalN > 0 ? Math.round((doneN / totalN) * 100) : 0;
-
-  const overdueN = rows.filter(
-    (r) =>
-      r.status !== "done" && r.due_date && new Date(r.due_date).getTime() < now,
-  ).length;
-  const thisWeekN = rows.filter((r) => {
-    if (r.status === "done" || !r.due_date) return false;
-    const t = new Date(r.due_date).getTime();
-    return t >= now && t <= weekEnd;
-  }).length;
-
-  const segments: DonutSegment[] = TASK_STATUS_ORDER.map((s) => ({
-    label: TASK_STATUS_META[s].label,
-    value: byStatus(s),
-    color: STATUS_COLOR[s],
-  }));
-
-  const deptOrder = [...DEPARTMENTS.map((d) => d.value), "__none__"];
-  const deptRows: DeptRow[] = deptOrder
-    .map((key) => {
-      const list =
-        key === "__none__"
-          ? rows.filter((r) => !r.department)
-          : rows.filter((r) => r.department === key);
-      return {
-        label: key === "__none__" ? "Chưa phân phòng" : key,
-        total: list.length,
-        done: list.filter((r) => r.status === "done").length,
-      };
-    })
-    .filter((r) => r.total > 0)
-    .sort((a, b) => b.total - a.total);
-
-  const widgets = [
-    {
-      label: "Tổng công việc",
-      value: totalN,
-      icon: ListTodo,
-      tone: "text-slate-600 bg-slate-100",
-    },
-    {
-      label: "Đang làm",
-      value: inProgressN,
-      icon: Loader2,
-      tone: "text-blue-600 bg-blue-100",
-    },
-    {
-      label: "Hoàn thành",
-      value: doneN,
-      icon: CircleCheck,
-      tone: "text-emerald-600 bg-emerald-100",
-    },
-    {
-      label: "Quá hạn",
-      value: overdueN,
-      icon: AlertTriangle,
-      tone: "text-red-600 bg-red-100",
-    },
-    {
-      label: "Đến hạn tuần này",
-      value: thisWeekN,
-      icon: CalendarClock,
-      tone: "text-amber-600 bg-amber-100",
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      {/* 2 cột trên điện thoại: 5 thẻ số liệu xếp dọc thì phải cuộn quá dài */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
-        {widgets.map((w) => (
-          <Card key={w.label}>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div
-                className={`flex h-10 w-10 items-center justify-center rounded-lg ${w.tone}`}
-              >
-                <w.icon className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold leading-tight">
-                  {w.value}
-                </p>
-                <p className="text-xs text-muted-foreground">{w.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardContent className="space-y-4 p-5">
-            <p className="text-sm font-medium">Phân bố theo trạng thái</p>
-            <StatusDonut segments={segments} total={totalN} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="space-y-4 p-5">
-            <p className="text-sm font-medium">Tiến độ hoàn thành theo phòng</p>
-            <DeptProgressBars rows={deptRows} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardContent className="space-y-3 p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Tỷ lệ hoàn thành chung</p>
-            <span className="text-sm font-semibold">{completion}%</span>
-          </div>
-          <Progress value={completion} indicatorClassName="bg-emerald-500" />
-          <p className="text-xs text-muted-foreground">
-            {doneN}/{totalN} công việc đã hoàn thành.{" "}
-            <Link href="/tasks" className="text-primary hover:underline">
-              Xem tất cả →
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+      <PersonSheet
+        p={selected}
+        buckets={scope.buckets}
+        onClose={() => setOpenPerson(null)}
+      />
     </div>
   );
 }
@@ -198,17 +178,20 @@ function DashboardStats({ rows }: { rows: Task[] }) {
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      {/* 2 cột trên điện thoại: 5 thẻ số liệu xếp dọc thì phải cuộn quá dài */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-[72px] w-full" />
+          <Skeleton key={i} className="h-[132px] w-full rounded-xl" />
         ))}
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Skeleton className="h-56 w-full" />
-        <Skeleton className="h-56 w-full" />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Skeleton className="h-72 w-full rounded-xl lg:col-span-2" />
+        <Skeleton className="h-72 w-full rounded-xl" />
       </div>
-      <Skeleton className="h-28 w-full" />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </div>
     </div>
   );
 }

@@ -11,12 +11,20 @@ export function formatDateTime(value: string | null | undefined): string {
   return format(new Date(value), "HH:mm · dd/MM/yyyy", { locale: vi });
 }
 
-/** Nhãn deadline thân thiện: "Hôm nay", "Quá hạn 3 ngày", ... */
-export function dueLabel(value: string | null | undefined): {
+/**
+ * Nhãn deadline thân thiện: "Hôm nay", "Quá hạn 3 ngày", ...
+ * Việc đã hoàn thành thì không còn quá hạn/sắp đến hạn: chỉ hiện ngày hạn chót
+ * (hoặc "Không hạn" nếu không đặt hạn).
+ */
+export function dueLabel(
+  value: string | null | undefined,
+  opts: { done?: boolean } = {},
+): {
   text: string;
   tone: "overdue" | "today" | "soon" | "normal" | "none";
 } {
   if (!value) return { text: "Không hạn", tone: "none" };
+  if (opts.done) return { text: formatDate(value), tone: "normal" };
   const date = new Date(value);
   if (isToday(date)) return { text: "Hôm nay", tone: "today" };
   if (isTomorrow(date)) return { text: "Ngày mai", tone: "soon" };

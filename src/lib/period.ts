@@ -3,14 +3,20 @@ import {
   endOfWeek,
   startOfMonth,
   endOfMonth,
+  startOfQuarter,
+  endOfQuarter,
+  startOfYear,
+  endOfYear,
   addWeeks,
   addMonths,
+  addQuarters,
+  addYears,
   format,
 } from "date-fns";
 import { vi } from "date-fns/locale";
 import type { Task } from "@/types/database";
 
-export type PeriodMode = "week" | "month" | "all";
+export type PeriodMode = "week" | "month" | "quarter" | "year" | "all";
 
 /** Kỳ đang xem: chế độ + 1 ngày bất kỳ nằm trong kỳ. */
 export interface Period {
@@ -29,6 +35,9 @@ export function periodRange(p: Period): { start: Date | null; end: Date | null }
   const d = new Date(p.anchor);
   if (p.mode === "week")
     return { start: startOfWeek(d, MON), end: endOfWeek(d, MON) };
+  if (p.mode === "quarter")
+    return { start: startOfQuarter(d), end: endOfQuarter(d) };
+  if (p.mode === "year") return { start: startOfYear(d), end: endOfYear(d) };
   return { start: startOfMonth(d), end: endOfMonth(d) };
 }
 
@@ -42,6 +51,9 @@ export function shiftPeriod(p: Period, dir: -1 | 1): Period {
   if (p.mode === "week") return { ...p, anchor: addWeeks(d, dir).toISOString() };
   if (p.mode === "month")
     return { ...p, anchor: addMonths(d, dir).toISOString() };
+  if (p.mode === "quarter")
+    return { ...p, anchor: addQuarters(d, dir).toISOString() };
+  if (p.mode === "year") return { ...p, anchor: addYears(d, dir).toISOString() };
   return p;
 }
 
@@ -51,6 +63,8 @@ export function periodLabel(p: Period): string {
   if (!start || !end) return "";
   if (p.mode === "month")
     return format(start, "'Tháng' M, yyyy", { locale: vi });
+  if (p.mode === "quarter") return `Quý ${format(start, "Q, yyyy")}`;
+  if (p.mode === "year") return `Năm ${format(start, "yyyy")}`;
   return `${format(start, "dd/MM")} – ${format(end, "dd/MM/yyyy")}`;
 }
 

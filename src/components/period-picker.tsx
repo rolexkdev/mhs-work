@@ -16,7 +16,7 @@ import {
   shiftPeriod,
 } from "@/lib/period";
 
-/** Bộ chọn kỳ: theo tuần / tháng / tất cả, có nút lùi-tới và "Hiện tại". */
+/** Bộ chọn kỳ: theo tuần / tháng / quý / năm / tất cả, có nút lùi-tới và "Hiện tại". */
 export function PeriodPicker({
   value,
   onChange,
@@ -38,6 +38,8 @@ export function PeriodPicker({
         <SelectContent>
           <SelectItem value="week">Theo tuần</SelectItem>
           <SelectItem value="month">Theo tháng</SelectItem>
+          <SelectItem value="quarter">Theo quý</SelectItem>
+          <SelectItem value="year">Theo năm</SelectItem>
           <SelectItem value="all">Tất cả</SelectItem>
         </SelectContent>
       </Select>

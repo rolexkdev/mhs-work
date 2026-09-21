@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { useTasks } from "@/modules/tasks/hooks";
 import { useMeetings } from "@/modules/meetings/hooks";
+import { FEATURES } from "@/lib/features";
 import { TASK_STATUS_META } from "@/modules/tasks/constants";
 import { formatDateTime } from "@/lib/format";
 
@@ -55,7 +56,11 @@ export function CommandPalette() {
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <Command.Input
               autoFocus
-              placeholder="Tìm công việc, cuộc họp..."
+              placeholder={
+                FEATURES.meetings
+                  ? "Tìm công việc, cuộc họp..."
+                  : "Tìm công việc..."
+              }
               className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
@@ -87,7 +92,7 @@ export function CommandPalette() {
               </Command.Group>
             )}
 
-            {meetings.length > 0 && (
+            {FEATURES.meetings && meetings.length > 0 && (
               <Command.Group
                 heading="Cuộc họp"
                 className="px-1 text-xs font-medium text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5"

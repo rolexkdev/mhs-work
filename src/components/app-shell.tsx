@@ -29,6 +29,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { RealtimeSync } from "@/components/realtime-sync";
 import { ProfileDialog } from "@/modules/auth/profile-dialog";
 import { signOut } from "@/modules/auth/actions";
+import { FEATURES } from "@/lib/features";
 import type { UserRole } from "@/types/database";
 
 type NavItem = {
@@ -40,7 +41,9 @@ type NavItem = {
 
 const NAV: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/meetings", label: "Họp giao ban", icon: CalendarDays },
+  ...(FEATURES.meetings
+    ? [{ href: "/meetings", label: "Họp giao ban", icon: CalendarDays }]
+    : []),
   { href: "/tasks", label: "Công việc", icon: ListChecks },
   { href: "/updates", label: "Báo cáo công việc", icon: ClipboardCheck },
 ];

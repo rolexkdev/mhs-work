@@ -360,8 +360,8 @@ export function TaskListView({
 
               {!isCollapsed &&
                 g.tasks.map((t) => {
-                  const due = dueLabel(t.due_date);
                   const isDone = t.status === "done";
+                  const due = dueLabel(t.due_date, { done: isDone });
                   return (
                     <div
                       key={t.id}
@@ -530,8 +530,8 @@ function MobileTaskRow({
   canHideWeek?: boolean;
   onToggleWeekHidden?: () => void;
 }) {
-  const due = dueLabel(t.due_date);
   const isDone = t.status === "done";
+  const due = dueLabel(t.due_date, { done: isDone });
   const status = TASK_STATUS_META[t.status];
   const deptColor = t.department ? colorOf(DEPARTMENTS, t.department) : null;
 

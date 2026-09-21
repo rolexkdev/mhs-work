@@ -31,7 +31,7 @@ export function TaskCard({
   onClick?: () => void;
   dragging?: boolean;
 }) {
-  const due = dueLabel(task.due_date);
+  const due = dueLabel(task.due_date, { done: task.status === "done" });
   return (
     <div
       onClick={onClick}
