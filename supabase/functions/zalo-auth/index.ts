@@ -28,7 +28,13 @@ Deno.serve(async (req) => {
     };
     if (!zaloAccessToken) return json({ message: "Thiếu zaloAccessToken" }, 400);
 
-    const zalo = await verifyZaloUser(zaloAccessToken);
+    let zalo: { id: string; name: string | null };
+    try {
+      zalo = await verifyZaloUser(zaloAccessToken);
+    } catch (e) {
+      // Token hết hạn / giả → 401, không phải lỗi máy chủ.
+      return json({ message: e instanceof Error ? e.message : "Token Zalo không hợp lệ" }, 401);
+    }
     const db = adminClient();
 
     let profileId: string;
