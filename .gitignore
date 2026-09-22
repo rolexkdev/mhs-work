@@ -11,3 +11,6 @@ npm-debug.log*
 next-env.d.ts
 backup-*.json
 tai-khoan-nhan-vien.csv
+
+# Supabase CLI cache
+supabase/.temp/
