@@ -1,0 +1,23 @@
+# Chép vào /etc/systemd/system/zalo-bridge.service rồi sửa dòng User=
+# cho đúng tên đăng nhập trên laptop. Xem README.md.
+[Unit]
+Description=Cau noi IP Viet Nam cho API Zalo (TaskApp)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=CHANGE_ME
+WorkingDirectory=/opt/zalo-bridge
+EnvironmentFile=/etc/zalo-bridge.env
+ExecStart=/usr/bin/node /opt/zalo-bridge/server.mjs
+Restart=always
+RestartSec=5
+# Siết quyền: dịch vụ này không cần ghi gì lên đĩa.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

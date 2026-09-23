@@ -35,6 +35,29 @@ export function anonClient(): SupabaseClient {
   });
 }
 
+/**
+ * Gọi API Zalo. Zalo chặn IP ngoài Việt Nam, mà Edge Function chạy ở nước
+ * ngoài — nên khi có `ZALO_BRIDGE_URL` thì đi vòng qua cầu nối đặt tại VN
+ * (xem `zalo-bridge/README.md`). Không đặt biến này thì gọi thẳng như cũ,
+ * tiện cho chạy thử từ máy trong nước.
+ */
+async function zaloFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const bridge = Deno.env.get("ZALO_BRIDGE_URL");
+  if (!bridge) return fetch(url, init);
+
+  const headers = new Headers(init.headers);
+  headers.set("x-bridge-secret", env("ZALO_BRIDGE_SECRET"));
+  const target = `${bridge.replace(/\/+$/, "")}/fwd?url=${encodeURIComponent(url)}`;
+  try {
+    return await fetch(target, { ...init, headers });
+  } catch (e) {
+    throw new Error(
+      `Không kết nối được cầu nối Zalo (${bridge}) — kiểm tra laptop cầu nối đã bật chưa: ` +
+        (e instanceof Error ? e.message : String(e)),
+    );
+  }
+}
+
 async function hmacSha256Hex(key: string, message: string): Promise<string> {
   const k = await crypto.subtle.importKey(
     "raw",
@@ -55,7 +78,7 @@ export async function verifyZaloUser(
   accessToken: string,
 ): Promise<{ id: string; name: string | null }> {
   const proof = await hmacSha256Hex(env("ZALO_APP_SECRET"), accessToken);
-  const res = await fetch("https://graph.zalo.me/v2.0/me?fields=id,name", {
+  const res = await zaloFetch("https://graph.zalo.me/v2.0/me?fields=id,name", {
     headers: { access_token: accessToken, appsecret_proof: proof },
   });
   const data = await res.json().catch(() => ({}));
@@ -81,7 +104,7 @@ export async function getOaAccessToken(db: SupabaseClient): Promise<string> {
   const expiresAt = new Date(row.expires_at).getTime();
   if (expiresAt - Date.now() > 10 * 60_000) return row.access_token;
 
-  const res = await fetch("https://oauth.zaloapp.com/v4/oa/access_token", {
+  const res = await zaloFetch("https://oauth.zaloapp.com/v4/oa/access_token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -117,7 +140,7 @@ export async function sendOaText(
   oaUserId: string,
   text: string,
 ): Promise<void> {
-  const res = await fetch("https://openapi.zalo.me/v3.0/oa/message/cs", {
+  const res = await zaloFetch("https://openapi.zalo.me/v3.0/oa/message/cs", {
     method: "POST",
     headers: { "Content-Type": "application/json", access_token: oaAccessToken },
     body: JSON.stringify({ recipient: { user_id: oaUserId }, message: { text } }),
