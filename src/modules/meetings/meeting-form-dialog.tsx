@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,7 @@ export function MeetingFormDialog({
   meeting?: Meeting | null;
 }) {
   const isEdit = !!meeting;
+  const router = useRouter();
   const createMeeting = useCreateMeeting();
   const updateMeeting = useUpdateMeeting();
 
@@ -82,12 +84,16 @@ export function MeetingFormDialog({
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      await createMeeting.mutateAsync({
+      const created = await createMeeting.mutateAsync({
         title: title.trim(),
         description: description.trim() || null,
         meeting_date,
         created_by: user.id,
       });
+      onOpenChange(false);
+      // Sang trang chi tiết để nhập đầu mục từ biên bản
+      router.push(`/meetings/${created.id}`);
+      return;
     }
     onOpenChange(false);
   }
@@ -120,7 +126,7 @@ export function MeetingFormDialog({
               id="m-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Tóm tắt nội dung, quyết định, đầu việc cần giao..."
+              placeholder="Có thể để trống — tải file biên bản ở bước sau sẽ tự điền."
             />
           </div>
 

@@ -42,6 +42,11 @@ export function RealtimeSync() {
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "meeting_items" },
+        () => qc.invalidateQueries({ queryKey: ["meeting-items"] }),
+      )
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "task_comments" },
         (payload) => {
           const id = taskIdFrom(payload);

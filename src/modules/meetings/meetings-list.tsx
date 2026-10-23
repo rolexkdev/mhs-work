@@ -12,6 +12,7 @@ import {
   useMeetings,
   useMeetingTaskCounts,
 } from "@/modules/meetings/hooks";
+import { useMe, useMeetingItemStats } from "@/modules/meetings/item-hooks";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
 
@@ -19,6 +20,9 @@ export function MeetingsList() {
   const [open, setOpen] = useState(false);
   const { data: meetings = [], isLoading } = useMeetings();
   const { data: counts = {} } = useMeetingTaskCounts();
+  const { data: stats = {} } = useMeetingItemStats();
+  const { data: me } = useMe();
+  const canManage = me?.role === "admin" || me?.role === "leader";
 
   return (
     <div className="space-y-4">
@@ -26,9 +30,11 @@ export function MeetingsList() {
         <p className="text-sm text-muted-foreground">
           {meetings.length} cuộc họp
         </p>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4" /> Tạo cuộc họp
-        </Button>
+        {canManage && (
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4" /> Tạo cuộc họp
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -48,6 +54,7 @@ export function MeetingsList() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {meetings.map((m) => {
             const meta = MEETING_STATUS_META[m.status];
+            const st = stats[m.id];
             return (
               <Link key={m.id} href={`/meetings/${m.id}`}>
                 <Card className="h-full transition-shadow hover:shadow-md">
@@ -79,10 +86,35 @@ export function MeetingsList() {
                       </p>
                     </div>
 
-                    {m.description && (
-                      <p className="line-clamp-2 text-xs text-muted-foreground">
-                        {m.description}
-                      </p>
+                    {st ? (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>
+                            {st.done}/{st.total} đầu mục đã xử lý
+                          </span>
+                          {st.total - st.done - st.inProgress > 0 && (
+                            <span className="text-orange-600">
+                              {st.total - st.done - st.inProgress} chưa nhận
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex h-1.5 overflow-hidden rounded-full bg-secondary">
+                          <div
+                            className="bg-emerald-500"
+                            style={{ width: `${(st.done / st.total) * 100}%` }}
+                          />
+                          <div
+                            className="bg-blue-500"
+                            style={{ width: `${(st.inProgress / st.total) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      m.description && (
+                        <p className="line-clamp-2 text-xs text-muted-foreground">
+                          {m.description}
+                        </p>
+                      )
                     )}
 
                     <div className="flex items-center gap-1 text-xs font-medium text-primary">

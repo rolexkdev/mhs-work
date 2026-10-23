@@ -2,20 +2,26 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Pencil } from "lucide-react";
+import { ArrowLeft, CalendarDays, ChevronDown, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMeeting } from "@/modules/meetings/hooks";
+import { useMe } from "@/modules/meetings/item-hooks";
+import { MeetingItems } from "@/modules/meetings/meeting-items";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
 import { TasksWorkspace } from "@/modules/tasks/components/tasks-workspace";
 
 export function MeetingDetail({ id }: { id: string }) {
   const { data: meeting, isLoading } = useMeeting(id);
+  const { data: me } = useMe();
   const [editOpen, setEditOpen] = useState(false);
+  const [showText, setShowText] = useState(false);
+  const canManage = me?.role === "admin" || me?.role === "leader";
 
   if (isLoading) {
     return <Skeleton className="h-40 w-full" />;
@@ -70,27 +76,56 @@ export function MeetingDetail({ id }: { id: string }) {
                 {meeting.title}
               </h1>
               {meeting.description && (
-                <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                  {meeting.description}
-                </p>
+                <div>
+                  <p
+                    className={cn(
+                      "whitespace-pre-wrap text-sm text-muted-foreground",
+                      !showText && "line-clamp-3",
+                    )}
+                  >
+                    {meeting.description}
+                  </p>
+                  {meeting.description.length > 240 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowText((v) => !v)}
+                      className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      {showText ? "Thu gọn" : "Xem toàn văn biên bản"}
+                      <ChevronDown
+                        className={cn("h-3.5 w-3.5", showText && "rotate-180")}
+                      />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => setEditOpen(true)}
-            >
-              <Pencil className="h-4 w-4" /> Sửa
-            </Button>
+            {canManage && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => setEditOpen(true)}
+              >
+                <Pencil className="h-4 w-4" /> Sửa
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      <div>
-        <h2 className="mb-3 text-base font-semibold">Công việc được giao</h2>
-        <TasksWorkspace meetingId={meeting.id} />
-      </div>
+      <Tabs defaultValue="items">
+        <TabsList>
+          <TabsTrigger value="items">Đầu mục chỉ đạo</TabsTrigger>
+          <TabsTrigger value="tasks">Công việc được giao</TabsTrigger>
+        </TabsList>
+        <TabsContent value="items" className="mt-4">
+          <MeetingItems meeting={meeting} />
+        </TabsContent>
+        <TabsContent value="tasks" className="mt-4">
+          <TasksWorkspace meetingId={meeting.id} />
+        </TabsContent>
+      </Tabs>
 
       <MeetingFormDialog
         open={editOpen}

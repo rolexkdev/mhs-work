@@ -61,6 +61,7 @@ export interface CreateTaskInput {
   title: string;
   description?: string | null;
   meeting_id?: string | null;
+  meeting_item_id?: string | null;
   assignee_id?: string | null;
   priority?: Task["priority"];
   status?: Task["status"];
@@ -86,6 +87,7 @@ export function useCreateTask() {
         title: input.title,
         description: input.description ?? null,
         meeting_id: input.meeting_id ?? null,
+        meeting_item_id: input.meeting_item_id ?? null,
         assignee_id: input.assignee_id ?? null,
         priority: input.priority ?? "medium",
         status: input.status ?? "todo",

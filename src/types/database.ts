@@ -9,6 +9,8 @@ export type UserRole = "admin" | "leader" | "member";
 
 export type MeetingStatus = "planned" | "ongoing" | "closed";
 
+export type MeetingItemStatus = "open" | "in_progress" | "done";
+
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export type TaskStatus = "todo" | "in_progress" | "review" | "done" | "blocked";
@@ -37,9 +39,36 @@ export type Meeting = Timestamps & {
   created_by: string;
 };
 
+/** Đầu mục chỉ đạo trong 1 cuộc họp giao ban (0014). */
+export type MeetingItem = Timestamps & {
+  id: string;
+  meeting_id: string;
+  /** Mảng trong biên bản, VD "I. Mảng xử lý nước thải" */
+  section: string | null;
+  /** Hạng mục công việc, VD "Ống hóa chất Javel" */
+  title: string | null;
+  /** Nội dung chỉ đạo / hành động */
+  content: string;
+  /** Đơn vị phụ trách ghi trong biên bản */
+  department: string | null;
+  /** Thời hạn ghi trong biên bản (chữ tự do) */
+  deadline: string | null;
+  due_date: string | null;
+  sort_order: number;
+  status: MeetingItemStatus;
+  /** Kết quả xử lý */
+  result: string | null;
+  handled_by: string | null;
+  handled_at: string | null;
+  created_by: string;
+  updated_at: string;
+};
+
 export type Task = Timestamps & {
   id: string;
   meeting_id: string | null;
+  /** Đầu mục cuộc họp sinh ra task này (0014). */
+  meeting_item_id: string | null;
   title: string;
   description: string | null;
   assignee_id: string | null;
@@ -135,6 +164,28 @@ export interface Database {
         Update: Update<Meeting>;
         Relationships: Rel[];
       };
+      meeting_items: {
+        Row: Row<MeetingItem>;
+        Insert: Insert<
+          MeetingItem,
+          | "id"
+          | "created_at"
+          | "updated_at"
+          | "created_by"
+          | "section"
+          | "title"
+          | "department"
+          | "deadline"
+          | "due_date"
+          | "sort_order"
+          | "status"
+          | "result"
+          | "handled_by"
+          | "handled_at"
+        >;
+        Update: Update<MeetingItem>;
+        Relationships: Rel[];
+      };
       tasks: {
         Row: Row<Task>;
         Insert: Insert<
@@ -144,6 +195,7 @@ export interface Database {
           | "updated_at"
           | "description"
           | "meeting_id"
+          | "meeting_item_id"
           | "assignee_id"
           | "priority"
           | "status"
@@ -193,6 +245,7 @@ export interface Database {
     Enums: {
       user_role: UserRole;
       meeting_status: MeetingStatus;
+      meeting_item_status: MeetingItemStatus;
       task_priority: TaskPriority;
       task_status: TaskStatus;
     };
