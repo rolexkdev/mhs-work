@@ -14,6 +14,7 @@ import { MeetingItems } from "@/modules/meetings/meeting-items";
 import { useMe } from "@/modules/meetings/item-hooks";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
+import { MarkdownView } from "@/components/markdown-view";
 import { TasksWorkspace } from "@/modules/tasks/components/tasks-workspace";
 
 export function MeetingDetail({ id }: { id: string }) {
@@ -56,7 +57,7 @@ export function MeetingDetail({ id }: { id: string }) {
       <Card>
         <CardContent className="p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3 sm:gap-4">
-            <div className="min-w-0 space-y-2">
+            <div className="min-w-0 flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span
                   className={cn(
@@ -76,15 +77,20 @@ export function MeetingDetail({ id }: { id: string }) {
                 {meeting.title}
               </h1>
               {meeting.description && (
-                <div>
-                  <p
+                <div className="pt-1">
+                  <div
                     className={cn(
-                      "whitespace-pre-wrap text-sm text-muted-foreground",
-                      !showText && "line-clamp-3",
+                      "relative",
+                      !showText &&
+                        meeting.description.length > 240 &&
+                        "max-h-40 overflow-hidden",
                     )}
                   >
-                    {meeting.description}
-                  </p>
+                    <MarkdownView source={meeting.description} />
+                    {!showText && meeting.description.length > 240 && (
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-card to-transparent" />
+                    )}
+                  </div>
                   {meeting.description.length > 240 && (
                     <button
                       type="button"
