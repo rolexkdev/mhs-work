@@ -10,8 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMeeting } from "@/modules/meetings/hooks";
-import { useMe } from "@/modules/meetings/item-hooks";
 import { MeetingItems } from "@/modules/meetings/meeting-items";
+import { useMe } from "@/modules/meetings/item-hooks";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
 import { TasksWorkspace } from "@/modules/tasks/components/tasks-workspace";
@@ -19,9 +19,9 @@ import { TasksWorkspace } from "@/modules/tasks/components/tasks-workspace";
 export function MeetingDetail({ id }: { id: string }) {
   const { data: meeting, isLoading } = useMeeting(id);
   const { data: me } = useMe();
+  const canManage = me?.role === "admin" || me?.role === "leader";
   const [editOpen, setEditOpen] = useState(false);
   const [showText, setShowText] = useState(false);
-  const canManage = me?.role === "admin" || me?.role === "leader";
 
   if (isLoading) {
     return <Skeleton className="h-40 w-full" />;

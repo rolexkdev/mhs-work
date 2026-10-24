@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, CalendarDays, ArrowRight } from "lucide-react";
+import { Plus, CalendarDays, ArrowRight, FileUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -14,15 +14,18 @@ import {
 } from "@/modules/meetings/hooks";
 import { useMe, useMeetingItemStats } from "@/modules/meetings/item-hooks";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
+import { ImportItemsDialog } from "@/modules/meetings/import-items-dialog";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
 
 export function MeetingsList() {
   const [open, setOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const { data: me } = useMe();
+  // Tạo/sửa cuộc họp: chỉ admin/leader (RLS meetings_write_leader_admin)
+  const canManage = me?.role === "admin" || me?.role === "leader";
   const { data: meetings = [], isLoading } = useMeetings();
   const { data: counts = {} } = useMeetingTaskCounts();
   const { data: stats = {} } = useMeetingItemStats();
-  const { data: me } = useMe();
-  const canManage = me?.role === "admin" || me?.role === "leader";
 
   return (
     <div className="space-y-4">
@@ -31,9 +34,14 @@ export function MeetingsList() {
           {meetings.length} cuộc họp
         </p>
         {canManage && (
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="h-4 w-4" /> Tạo cuộc họp
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setOpen(true)}>
+              <Plus className="h-4 w-4" /> Tạo trống
+            </Button>
+            <Button onClick={() => setImportOpen(true)}>
+              <FileUp className="h-4 w-4" /> Tạo từ biên bản
+            </Button>
+          </div>
         )}
       </div>
 
@@ -47,8 +55,14 @@ export function MeetingsList() {
         <div className="rounded-lg border border-dashed py-16 text-center">
           <CalendarDays className="mx-auto h-8 w-8 text-muted-foreground" />
           <p className="mt-2 text-sm text-muted-foreground">
-            Chưa có cuộc họp nào. Tạo cuộc họp giao ban để bắt đầu giao việc.
+            Chưa có cuộc họp nào. Tải biên bản họp (.docx) lên để tạo cuộc họp
+            và tách các đầu mục cần giao.
           </p>
+          {canManage && (
+            <Button className="mt-4" onClick={() => setImportOpen(true)}>
+              <FileUp className="h-4 w-4" /> Tạo từ biên bản
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -129,6 +143,7 @@ export function MeetingsList() {
       )}
 
       <MeetingFormDialog open={open} onOpenChange={setOpen} />
+      <ImportItemsDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   );
 }

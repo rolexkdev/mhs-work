@@ -343,7 +343,7 @@ export function ItemFormDialog({
   meetingId: string;
   item?: MeetingItem | null;
 }) {
-  const add = useAddMeetingItems(meetingId);
+  const add = useAddMeetingItems();
   const update = useUpdateMeetingItem();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -370,7 +370,11 @@ export function ItemFormDialog({
       deadline: deadline.trim() || null,
     };
     if (item) await update.mutateAsync({ id: item.id, ...fields });
-    else await add.mutateAsync([{ section: null, ...fields }]);
+    else
+      await add.mutateAsync({
+        meetingId,
+        items: [{ section: null, ...fields }],
+      });
     onOpenChange(false);
   }
 

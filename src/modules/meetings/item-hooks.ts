@@ -82,10 +82,16 @@ function invalidateItems(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["meeting-items"] });
 }
 
-export function useAddMeetingItems(meetingId: string) {
+export function useAddMeetingItems() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (items: ParsedItem[]) => {
+    mutationFn: async ({
+      meetingId,
+      items,
+    }: {
+      meetingId: string;
+      items: ParsedItem[];
+    }) => {
       const supabase = createClient();
       // Nối tiếp sau các đầu mục đã có
       const { data: last } = await supabase

@@ -16,6 +16,8 @@ export type ParsedItem = {
 
 export type ParsedMinutes = {
   title: string | null;
+  /** Ngày họp đọc từ dòng "Ngày họp: dd/mm/yyyy" (nếu có). */
+  date: Date | null;
   /** Toàn văn biên bản (dạng chữ) — lưu vào mô tả cuộc họp để xem lại. */
   text: string;
   items: ParsedItem[];
@@ -113,6 +115,15 @@ export function parseBlocks(blocks: Block[]): ParsedMinutes {
   const paragraphs = blocks.filter((b) => b.kind === "p").map((b) => b.text);
   const title = paragraphs.find((t) => /biên bản/i.test(t)) ?? paragraphs[0] ?? null;
 
+  let date: Date | null = null;
+  for (const t of paragraphs) {
+    const m = /ngày\s*họp\s*:?\s*(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/i.exec(t);
+    if (m) {
+      date = new Date(+m[3], +m[2] - 1, +m[1], 8, 0);
+      break;
+    }
+  }
+
   // Toàn văn: đoạn văn + bảng (ô cách nhau bởi " | ")
   const text = blocks
     .map((b) =>
@@ -130,7 +141,7 @@ export function parseBlocks(blocks: Block[]): ParsedMinutes {
       if (items.length) fromTable = items;
     }
   }
-  if (fromTable.length) return { title, text, items: fromTable };
+  if (fromTable.length) return { title, date, text, items: fromTable };
 
   // 2) Mục đánh số dưới các mảng La Mã
   const items: ParsedItem[] = [];
@@ -156,9 +167,102 @@ export function parseBlocks(blocks: Block[]): ParsedMinutes {
   }
   return {
     title,
+    date,
     text,
     items: items.map((it) => ({ ...it, content: it.content || it.title || "" })),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Markdown (xem public/mau-bien-ban-giao-ban.md)
+// ---------------------------------------------------------------------------
+
+/** "2026-10-21 08:00" | "2026-10-21" | "21/10/2026 14:30" | "21/10/2026" */
+function parseLooseDate(s: string): Date | null {
+  let m = /(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/.exec(s);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3], +(m[4] ?? 8), +(m[5] ?? 0));
+  m = /(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?:\s+(\d{1,2})[:h](\d{2}))?/.exec(s);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] ?? 8), +(m[5] ?? 0));
+  return null;
+}
+
+function splitMdRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split(/(?<!\\)\|/)
+    .map((c) =>
+      c
+        .replace(/\\\|/g, "|")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/\*\*(.+?)\*\*/g, "$1")
+        .trim(),
+    );
+}
+
+const MD_SEPARATOR = /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+
+export function parseMarkdown(raw: string): ParsedMinutes {
+  // AI hay trả về trong khối ```markdown ... ``` → bỏ lớp bọc ngoài
+  const src = raw
+    .replace(/\r\n?/g, "\n")
+    .replace(/^﻿/, "")
+    .trim()
+    .replace(/^```[\w-]*\n/, "")
+    .replace(/\n```$/, "");
+
+  // Frontmatter --- key: value ---
+  const meta: Record<string, string> = {};
+  let body = src;
+  const fm = /^---\n([\s\S]*?)\n---\n?/.exec(src);
+  if (fm) {
+    body = src.slice(fm[0].length);
+    for (const line of fm[1].split("\n")) {
+      const m = /^\s*([\wÀ-ỹ ]+?)\s*:\s*(.*?)\s*$/.exec(line);
+      if (m) meta[norm(m[1]).replace(/\s+/g, "_")] = m[2].replace(/^["']|["']$/g, "");
+    }
+  }
+
+  const blocks: Block[] = [];
+  let table: string[][] | null = null;
+  let h1: string | null = null;
+  for (const line of body.split("\n")) {
+    if (line.trim().startsWith("|")) {
+      if (MD_SEPARATOR.test(line.trim())) continue;
+      if (!table) blocks.push({ kind: "table", rows: (table = []) });
+      table.push(splitMdRow(line));
+      continue;
+    }
+    table = null;
+    const h = /^#\s+(.+)/.exec(line);
+    if (h && !h1) h1 = h[1].trim();
+    const text = line
+      .replace(/^#+\s*/, "")
+      .replace(/^\s*[-*+]\s+/, "")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .trim();
+    if (text) blocks.push({ kind: "p", text });
+  }
+
+  const parsed = parseBlocks(blocks);
+  const chair = meta.chair ?? meta.chu_tri ?? meta.nguoi_chu_tri;
+  return {
+    ...parsed,
+    title: meta.title ?? meta.tieu_de ?? meta.ten ?? h1 ?? parsed.title,
+    date: parseLooseDate(meta.date ?? meta.ngay ?? meta.ngay_hop ?? "") ?? parsed.date,
+    text: [chair && `Người chủ trì: ${chair}`, body.trim()].filter(Boolean).join("\n\n"),
+  };
+}
+
+/** Chữ dán vào có phải markdown biên bản (frontmatter hoặc bảng markdown)? */
+export function looksLikeMarkdown(raw: string): boolean {
+  return /^\s*---\n/.test(raw.replace(/\r\n?/g, "\n")) || /^\s*\|.*\|\s*$\n^\s*\|?\s*:?-{3,}/m.test(raw.replace(/\r\n?/g, "\n"));
+}
+
+export async function parseMinutesFile(file: File): Promise<ParsedMinutes> {
+  if (/\.(md|markdown|txt)$/i.test(file.name)) return parseMarkdown(await file.text());
+  return parseDocx(file);
 }
 
 export async function parseDocx(file: File): Promise<ParsedMinutes> {

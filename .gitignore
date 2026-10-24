@@ -14,4 +14,3 @@ tai-khoan-nhan-vien.csv
 
 # Supabase CLI cache
 supabase/.temp/
-*.md
