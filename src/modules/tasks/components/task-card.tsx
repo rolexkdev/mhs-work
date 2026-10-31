@@ -6,8 +6,11 @@ import { dueLabel } from "@/lib/format";
 import { Progress } from "@/components/ui/progress";
 import {
   PriorityBadge,
-  AssigneeChip,
 } from "@/modules/tasks/components/task-badges";
+import {
+  AssigneeStack,
+  type Person,
+} from "@/modules/tasks/components/assignee-stack";
 import type { Task } from "@/types/database";
 
 const DUE_TONE: Record<string, string> = {
@@ -20,14 +23,12 @@ const DUE_TONE: Record<string, string> = {
 
 export function TaskCard({
   task,
-  assigneeName,
-  assigneeAvatar,
+  assignees,
   onClick,
   dragging,
 }: {
   task: Task;
-  assigneeName: string | null;
-  assigneeAvatar?: string | null;
+  assignees: Person[];
   onClick?: () => void;
   dragging?: boolean;
 }) {
@@ -55,7 +56,13 @@ export function TaskCard({
       )}
 
       <div className="flex items-center justify-between">
-        <AssigneeChip name={assigneeName} avatarUrl={assigneeAvatar} />
+        <AssigneeStack
+          people={assignees}
+          className="text-xs"
+          empty={
+            <span className="text-xs italic text-muted-foreground">Chưa giao</span>
+          }
+        />
         {task.due_date && (
           <span
             className={cn(

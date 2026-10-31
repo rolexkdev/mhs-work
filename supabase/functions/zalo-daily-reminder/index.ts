@@ -21,7 +21,7 @@ type Task = {
   title: string;
   status: string;
   due_date: string | null;
-  assignee_id: string | null;
+  assignee_ids: string[];
   manual_progress: number;
 };
 
@@ -108,8 +108,8 @@ Deno.serve(async (req) => {
     const ids = links.map((l) => l.profile_id);
     const { data: tasks, error: taskErr } = await db
       .from("tasks")
-      .select("id, title, status, due_date, assignee_id, manual_progress")
-      .in("assignee_id", ids)
+      .select("id, title, status, due_date, assignee_ids, manual_progress")
+      .overlaps("assignee_ids", ids)
       .neq("status", "done");
     if (taskErr) throw taskErr;
 
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
       const name = p?.full_name?.trim().split(/\s+/).pop() ?? "bạn";
       const text = compose(
         name,
-        (tasks ?? []).filter((t) => t.assignee_id === l.profile_id),
+        (tasks ?? []).filter((t) => t.assignee_ids.includes(l.profile_id)),
         today,
       );
 

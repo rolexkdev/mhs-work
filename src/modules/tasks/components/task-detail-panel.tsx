@@ -70,6 +70,11 @@ import {
   getAttachmentUrl,
 } from "@/modules/tasks/attachment-hooks";
 import { useTaskLogs } from "@/modules/tasks/log-hooks";
+import {
+  AssigneePicker,
+  AssigneeStack,
+  peopleOf,
+} from "@/modules/tasks/components/assignee-stack";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import type {
   Meeting,
@@ -80,7 +85,6 @@ import type {
   TaskPriority,
 } from "@/types/database";
 
-const UNASSIGNED = "__none__";
 const NO_MEETING = "__none__";
 
 function Row({
@@ -174,6 +178,11 @@ export function TaskDetailPanel({
       .catch(() => toast.error("Không chép được liên kết"));
   }
 
+  const assigneeOptions = profiles.map((p) => ({
+    value: p.id,
+    label: p.full_name ?? p.email,
+    avatarUrl: p.avatar_url,
+  }));
   const nameOf = (id: string | null) =>
     id ? profiles.find((p) => p.id === id)?.full_name ?? null : null;
   const avatarOf = (id: string | null) =>
@@ -296,24 +305,26 @@ export function TaskDetailPanel({
                 </Row>
 
                 <Row icon={User} label="Người thực hiện">
-                  <Select
-                    value={task.assignee_id ?? UNASSIGNED}
-                    onValueChange={(v) =>
-                      patch({ assignee_id: v === UNASSIGNED ? null : v })
-                    }
+                  <AssigneePicker
+                    value={task.assignee_ids}
+                    options={assigneeOptions}
+                    onChange={(ids) => patch({ assignee_ids: ids })}
                   >
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={UNASSIGNED}>Chưa giao</SelectItem>
-                      {profiles.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.full_name ?? p.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <button
+                      type="button"
+                      className="flex h-8 w-full min-w-0 items-center rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <AssigneeStack
+                        people={peopleOf(
+                          task.assignee_ids,
+                          nameOf,
+                          (id) =>
+                            profiles.find((p) => p.id === id)?.avatar_url ?? null,
+                        )}
+                        empty="Chưa giao"
+                      />
+                    </button>
+                  </AssigneePicker>
                 </Row>
 
                 <Row icon={Building2} label="Phòng/Nhóm">
@@ -743,8 +754,13 @@ function describeLog(
     v === null || v === undefined || v === "" ? "trống" : String(v);
   const date = (v: unknown) =>
     typeof v === "string" && v ? formatDate(v) : "trống";
-  const person = (v: unknown) =>
-    typeof v === "string" && v ? nameOf(v) ?? "—" : "trống";
+  // Log cũ lưu 1 id, log từ 0015 lưu danh sách id
+  const person = (v: unknown) => {
+    const ids = (Array.isArray(v) ? v : [v]).filter(
+      (id): id is string => typeof id === "string" && !!id,
+    );
+    return ids.length ? ids.map((id) => nameOf(id) ?? "—").join(", ") : "trống";
+  };
 
   switch (log.action) {
     case "created":

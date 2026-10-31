@@ -95,7 +95,13 @@ export function CompletedView({
   const list = useMemo(() => {
     const kw = q.trim().toLowerCase();
     return scope.completed
-      .filter((t) => !person || (t.assignee_id ?? UNASSIGNED) === person)
+      .filter(
+        (t) =>
+          !person ||
+          (person === UNASSIGNED
+            ? !t.assignee_ids.length
+            : t.assignee_ids.includes(person)),
+      )
       .filter((t) => !kw || t.title.toLowerCase().includes(kw))
       .sort(
         (a, b) => completedDate(b)!.getTime() - completedDate(a)!.getTime(),
@@ -383,7 +389,8 @@ export function CompletedView({
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-medium">{t.title}</p>
                             <p className="truncate text-[11px] text-muted-foreground">
-                              {nameOf(t.assignee_id) || "—"}
+                              {t.assignee_ids.map(nameOf).filter(Boolean).join(", ") ||
+                                "—"}
                               {t.department && ` · ${t.department}`}
                               {lead !== null && ` · ${lead} ngày xử lý`}
                             </p>

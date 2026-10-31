@@ -28,7 +28,7 @@ export function useTasks(filters: TaskQueryFilters = {}) {
       const supabase = createClient();
       let q = supabase.from("tasks").select("*");
       if (filters.meetingId) q = q.eq("meeting_id", filters.meetingId);
-      if (filters.assigneeId) q = q.eq("assignee_id", filters.assigneeId);
+      if (filters.assigneeId) q = q.contains("assignee_ids", [filters.assigneeId]);
       if (filters.status) q = q.eq("status", filters.status);
       if (filters.priority) q = q.eq("priority", filters.priority);
       const { data, error } = await q.order("created_at", {
@@ -62,7 +62,7 @@ export interface CreateTaskInput {
   description?: string | null;
   meeting_id?: string | null;
   meeting_item_id?: string | null;
-  assignee_id?: string | null;
+  assignee_ids?: string[];
   priority?: Task["priority"];
   status?: Task["status"];
   start_date?: string | null;
@@ -88,7 +88,7 @@ export function useCreateTask() {
         description: input.description ?? null,
         meeting_id: input.meeting_id ?? null,
         meeting_item_id: input.meeting_item_id ?? null,
-        assignee_id: input.assignee_id ?? null,
+        assignee_ids: input.assignee_ids ?? [],
         priority: input.priority ?? "medium",
         status: input.status ?? "todo",
         start_date: input.start_date ?? null,
