@@ -72,7 +72,7 @@ function readBlocks(xml: string): Block[] {
   return blocks;
 }
 
-const norm = (s: string) =>
+export const norm = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
 
 /** Xác định cột nào là gì từ dòng tiêu đề bảng. Trả null nếu không giống bảng nhiệm vụ. */

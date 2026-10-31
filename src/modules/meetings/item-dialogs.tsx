@@ -16,6 +16,7 @@ import {
   useAddMeetingItems,
   useUpdateMeetingItem,
 } from "@/modules/meetings/item-hooks";
+import { resolveDeadline } from "@/modules/meetings/resolve-deadline";
 import type { MeetingItem } from "@/types/database";
 
 // ---------------------------------------------------------------------------
@@ -25,11 +26,13 @@ export function ItemFormDialog({
   open,
   onOpenChange,
   meetingId,
+  meetingDate,
   item,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   meetingId: string;
+  meetingDate: string;
   item?: MeetingItem | null;
 }) {
   const add = useAddMeetingItems();
@@ -48,6 +51,7 @@ export function ItemFormDialog({
   }, [open, item]);
 
   const pending = add.isPending || update.isPending;
+  const resolved = resolveDeadline(deadline, meetingDate);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,10 +62,17 @@ export function ItemFormDialog({
       department: department.trim() || null,
       deadline: deadline.trim() || null,
     };
-    if (item) await update.mutateAsync({ id: item.id, ...fields });
+    if (item)
+      await update.mutateAsync({
+        id: item.id,
+        prevDeadline: item.deadline,
+        meetingDate,
+        ...fields,
+      });
     else
       await add.mutateAsync({
         meetingId,
+        meetingDate,
         items: [{ section: null, ...fields }],
       });
     onOpenChange(false);
@@ -110,8 +121,13 @@ export function ItemFormDialog({
                 id="if-deadline"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
-                placeholder="VD: Tuần tới"
+                placeholder="VD: Tuần tới, 25/10"
               />
+              {resolved && resolved.label !== deadline.trim() && (
+                <p className="text-xs text-muted-foreground">
+                  Tính theo ngày họp: {resolved.label}
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>

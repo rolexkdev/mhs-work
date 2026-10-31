@@ -27,10 +27,12 @@ import { TaskDetailPanel } from "@/modules/tasks/components/task-detail-panel";
 import {
   useCreateMissingTasks,
   useDeleteMeetingItem,
+  useFillDueDates,
   useMe,
   useMeetingItems,
 } from "@/modules/meetings/item-hooks";
 import { ItemFormDialog } from "@/modules/meetings/item-dialogs";
+import { dueIso, resolveDeadline } from "@/modules/meetings/resolve-deadline";
 import { ImportItemsDialog } from "@/modules/meetings/import-items-dialog";
 import type { Meeting, MeetingItem, Task, TaskStatus } from "@/types/database";
 
@@ -62,6 +64,7 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
   const { data: me } = useMe();
   const del = useDeleteMeetingItem();
   const createMissing = useCreateMissingTasks();
+  const fillDue = useFillDueDates();
 
   const canManage = me?.role === "admin" || me?.role === "leader";
 
@@ -94,6 +97,14 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
   ).length;
   const total = linkedTasks.length;
   const missing = items.filter((it) => !tasksByItem.has(it.id));
+  // Công việc tạo trước khi có quy đổi thời hạn: chưa có hạn chót
+  const noDue = items.flatMap((it) => {
+    const due = dueIso(resolveDeadline(it.deadline, meeting.meeting_date)?.due);
+    if (!due) return [];
+    return (tasksByItem.get(it.id) ?? [])
+      .filter((t) => !t.due_date)
+      .map((t) => ({ id: t.id, due_date: due }));
+  });
   const departments = [
     ...new Set(linkedTasks.flatMap((t) => (t.department ? [t.department] : []))),
   ].sort();
@@ -145,9 +156,27 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
           <Button
             size="sm"
             disabled={createMissing.isPending}
-            onClick={() => createMissing.mutate(missing)}
+            onClick={() =>
+              createMissing.mutate({
+                items: missing,
+                meetingDate: meeting.meeting_date,
+              })
+            }
           >
             {createMissing.isPending ? "Đang tạo..." : "Tạo công việc"}
+          </Button>
+        </div>
+      )}
+
+      {canManage && noDue.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300">
+          <span>{noDue.length} công việc chưa có hạn chót theo ngày họp.</span>
+          <Button
+            size="sm"
+            disabled={fillDue.isPending}
+            onClick={() => fillDue.mutate(noDue)}
+          >
+            {fillDue.isPending ? "Đang lưu..." : "Đặt hạn chót"}
           </Button>
         </div>
       )}
@@ -255,7 +284,11 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
                         {(it.department || it.deadline) && (
                           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                             {it.department && <span>👥 {it.department}</span>}
-                            {it.deadline && <span>⏰ {it.deadline}</span>}
+                            {it.deadline && (
+                              <span title={`Biên bản ghi: ${it.deadline}`}>
+                                ⏰ {resolveDeadline(it.deadline, meeting.meeting_date)?.label}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -362,6 +395,7 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
         open={formOpen}
         onOpenChange={setFormOpen}
         meetingId={meeting.id}
+        meetingDate={meeting.meeting_date}
         item={editing}
       />
       <ConfirmDialog

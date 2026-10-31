@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/query-keys";
 import { friendlyError } from "@/lib/errors";
 import { DEPARTMENTS } from "@/modules/tasks/constants";
+import { dueIso, resolveDeadline } from "@/modules/meetings/resolve-deadline";
 import type { Database, MeetingItem, Profile } from "@/types/database";
 import type { ParsedItem } from "@/modules/meetings/parse-minutes";
 
@@ -86,7 +87,11 @@ const taskTitle = (it: TaskFields) =>
   it.title ? `${it.title}: ${it.content}` : it.content;
 
 /** Công việc của 1 đầu mục: giao theo phòng, chưa chọn người thực hiện. */
-function taskFromItem(item: MeetingItem, userId: string): TaskInsert {
+function taskFromItem(
+  item: MeetingItem,
+  userId: string,
+  meetingDate: string,
+): TaskInsert {
   return {
     title: taskTitle(item),
     description:
@@ -99,6 +104,7 @@ function taskFromItem(item: MeetingItem, userId: string): TaskInsert {
     meeting_id: item.meeting_id,
     meeting_item_id: item.id,
     department: taskDepartment(item.department),
+    due_date: dueIso(resolveDeadline(item.deadline, meetingDate)?.due),
     created_by: userId,
   };
 }
@@ -123,9 +129,11 @@ export function useAddMeetingItems() {
   return useMutation({
     mutationFn: async ({
       meetingId,
+      meetingDate,
       items,
     }: {
       meetingId: string;
+      meetingDate: string;
       items: ParsedItem[];
     }) => {
       const supabase = createClient();
@@ -157,7 +165,7 @@ export function useAddMeetingItems() {
 
       const { error: taskError } = await supabase
         .from("tasks")
-        .insert((data ?? []).map((it) => taskFromItem(it, userId)));
+        .insert((data ?? []).map((it) => taskFromItem(it, userId, meetingDate)));
       if (taskError) throw taskError;
       return items.length;
     },
@@ -173,11 +181,17 @@ export function useAddMeetingItems() {
 export function useCreateMissingTasks() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (items: MeetingItem[]) => {
+    mutationFn: async ({
+      items,
+      meetingDate,
+    }: {
+      items: MeetingItem[];
+      meetingDate: string;
+    }) => {
       const userId = await currentUserId();
       const { error } = await createClient()
         .from("tasks")
-        .insert(items.map((it) => taskFromItem(it, userId)));
+        .insert(items.map((it) => taskFromItem(it, userId, meetingDate)));
       if (error) throw error;
       return items.length;
     },
@@ -189,11 +203,45 @@ export function useCreateMissingTasks() {
   });
 }
 
-/** Sửa đầu mục, cập nhật theo tên + phòng của công việc đi kèm. */
+/** Đặt hạn chót cho công việc đã tạo trước khi có quy đổi thời hạn theo ngày họp. */
+export function useFillDueDates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rows: { id: string; due_date: string }[]) => {
+      const supabase = createClient();
+      const results = await Promise.all(
+        rows.map((r) =>
+          supabase
+            .from("tasks")
+            .update({ due_date: r.due_date })
+            .eq("id", r.id),
+        ),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+      return rows.length;
+    },
+    onSuccess: (n) => {
+      invalidateAll(qc);
+      toast.success(`Đã đặt hạn chót cho ${n} công việc`);
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
+
+/**
+ * Sửa đầu mục, cập nhật theo tên + phòng của công việc đi kèm. Hạn chót chỉ đổi
+ * khi "Thời hạn" đổi, để không đè lên hạn đã chỉnh tay trong công việc.
+ */
 export function useUpdateMeetingItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...fields }: { id: string } & TaskFields) => {
+    mutationFn: async ({
+      id,
+      prevDeadline,
+      meetingDate,
+      ...fields
+    }: { id: string; prevDeadline: string | null; meetingDate: string } & TaskFields) => {
       const supabase = createClient();
       const { error } = await supabase
         .from("meeting_items")
@@ -205,6 +253,9 @@ export function useUpdateMeetingItem() {
         .update({
           title: taskTitle(fields),
           department: taskDepartment(fields.department),
+          ...(fields.deadline !== prevDeadline && {
+            due_date: dueIso(resolveDeadline(fields.deadline, meetingDate)?.due),
+          }),
         })
         .eq("meeting_item_id", id);
       if (taskError) throw taskError;

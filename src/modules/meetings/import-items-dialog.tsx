@@ -27,6 +27,7 @@ import {
 } from "@/modules/meetings/parse-minutes";
 import { MINUTES_PROMPT } from "@/modules/meetings/minutes-prompt";
 import { useAddMeetingItems } from "@/modules/meetings/item-hooks";
+import { resolveDeadline } from "@/modules/meetings/resolve-deadline";
 import { useCreateMeeting, useUpdateMeeting } from "@/modules/meetings/hooks";
 import { createClient } from "@/lib/supabase/client";
 import type { Meeting } from "@/types/database";
@@ -137,6 +138,8 @@ export function ImportItemsDialog({
   }
 
   const count = picked.filter(Boolean).length;
+  // Xem trước thời hạn theo ngày họp đang chọn
+  const meetingDate = meeting?.meeting_date ?? (date || new Date());
   const pending =
     addItems.isPending || createMeeting.isPending || updateMeeting.isPending;
   const withText = canEditMeeting && saveText && !!fullText;
@@ -157,14 +160,22 @@ export function ImportItemsDialog({
         created_by: user.id,
       });
       if (chosen.length)
-        await addItems.mutateAsync({ meetingId: created.id, items: chosen });
+        await addItems.mutateAsync({
+          meetingId: created.id,
+          meetingDate: created.meeting_date,
+          items: chosen,
+        });
       onOpenChange(false);
       router.push(`/meetings/${created.id}`);
       return;
     }
 
     if (!chosen.length) return;
-    await addItems.mutateAsync({ meetingId: meeting.id, items: chosen });
+    await addItems.mutateAsync({
+      meetingId: meeting.id,
+      meetingDate: meeting.meeting_date,
+      items: chosen,
+    });
     if (withText) {
       await updateMeeting.mutateAsync({ id: meeting.id, description: fullText });
     }
@@ -363,7 +374,9 @@ export function ImportItemsDialog({
                           <p className="text-xs text-muted-foreground">
                             {it.department && <>👥 {it.department}</>}
                             {it.department && it.deadline && " · "}
-                            {it.deadline && <>⏰ {it.deadline}</>}
+                            {it.deadline && (
+                              <>⏰ {resolveDeadline(it.deadline, meetingDate)?.label}</>
+                            )}
                           </p>
                         )}
                       </div>
