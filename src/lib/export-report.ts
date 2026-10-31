@@ -101,7 +101,8 @@ export async function exportWeeklyReport(opts: {
     const rowValues: Record<string, string | number> = {
       stt,
       title: t.title,
-      assignee: nameOf(t.assignee_id) ?? "Chưa giao",
+      assignee:
+        t.assignee_ids.map(nameOf).filter(Boolean).join(", ") || "Chưa giao",
       status: `${statusLabel} (${t.manual_progress}%)`,
       current: t.latest_update ?? "",
       note: t.note ?? "",

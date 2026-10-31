@@ -260,15 +260,17 @@ export type PersonStats = {
 
 export function personStats(scope: Scope, profiles: Profile[]): PersonStats[] {
   const profileById = new Map(profiles.map((p) => [p.id, p]));
-  const keyOf = (t: Task) => t.assignee_id ?? UNASSIGNED;
+  // Việc có nhiều người phụ trách được tính cho từng người.
+  const keysOf = (t: Task) =>
+    t.assignee_ids.length ? t.assignee_ids : [UNASSIGNED];
 
-  const ids = new Set([...scope.rows, ...scope.completed].map(keyOf));
+  const ids = new Set([...scope.rows, ...scope.completed].flatMap(keysOf));
   const now = Date.now();
 
   return [...ids].map((id) => {
     const p = profileById.get(id);
-    const rows = scope.rows.filter((t) => keyOf(t) === id);
-    const completed = scope.completed.filter((t) => keyOf(t) === id);
+    const rows = scope.rows.filter((t) => keysOf(t).includes(id));
+    const completed = scope.completed.filter((t) => keysOf(t).includes(id));
     const open = rows.filter((t) => t.status !== "done");
     const overdue = open.filter((t) => isOverdue(t, now));
 

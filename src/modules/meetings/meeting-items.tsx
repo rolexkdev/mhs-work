@@ -365,11 +365,11 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
                                   {tm.label}
                                 </span>
                               </span>
-                              {(t.latest_update || t.assignee_id) && (
+                              {(t.latest_update || t.assignee_ids.length > 0) && (
                                 <span className="block truncate text-xs text-muted-foreground">
-                                  {t.assignee_id && `${nameOf(t.assignee_id)} `}
-                                  {t.assignee_id && t.latest_update && "· "}
-                                  {t.latest_update}
+                                  {[t.assignee_ids.map(nameOf).join(", "), t.latest_update]
+                                    .filter(Boolean)
+                                    .join(" · ")}
                                 </span>
                               )}
                             </button>

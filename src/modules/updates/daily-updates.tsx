@@ -11,9 +11,12 @@ import {
 import { addDays, format, isToday } from "date-fns";
 import { vi } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { formatDateTime, initials } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import { isTaskInPeriod } from "@/lib/period";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  AssigneeStack,
+  peopleOf,
+} from "@/modules/tasks/components/assignee-stack";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -184,21 +187,16 @@ export function DailyUpdates() {
                     </div>
 
                     <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Avatar className="h-4 w-4">
-                        {profileById.get(task.assignee_id ?? "")?.avatar_url && (
-                          <AvatarImage
-                            src={
-                              profileById.get(task.assignee_id ?? "")!
-                                .avatar_url!
-                            }
-                            alt=""
-                          />
+                      <AssigneeStack
+                        people={peopleOf(
+                          task.assignee_ids,
+                          nameOf,
+                          (id) => profileById.get(id ?? "")?.avatar_url ?? null,
                         )}
-                        <AvatarFallback className="text-[8px]">
-                          {initials(nameOf(task.assignee_id) ?? "?")}
-                        </AvatarFallback>
-                      </Avatar>
-                      {nameOf(task.assignee_id) ?? "Chưa giao"}
+                        avatarClassName="h-4 w-4"
+                        fallbackClassName="text-[8px]"
+                        empty="Chưa giao"
+                      />
                     </div>
 
                     {log ? (

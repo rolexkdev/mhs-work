@@ -12,8 +12,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { dueLabel, formatDate, initials } from "@/lib/format";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { dueLabel, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { ProgressDial } from "@/modules/tasks/components/progress-dial";
 import {
@@ -34,6 +33,13 @@ import {
   colorOf,
   type TagColor,
 } from "@/modules/tasks/constants";
+import {
+  AssigneePicker,
+  AssigneeStack,
+  peopleOf,
+  type AssigneeOption,
+  type Person,
+} from "@/modules/tasks/components/assignee-stack";
 import type { Task, TaskStatus, Profile, Meeting } from "@/types/database";
 
 export type GroupBy =
@@ -146,7 +152,12 @@ function buildGroups(
   for (const t of tasks) {
     if (groupBy === "status") push(t.status, t);
     else if (groupBy === "department") push(t.department ?? "__none__", t);
-    else if (groupBy === "assignee") push(t.assignee_id ?? "__none__", t);
+    else if (groupBy === "assignee") {
+      // Nhiều người phụ trách: việc hiện ở nhóm của từng người
+      for (const id of t.assignee_ids.length ? t.assignee_ids : ["__none__"]) {
+        push(id, t);
+      }
+    }
     else if (groupBy === "meeting") push(t.meeting_id ?? "__none__", t);
     else push("__none__", t);
   }
@@ -311,8 +322,7 @@ export function TaskListView({
                       key={t.id}
                       task={t}
                       showDept={showDept}
-                      assigneeName={nameOf(t.assignee_id)}
-                      assigneeAvatar={avatarOf(t.assignee_id)}
+                      assignees={peopleOf(t.assignee_ids, nameOf, avatarOf)}
                       onOpen={() => onOpen(t)}
                       onPatch={(p) => onPatch(t.id, p)}
                       onDelete={() => onDelete(t)}
@@ -405,15 +415,24 @@ export function TaskListView({
 
                       {/* Người phụ trách */}
                       <div className="min-w-0">
-                        <AssigneeCell
-                          assigneeId={t.assignee_id}
-                          name={nameOf(t.assignee_id)}
-                          avatarUrl={avatarOf(t.assignee_id)}
+                        <AssigneePicker
+                          value={t.assignee_ids}
                           options={assigneeOptions}
-                          onChange={(v) =>
-                            onPatch(t.id, { assignee_id: v })
+                          onChange={(ids) =>
+                            onPatch(t.id, { assignee_ids: ids })
                           }
-                        />
+                        >
+                          <button className="flex min-w-0 max-w-full items-center rounded px-1 py-0.5 text-xs hover:bg-muted/60">
+                            <AssigneeStack
+                              people={peopleOf(t.assignee_ids, nameOf, avatarOf)}
+                              empty={
+                                <span className="text-muted-foreground/60">
+                                  + Trống
+                                </span>
+                              }
+                            />
+                          </button>
+                        </AssigneePicker>
                       </div>
 
                       {/* Trạng thái */}
@@ -512,8 +531,7 @@ export function TaskListView({
 function MobileTaskRow({
   task: t,
   showDept,
-  assigneeName,
-  assigneeAvatar,
+  assignees,
   onOpen,
   onPatch,
   onDelete,
@@ -522,8 +540,7 @@ function MobileTaskRow({
 }: {
   task: Task;
   showDept: boolean;
-  assigneeName: string | null;
-  assigneeAvatar: string | null;
+  assignees: Person[];
   onOpen: () => void;
   onPatch: (patch: Partial<Task>) => void;
   onDelete: () => void;
@@ -585,21 +602,12 @@ function MobileTaskRow({
         </div>
 
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {assigneeName ? (
-            <>
-              <Avatar className="h-4 w-4 shrink-0">
-                {assigneeAvatar && (
-                  <AvatarImage src={assigneeAvatar} alt={assigneeName} />
-                )}
-                <AvatarFallback className="text-[8px]">
-                  {initials(assigneeName)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="truncate">{assigneeName}</span>
-            </>
-          ) : (
-            <span className="italic">Chưa giao</span>
-          )}
+          <AssigneeStack
+            people={assignees}
+            avatarClassName="h-4 w-4"
+            fallbackClassName="text-[8px]"
+            empty={<span className="italic">Chưa giao</span>}
+          />
         </div>
 
         {t.latest_update && (
@@ -797,62 +805,5 @@ function InlineDateCell({
     >
       {label}
     </button>
-  );
-}
-
-type AssigneeOption = { value: string; label: string; avatarUrl: string | null };
-
-function AssigneeCell({
-  assigneeId,
-  name,
-  avatarUrl,
-  options,
-  onChange,
-}: {
-  assigneeId: string | null;
-  name: string | null;
-  avatarUrl: string | null;
-  options: AssigneeOption[];
-  onChange: (value: string | null) => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="flex min-w-0 max-w-full items-center gap-1.5 rounded px-1 py-0.5 hover:bg-muted/60">
-          {assigneeId && name ? (
-            <>
-              <Avatar className="h-5 w-5 shrink-0">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
-                <AvatarFallback className="text-[10px]">
-                  {initials(name)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="min-w-0 truncate text-xs">{name}</span>
-            </>
-          ) : (
-            <span className="text-xs text-muted-foreground/60">+ Trống</span>
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="max-h-72 overflow-y-auto"
-      >
-        <DropdownMenuItem onClick={() => onChange(null)}>
-          <span className="text-xs text-muted-foreground">Chưa giao</span>
-        </DropdownMenuItem>
-        {options.map((o) => (
-          <DropdownMenuItem key={o.value} onClick={() => onChange(o.value)}>
-            <Avatar className="h-5 w-5">
-              {o.avatarUrl && <AvatarImage src={o.avatarUrl} alt={o.label} />}
-              <AvatarFallback className="text-[10px]">
-                {initials(o.label)}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm">{o.label}</span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

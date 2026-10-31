@@ -273,7 +273,7 @@ export function OverviewView({
           sub={`${pct(overdue.length, open.length)}% số việc đang mở`}
         >
           <div className="flex -space-x-1.5">
-            {[...new Set(overdue.map((t) => t.assignee_id))]
+            {[...new Set(overdue.flatMap((t) => t.assignee_ids))]
               .slice(0, 5)
               .map((id) => {
                 const p = people.find((x) => x.id === id);
@@ -478,7 +478,7 @@ function AttentionList({
             <div className="min-w-0 flex-1">
               <p className="truncate">{t.title}</p>
               <p className="truncate text-[11px] text-muted-foreground">
-                {nameOf(t.assignee_id) || "—"}
+                {t.assignee_ids.map(nameOf).filter(Boolean).join(", ") || "—"}
                 {t.department && ` · ${t.department}`}
               </p>
             </div>

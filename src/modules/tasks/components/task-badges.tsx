@@ -1,6 +1,4 @@
 import { cn } from "@/lib/utils";
-import { initials } from "@/lib/format";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   TASK_STATUS_META,
   TASK_PRIORITY_META,
@@ -33,30 +31,6 @@ export function PriorityBadge({ priority }: { priority: TaskPriority }) {
     >
       <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
       {meta.label}
-    </span>
-  );
-}
-
-export function AssigneeChip({
-  name,
-  avatarUrl,
-}: {
-  name: string | null;
-  avatarUrl?: string | null;
-}) {
-  if (!name)
-    return (
-      <span className="text-xs italic text-muted-foreground">Chưa giao</span>
-    );
-  return (
-    <span className="flex min-w-0 items-center gap-1.5">
-      <Avatar className="h-5 w-5 shrink-0">
-        {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
-        <AvatarFallback className="text-[10px]">
-          {initials(name)}
-        </AvatarFallback>
-      </Avatar>
-      <span className="truncate text-xs">{name}</span>
     </span>
   );
 }

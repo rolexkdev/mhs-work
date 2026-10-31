@@ -71,6 +71,9 @@ export type Task = Timestamps & {
   meeting_item_id: string | null;
   title: string;
   description: string | null;
+  /** Người phụ trách, ngang hàng nhau (0015). */
+  assignee_ids: string[];
+  /** Người đầu assignee_ids, DB tự đồng bộ. Code mới dùng assignee_ids. */
   assignee_id: string | null;
   created_by: string;
   priority: TaskPriority;
@@ -197,6 +200,7 @@ export interface Database {
           | "meeting_id"
           | "meeting_item_id"
           | "assignee_id"
+          | "assignee_ids"
           | "priority"
           | "status"
           | "progress"

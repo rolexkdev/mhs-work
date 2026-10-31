@@ -14,18 +14,20 @@ import {
 } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS_META, TASK_STATUS_ORDER } from "@/modules/tasks/constants";
+import {
+  peopleOf,
+  type Person,
+} from "@/modules/tasks/components/assignee-stack";
 import { TaskCard } from "@/modules/tasks/components/task-card";
 import type { Task, TaskStatus } from "@/types/database";
 
 function DraggableCard({
   task,
-  assigneeName,
-  assigneeAvatar,
+  assignees,
   onEdit,
 }: {
   task: Task;
-  assigneeName: string | null;
-  assigneeAvatar: string | null;
+  assignees: Person[];
   onEdit: (t: Task) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -35,8 +37,7 @@ function DraggableCard({
     <div ref={setNodeRef} {...listeners} {...attributes}>
       <TaskCard
         task={task}
-        assigneeName={assigneeName}
-        assigneeAvatar={assigneeAvatar}
+        assignees={assignees}
         dragging={isDragging}
         onClick={() => onEdit(task)}
       />
@@ -80,8 +81,7 @@ function Column({
           <DraggableCard
             key={t.id}
             task={t}
-            assigneeName={nameOf(t.assignee_id)}
-            assigneeAvatar={avatarOf(t.assignee_id)}
+            assignees={peopleOf(t.assignee_ids, nameOf, avatarOf)}
             onEdit={onEdit}
           />
         ))}
@@ -152,8 +152,7 @@ export function TaskBoard({
         {activeTask ? (
           <TaskCard
             task={activeTask}
-            assigneeName={nameOf(activeTask.assignee_id)}
-            assigneeAvatar={avatarOf(activeTask.assignee_id)}
+            assignees={peopleOf(activeTask.assignee_ids, nameOf, avatarOf)}
           />
         ) : null}
       </DragOverlay>

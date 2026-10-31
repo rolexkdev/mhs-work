@@ -28,10 +28,14 @@ import {
   RECURRENCE_ORDER,
 } from "@/modules/tasks/constants";
 import { useCreateTask, useUpdateTask } from "@/modules/tasks/hooks";
+import {
+  AssigneePicker,
+  AssigneeStack,
+  peopleOf,
+} from "@/modules/tasks/components/assignee-stack";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import type { Task, Meeting } from "@/types/database";
 
-const UNASSIGNED = "__none__";
 const NO_MEETING = "__none__";
 const NO_DEPT = "__none__";
 const NO_CAT = "__none__";
@@ -66,7 +70,7 @@ export function TaskFormDialog({
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [assignee, setAssignee] = useState<string>(UNASSIGNED);
+  const [assignees, setAssignees] = useState<string[]>([]);
   const [meetingId, setMeetingId] = useState<string>(NO_MEETING);
   const [department, setDepartment] = useState<string>(NO_DEPT);
   const [category, setCategory] = useState<string>(NO_CAT);
@@ -80,7 +84,7 @@ export function TaskFormDialog({
     if (!open) return;
     setTitle(task?.title ?? "");
     setDescription(task?.description ?? "");
-    setAssignee(task?.assignee_id ?? UNASSIGNED);
+    setAssignees(task?.assignee_ids ?? []);
     setMeetingId(task?.meeting_id ?? defaultMeetingId ?? NO_MEETING);
     setDepartment(task?.department ?? NO_DEPT);
     setCategory(task?.category ?? NO_CAT);
@@ -99,7 +103,7 @@ export function TaskFormDialog({
     const common = {
       title: title.trim(),
       description: description.trim() || null,
-      assignee_id: assignee === UNASSIGNED ? null : assignee,
+      assignee_ids: assignees,
       meeting_id: meetingId === NO_MEETING ? null : meetingId,
       department: department === NO_DEPT ? null : department,
       category: category === NO_CAT ? null : category,
@@ -168,19 +172,33 @@ export function TaskFormDialog({
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <FieldLabel>Người thực hiện</FieldLabel>
-                  <Select value={assignee} onValueChange={setAssignee}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={UNASSIGNED}>Chưa giao</SelectItem>
-                      {profiles.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.full_name ?? p.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <AssigneePicker
+                    value={assignees}
+                    options={profiles.map((p) => ({
+                      value: p.id,
+                      label: p.full_name ?? p.email,
+                      avatarUrl: p.avatar_url,
+                    }))}
+                    onChange={setAssignees}
+                  >
+                    <button
+                      type="button"
+                      className="flex h-10 w-full min-w-0 items-center rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <AssigneeStack
+                        people={peopleOf(
+                          assignees,
+                          (id) => {
+                            const p = profiles.find((x) => x.id === id);
+                            return p ? p.full_name ?? p.email : null;
+                          },
+                          (id) =>
+                            profiles.find((x) => x.id === id)?.avatar_url ?? null,
+                        )}
+                        empty="Chưa giao"
+                      />
+                    </button>
+                  </AssigneePicker>
                 </div>
 
                 <div className="space-y-1.5">
