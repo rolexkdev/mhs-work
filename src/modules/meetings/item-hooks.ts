@@ -9,10 +9,10 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/query-keys";
 import { friendlyError } from "@/lib/errors";
+import { DEPARTMENTS } from "@/modules/tasks/constants";
 import type { Database, MeetingItem, Profile } from "@/types/database";
 import type { ParsedItem } from "@/modules/meetings/parse-minutes";
 
-type ItemUpdate = Database["public"]["Tables"]["meeting_items"]["Update"];
 type TaskInsert = Database["public"]["Tables"]["tasks"]["Insert"];
 
 /** User đang đăng nhập (id + role) — để hiện nút theo quyền. */
@@ -54,34 +54,70 @@ export function useMeetingItems(meetingId: string) {
   });
 }
 
-export type ItemStats = { total: number; done: number; inProgress: number };
+const DEPT_ALIASES: { re: RegExp; value: string }[] = [
+  { re: /(^|[^\p{L}])mt($|[^\p{L}])/iu, value: "Môi trường" },
+  { re: /xlnt/i, value: "NM Xử lý nước thải" },
+];
 
-/** Số đầu mục theo từng cuộc họp (cho thẻ ở trang danh sách). */
-export function useMeetingItemStats() {
-  return useQuery({
-    queryKey: queryKeys.meetingItemStats,
-    queryFn: async (): Promise<Record<string, ItemStats>> => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("meeting_items")
-        .select("meeting_id, status");
-      if (error) throw error;
-      const stats: Record<string, ItemStats> = {};
-      for (const row of data ?? []) {
-        const s = (stats[row.meeting_id] ??= { total: 0, done: 0, inProgress: 0 });
-        s.total += 1;
-        if (row.status === "done") s.done += 1;
-        else if (row.status === "in_progress") s.inProgress += 1;
-      }
-      return stats;
-    },
-  });
+/**
+ * Phòng của công việc từ "Đơn vị phụ trách" trong biên bản: lấy phòng được nhắc
+ * tới đầu tiên trong danh sách phòng; không có thì giữ nguyên chữ trong biên bản.
+ */
+export function taskDepartment(text: string | null): string | null {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  const hits = [
+    ...DEPARTMENTS.map((d) => ({
+      at: t.indexOf(d.value.toLowerCase()),
+      value: d.value,
+    })),
+    ...DEPT_ALIASES.map((a) => ({ at: t.search(a.re), value: a.value })),
+  ].filter((h) => h.at >= 0);
+  hits.sort((a, b) => a.at - b.at);
+  return hits[0]?.value ?? text;
 }
 
-function invalidateItems(qc: ReturnType<typeof useQueryClient>) {
+type TaskFields = Pick<
+  MeetingItem,
+  "title" | "content" | "department" | "deadline"
+>;
+
+const taskTitle = (it: TaskFields) =>
+  it.title ? `${it.title}: ${it.content}` : it.content;
+
+/** Công việc của 1 đầu mục: giao theo phòng, chưa chọn người thực hiện. */
+function taskFromItem(item: MeetingItem, userId: string): TaskInsert {
+  return {
+    title: taskTitle(item),
+    description:
+      [
+        item.department && `Đơn vị phụ trách (biên bản): ${item.department}`,
+        item.deadline && `Thời hạn (biên bản): ${item.deadline}`,
+      ]
+        .filter(Boolean)
+        .join("\n") || null,
+    meeting_id: item.meeting_id,
+    meeting_item_id: item.id,
+    department: taskDepartment(item.department),
+    created_by: userId,
+  };
+}
+
+async function currentUserId() {
+  const {
+    data: { user },
+  } = await createClient().auth.getUser();
+  if (!user) throw new Error("Chưa đăng nhập");
+  return user.id;
+}
+
+function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["meeting-items"] });
+  qc.invalidateQueries({ queryKey: ["tasks"] });
+  qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
 }
 
+/** Thêm đầu mục và tạo luôn công việc cho từng đầu mục. */
 export function useAddMeetingItems() {
   const qc = useQueryClient();
   return useMutation({
@@ -93,6 +129,7 @@ export function useAddMeetingItems() {
       items: ParsedItem[];
     }) => {
       const supabase = createClient();
+      const userId = await currentUserId();
       // Nối tiếp sau các đầu mục đã có
       const { data: last } = await supabase
         .from("meeting_items")
@@ -102,149 +139,101 @@ export function useAddMeetingItems() {
         .limit(1)
         .maybeSingle();
       const base = (last?.sort_order ?? -1) + 1;
-      const { error } = await supabase.from("meeting_items").insert(
-        items.map((it, i) => ({
-          meeting_id: meetingId,
-          section: it.section,
-          title: it.title,
-          content: it.content,
-          department: it.department,
-          deadline: it.deadline,
-          sort_order: base + i,
-        })),
-      );
+      const { data, error } = await supabase
+        .from("meeting_items")
+        .insert(
+          items.map((it, i) => ({
+            meeting_id: meetingId,
+            section: it.section,
+            title: it.title,
+            content: it.content,
+            department: it.department,
+            deadline: it.deadline,
+            sort_order: base + i,
+          })),
+        )
+        .select();
+      if (error) throw error;
+
+      const { error: taskError } = await supabase
+        .from("tasks")
+        .insert((data ?? []).map((it) => taskFromItem(it, userId)));
+      if (taskError) throw taskError;
+      return items.length;
+    },
+    onSuccess: (n) => {
+      invalidateAll(qc);
+      toast.success(`Đã tạo ${n} công việc`);
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
+
+/** Tạo bù công việc cho các đầu mục chưa có (họp import trước đây). */
+export function useCreateMissingTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: MeetingItem[]) => {
+      const userId = await currentUserId();
+      const { error } = await createClient()
+        .from("tasks")
+        .insert(items.map((it) => taskFromItem(it, userId)));
       if (error) throw error;
       return items.length;
     },
     onSuccess: (n) => {
-      invalidateItems(qc);
-      toast.success(`Đã thêm ${n} đầu mục`);
+      invalidateAll(qc);
+      toast.success(`Đã tạo ${n} công việc`);
     },
     onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }
 
+/** Sửa đầu mục, cập nhật theo tên + phòng của công việc đi kèm. */
 export function useUpdateMeetingItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...patch }: { id: string } & ItemUpdate) => {
+    mutationFn: async ({ id, ...fields }: { id: string } & TaskFields) => {
       const supabase = createClient();
       const { error } = await supabase
         .from("meeting_items")
-        .update(patch)
+        .update(fields)
         .eq("id", id);
       if (error) throw error;
+      const { error: taskError } = await supabase
+        .from("tasks")
+        .update({
+          title: taskTitle(fields),
+          department: taskDepartment(fields.department),
+        })
+        .eq("meeting_item_id", id);
+      if (taskError) throw taskError;
     },
-    onSuccess: () => invalidateItems(qc),
+    onSuccess: () => invalidateAll(qc),
     onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }
 
-/** Đánh dấu đã xử lý (kèm kết quả) hoặc mở lại. */
-export function useResolveMeetingItem() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      id,
-      done,
-      result,
-    }: {
-      id: string;
-      done: boolean;
-      result?: string | null;
-    }) => {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const patch: ItemUpdate = done
-        ? {
-            status: "done",
-            result: result ?? null,
-            handled_by: user?.id ?? null,
-            handled_at: new Date().toISOString(),
-          }
-        : { status: "in_progress", handled_by: null, handled_at: null };
-      const { error } = await supabase
-        .from("meeting_items")
-        .update(patch)
-        .eq("id", id);
-      if (error) throw error;
-      return done;
-    },
-    onSuccess: (done) => {
-      invalidateItems(qc);
-      toast.success(done ? "Đã đánh dấu xử lý xong" : "Đã mở lại đầu mục");
-    },
-    onError: (e: Error) => toast.error(friendlyError(e)),
-  });
-}
-
+/** Xoá đầu mục cùng công việc đi kèm. */
 export function useDeleteMeetingItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient();
-      const { error } = await supabase.from("meeting_items").delete().eq("id", id);
+      const { error: taskError } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("meeting_item_id", id);
+      if (taskError) throw taskError;
+      const { error } = await supabase
+        .from("meeting_items")
+        .delete()
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      invalidateItems(qc);
-      qc.invalidateQueries({ queryKey: ["tasks"] });
+      invalidateAll(qc);
       toast.success("Đã xoá đầu mục");
-    },
-    onError: (e: Error) => toast.error(friendlyError(e)),
-  });
-}
-
-/**
- * Giao việc từ 1 đầu mục: tạo task (mỗi người 1 task) gắn với cuộc họp + đầu mục,
- * rồi chuyển đầu mục sang "Đang xử lý" nếu đang "Chưa nhận".
- */
-export function useAssignMeetingItem() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: {
-      item: MeetingItem;
-      title: string;
-      description: string | null;
-      assigneeIds: string[];
-      department: string | null;
-      due_date: string | null;
-    }) => {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Chưa đăng nhập");
-
-      const assignees = input.assigneeIds.length ? input.assigneeIds : [null];
-      const rows: TaskInsert[] = assignees.map((assignee_id) => ({
-        title: input.title,
-        description: input.description,
-        meeting_id: input.item.meeting_id,
-        meeting_item_id: input.item.id,
-        assignee_id,
-        department: input.department,
-        due_date: input.due_date,
-        created_by: user.id,
-      }));
-      const { error } = await supabase.from("tasks").insert(rows);
-      if (error) throw error;
-
-      if (input.item.status === "open") {
-        await supabase
-          .from("meeting_items")
-          .update({ status: "in_progress" })
-          .eq("id", input.item.id);
-      }
-      return rows.length;
-    },
-    onSuccess: (n) => {
-      invalidateItems(qc);
-      qc.invalidateQueries({ queryKey: ["tasks"] });
-      qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
-      toast.success(n > 1 ? `Đã tạo ${n} công việc` : "Đã tạo công việc");
     },
     onError: (e: Error) => toast.error(friendlyError(e)),
   });

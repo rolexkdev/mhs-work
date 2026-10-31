@@ -179,8 +179,8 @@ export function ImportItemsDialog({
             {isCreate ? "Tạo cuộc họp từ biên bản" : "Nhập đầu mục từ biên bản"}
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Mỗi đầu mục là 1 nội dung chỉ đạo — mọi người sẽ nhận/giao việc và
-            đánh dấu đã xử lý trên từng đầu mục.
+            Mỗi đầu mục sẽ tạo thành 1 công việc giao theo phòng phụ trách, các
+            anh chị tự cập nhật tiến độ.
           </p>
         </DialogHeader>
 
@@ -386,8 +386,8 @@ export function ImportItemsDialog({
             {pending
               ? "Đang lưu..."
               : isCreate
-                ? `Tạo cuộc họp${count ? ` + ${count} đầu mục` : ""}`
-                : `Thêm ${count} đầu mục`}
+                ? `Tạo cuộc họp${count ? ` + ${count} công việc` : ""}`
+                : `Tạo ${count} công việc`}
           </Button>
         </DialogFooter>
       </DialogContent>

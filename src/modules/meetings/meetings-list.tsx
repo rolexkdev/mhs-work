@@ -12,7 +12,7 @@ import {
   useMeetings,
   useMeetingTaskCounts,
 } from "@/modules/meetings/hooks";
-import { useMe, useMeetingItemStats } from "@/modules/meetings/item-hooks";
+import { useMe } from "@/modules/meetings/item-hooks";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
 import { ImportItemsDialog } from "@/modules/meetings/import-items-dialog";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
@@ -25,7 +25,6 @@ export function MeetingsList() {
   const canManage = me?.role === "admin" || me?.role === "leader";
   const { data: meetings = [], isLoading } = useMeetings();
   const { data: counts = {} } = useMeetingTaskCounts();
-  const { data: stats = {} } = useMeetingItemStats();
 
   return (
     <div className="space-y-4">
@@ -68,7 +67,7 @@ export function MeetingsList() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {meetings.map((m) => {
             const meta = MEETING_STATUS_META[m.status];
-            const st = stats[m.id];
+            const c = counts[m.id];
             return (
               <Link key={m.id} href={`/meetings/${m.id}`}>
                 <Card className="h-full transition-shadow hover:shadow-md">
@@ -85,9 +84,6 @@ export function MeetingsList() {
                         />
                         {meta.label}
                       </span>
-                      <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        {counts[m.id] ?? 0} việc
-                      </span>
                     </div>
 
                     <div>
@@ -100,26 +96,18 @@ export function MeetingsList() {
                       </p>
                     </div>
 
-                    {st ? (
+                    {c ? (
                       <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>
-                            {st.done}/{st.total} đầu mục đã xử lý
-                          </span>
-                          {st.total - st.done - st.inProgress > 0 && (
-                            <span className="text-orange-600">
-                              {st.total - st.done - st.inProgress} chưa nhận
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex h-1.5 overflow-hidden rounded-full bg-secondary">
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-semibold text-foreground">
+                            {c.done}/{c.total}
+                          </span>{" "}
+                          công việc hoàn thành
+                        </p>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
                           <div
-                            className="bg-emerald-500"
-                            style={{ width: `${(st.done / st.total) * 100}%` }}
-                          />
-                          <div
-                            className="bg-blue-500"
-                            style={{ width: `${(st.inProgress / st.total) * 100}%` }}
+                            className="h-full bg-emerald-500"
+                            style={{ width: `${(c.done / c.total) * 100}%` }}
                           />
                         </div>
                       </div>
@@ -132,7 +120,7 @@ export function MeetingsList() {
                     )}
 
                     <div className="flex items-center gap-1 text-xs font-medium text-primary">
-                      Xem & giao việc <ArrowRight className="h-3.5 w-3.5" />
+                      Xem chi tiết <ArrowRight className="h-3.5 w-3.5" />
                     </div>
                   </CardContent>
                 </Card>

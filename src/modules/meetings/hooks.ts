@@ -47,20 +47,25 @@ export function useMeeting(id: string) {
   });
 }
 
-/** Đếm số task theo từng cuộc họp (client-side aggregate). */
+export type MeetingTaskCount = { total: number; done: number };
+
+/** Số công việc hoàn thành / tổng theo từng cuộc họp (client-side aggregate). */
 export function useMeetingTaskCounts() {
   return useQuery({
     queryKey: ["meeting-task-counts"],
-    queryFn: async (): Promise<Record<string, number>> => {
+    queryFn: async (): Promise<Record<string, MeetingTaskCount>> => {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("tasks")
-        .select("meeting_id");
+        .select("meeting_id, status")
+        .not("meeting_id", "is", null);
       if (error) throw error;
-      const counts: Record<string, number> = {};
+      const counts: Record<string, MeetingTaskCount> = {};
       for (const row of data ?? []) {
-        if (row.meeting_id)
-          counts[row.meeting_id] = (counts[row.meeting_id] ?? 0) + 1;
+        if (!row.meeting_id) continue;
+        const c = (counts[row.meeting_id] ??= { total: 0, done: 0 });
+        c.total += 1;
+        if (row.status === "done") c.done += 1;
       }
       return counts;
     },
