@@ -11,6 +11,10 @@ npm-debug.log*
 next-env.d.ts
 backup-*.json
 tai-khoan-nhan-vien.csv
+graphify-out
+.agents
+dev.log
 
 # Supabase CLI cache
 supabase/.temp/
+
