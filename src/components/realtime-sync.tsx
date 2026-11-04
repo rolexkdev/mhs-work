@@ -3,8 +3,13 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/query-keys";
 
-type ChangeRow = { task_id?: string } | null;
+type ChangeRow = {
+  id?: string;
+  task_id?: string;
+  document_id?: string;
+} | null;
 
 /**
  * Đồng bộ realtime: lắng nghe thay đổi từ Supabase và làm mới cache react-query
@@ -19,6 +24,12 @@ export function RealtimeSync() {
 
     const taskIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
       payload.new?.task_id ?? payload.old?.task_id ?? null;
+
+    const documentIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
+      payload.new?.document_id ?? payload.old?.document_id ?? null;
+
+    const rowIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
+      payload.new?.id ?? payload.old?.id ?? null;
 
     const channel = supabase
       .channel("realtime-app")
@@ -36,7 +47,7 @@ export function RealtimeSync() {
         "postgres_changes",
         { event: "*", schema: "public", table: "meetings" },
         () => {
-          qc.invalidateQueries({ queryKey: ["meetings"] });
+          qc.invalidateQueries({ queryKey: queryKeys.meetings });
           qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
         },
       )
@@ -70,9 +81,70 @@ export function RealtimeSync() {
           if (id) qc.invalidateQueries({ queryKey: ["attachments", id] });
         },
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "documents" },
+        (payload) => {
+          const id = rowIdFrom(payload);
+          qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
+          qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
+          qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
+          if (id) {
+            qc.invalidateQueries({ queryKey: queryKeys.document(id) });
+            qc.invalidateQueries({ queryKey: queryKeys.documentHolders(id) });
+            qc.invalidateQueries({ queryKey: queryKeys.documentLogs(id) });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "document_handoffs" },
+        (payload) => {
+          const docId = documentIdFrom(payload);
+          qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
+          qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
+          qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
+          if (docId) {
+            qc.invalidateQueries({
+              queryKey: queryKeys.documentHandoffs(docId),
+            });
+            qc.invalidateQueries({
+              queryKey: queryKeys.documentHolders(docId),
+            });
+            qc.invalidateQueries({ queryKey: queryKeys.document(docId) });
+            qc.invalidateQueries({ queryKey: queryKeys.documentLogs(docId) });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "document_attachments" },
+        (payload) => {
+          const docId = documentIdFrom(payload);
+          if (docId) {
+            qc.invalidateQueries({
+              queryKey: queryKeys.documentAttachments(docId),
+            });
+          }
+        },
+      );
+
+    // Join with the user's JWT, not the anon key: every table policy is
+    // `to authenticated`, so an anon join gets SUBSCRIBED but no events.
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) supabase.realtime.setAuth(data.session.access_token);
+      channel.subscribe();
+    });
+
+    // Keep the socket's token fresh after the hourly refresh.
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session) supabase.realtime.setAuth(session.access_token);
+      },
+    );
 
     return () => {
+      authListener.subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, [qc]);
