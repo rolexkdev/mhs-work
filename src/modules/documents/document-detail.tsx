@@ -967,29 +967,33 @@ function AttachmentsCard({
             <Paperclip className="h-4 w-4 text-muted-foreground" />
             Tệp đính kèm ({attachments.length})
           </h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => inputRef.current?.click()}
-            disabled={upload.isPending}
-          >
-            {upload.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Plus className="h-3.5 w-3.5" />
-            )}
-            Tải lên
-          </Button>
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) upload.mutate(f);
-              e.target.value = "";
-            }}
-          />
+          {canManage && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => inputRef.current?.click()}
+                disabled={upload.isPending}
+              >
+                {upload.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5" />
+                )}
+                Tải lên
+              </Button>
+              <input
+                ref={inputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) upload.mutate(f);
+                  e.target.value = "";
+                }}
+              />
+            </>
+          )}
         </div>
 
         {images.length > 0 && (
