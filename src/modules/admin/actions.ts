@@ -60,7 +60,9 @@ export async function listAccounts(): Promise<{
 
   const { data: profiles, error } = await guard.admin
     .from("profiles")
-    .select("id, email, full_name, role, avatar_url, created_at");
+    .select(
+      "id, email, full_name, role, office_id, department, avatar_url, created_at",
+    );
   if (error) return { error: error.message };
 
   // last_sign_in_at / banned_until chỉ có trong auth.users, không có ở profiles.
@@ -86,6 +88,8 @@ export async function listAccounts(): Promise<{
       email: p.email,
       fullName: p.full_name,
       role: p.role,
+      officeId: p.office_id ?? null,
+      department: p.department ?? null,
       avatarUrl: p.avatar_url,
       createdAt: p.created_at,
       lastSignInAt: authById.get(p.id)?.lastSignInAt ?? null,
@@ -102,11 +106,20 @@ export async function listAccounts(): Promise<{
 
 async function createOne(
   admin: ReturnType<typeof createAdminClient>,
-  input: { fullName: string; email: string; role: UserRole; password?: string },
+  input: {
+    fullName: string;
+    email: string;
+    role: UserRole;
+    officeId?: string | null;
+    department?: string | null;
+    password?: string;
+  },
 ): Promise<{ error?: string }> {
   const email = input.email.trim().toLowerCase();
   const fullName = input.fullName.trim();
   const password = input.password?.trim() || DEFAULT_PASSWORD;
+  const officeId = input.officeId?.trim() || null;
+  const department = input.department?.trim() || null;
 
   if (!email.includes("@")) return { error: "Email không hợp lệ." };
   if (!fullName) return { error: "Chưa nhập họ tên." };
@@ -129,10 +142,18 @@ async function createOne(
   }
 
   // Trigger handle_new_user đã tạo profile — ghi đè cho chắc tên và vai trò.
+  // Also persist office_id and department on profile creation.
   const { error: profileError } = await admin
     .from("profiles")
     .upsert(
-      { id: data.user.id, email, full_name: fullName, role: input.role },
+      {
+        id: data.user.id,
+        email,
+        full_name: fullName,
+        role: input.role,
+        office_id: officeId,
+        department,
+      },
       { onConflict: "id" },
     );
   if (profileError) return { error: profileError.message };
@@ -144,6 +165,8 @@ export async function createAccount(input: {
   fullName: string;
   email: string;
   role: UserRole;
+  officeId?: string | null;
+  department?: string | null;
   password?: string;
 }): Promise<{ error?: string }> {
   const guard = await requireAdmin();
@@ -189,6 +212,8 @@ export async function updateAccount(input: {
   userId: string;
   fullName: string;
   role: UserRole;
+  officeId?: string | null;
+  department?: string | null;
 }): Promise<{ error?: string }> {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
@@ -204,9 +229,17 @@ export async function updateAccount(input: {
     };
   }
 
+  const officeId = input.officeId?.trim() || null;
+  const department = input.department?.trim() || null;
+
   const { error } = await guard.admin
     .from("profiles")
-    .update({ full_name: fullName, role: input.role })
+    .update({
+      full_name: fullName,
+      role: input.role,
+      office_id: officeId,
+      department,
+    })
     .eq("id", input.userId);
 
   return error ? { error: error.message } : {};

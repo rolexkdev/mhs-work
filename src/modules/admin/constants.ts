@@ -36,6 +36,8 @@ export type AccountRow = {
   email: string;
   fullName: string | null;
   role: UserRole;
+  officeId: string | null;
+  department: string | null;
   avatarUrl: string | null;
   createdAt: string;
   /** null = chưa đăng nhập lần nào. */

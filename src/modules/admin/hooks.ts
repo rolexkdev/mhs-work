@@ -42,6 +42,8 @@ export function useCreateAccount() {
       fullName: string;
       email: string;
       role: UserRole;
+      officeId?: string | null;
+      department?: string | null;
       password?: string;
     }) => {
       const res = await createAccount(input);
@@ -81,6 +83,8 @@ export function useUpdateAccount() {
       userId: string;
       fullName: string;
       role: UserRole;
+      officeId?: string | null;
+      department?: string | null;
     }) => {
       const res = await updateAccount(input);
       if (res.error) throw new Error(res.error);

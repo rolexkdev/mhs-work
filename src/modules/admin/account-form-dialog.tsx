@@ -25,7 +25,10 @@ import {
   type AccountRow,
 } from "@/modules/admin/constants";
 import { useCreateAccount, useUpdateAccount } from "@/modules/admin/hooks";
+import { useOffices } from "@/modules/documents/office-hooks";
 import type { UserRole } from "@/types/database";
+
+const NONE_OFFICE = "__none__";
 
 export function AccountFormDialog({
   open,
@@ -40,10 +43,13 @@ export function AccountFormDialog({
   const isEdit = !!account;
   const createAccount = useCreateAccount();
   const updateAccount = useUpdateAccount();
+  const { data: offices = [] } = useOffices();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("member");
+  const [officeId, setOfficeId] = useState<string>(NONE_OFFICE);
+  const [department, setDepartment] = useState("");
   const [password, setPassword] = useState(DEFAULT_PASSWORD);
 
   useEffect(() => {
@@ -51,6 +57,8 @@ export function AccountFormDialog({
     setFullName(account?.fullName ?? "");
     setEmail(account?.email ?? "");
     setRole(account?.role ?? "member");
+    setOfficeId(account?.officeId ?? NONE_OFFICE);
+    setDepartment(account?.department ?? "");
     setPassword(DEFAULT_PASSWORD);
   }, [open, account]);
 
@@ -60,17 +68,24 @@ export function AccountFormDialog({
     e.preventDefault();
     if (!fullName.trim()) return;
 
+    const resolvedOfficeId = officeId === NONE_OFFICE ? null : officeId;
+    const resolvedDepartment = department.trim() || null;
+
     if (isEdit && account) {
       await updateAccount.mutateAsync({
         userId: account.id,
         fullName: fullName.trim(),
         role,
+        officeId: resolvedOfficeId,
+        department: resolvedDepartment,
       });
     } else {
       await createAccount.mutateAsync({
         fullName: fullName.trim(),
         email: email.trim(),
         role,
+        officeId: resolvedOfficeId,
+        department: resolvedDepartment,
         password,
       });
     }
@@ -140,6 +155,33 @@ export function AccountFormDialog({
             <p className="text-xs text-muted-foreground">
               {ROLE_OPTIONS.find((r) => r.value === role)?.hint}
             </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Văn phòng</Label>
+            <Select value={officeId} onValueChange={setOfficeId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Chọn văn phòng" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_OFFICE}>Chưa gán văn phòng</SelectItem>
+                {offices.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.code} — {o.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="a-department">Phòng ban</Label>
+            <Input
+              id="a-department"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              placeholder="VD: Phòng Hành chính - Nhân sự"
+            />
           </div>
 
           {!isEdit && (
