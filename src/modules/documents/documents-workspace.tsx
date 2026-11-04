@@ -8,17 +8,11 @@ import {
   Plus,
   Search,
   FileText,
-  ArrowRight,
-  CalendarClock,
-  Building2,
-  User,
   Filter,
   Loader2,
-  Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  dueLabel,
   formatDate,
   formatDateTime,
   initials,
@@ -44,15 +38,12 @@ import {
 import {
   DOCUMENT_STATUS_META,
   DOCUMENT_STATUS_ORDER,
-  DOCUMENT_PRIORITY_META,
   HANDOFF_KIND_META,
-  NON_SHIPPABLE_DOCUMENT_STATUSES,
 } from "@/modules/documents/constants";
 import { useDocuments } from "@/modules/documents/hooks";
 import {
   useMyPendingHandoffs,
   useMyHeldDocumentIds,
-  useDocumentsWithPendingHandoffs,
   useRespondHandoff,
   type PendingHandoffWithDocument,
 } from "@/modules/documents/handoff-hooks";
@@ -61,7 +52,6 @@ import { useProfiles } from "@/modules/auth/use-profiles";
 import { useMe } from "@/modules/meetings/item-hooks";
 import { DocumentFormDialog } from "@/modules/documents/document-form-dialog";
 import { RespondHandoffDialog } from "@/modules/documents/respond-handoff-dialog";
-import { ShipmentFormDialog } from "@/modules/documents/shipment-form-dialog";
 import type { DocumentRecord, DocumentStatus, Office } from "@/types/database";
 
 const ALL = "__all__";
@@ -77,8 +67,6 @@ export function DocumentsWorkspace() {
   const [categorySearch, setCategorySearch] = useState("");
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [shipmentOpen, setShipmentOpen] = useState(false);
-  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
 
   const [respondTarget, setRespondTarget] = useState<{
     handoff: PendingHandoffWithDocument;
@@ -101,8 +89,6 @@ export function DocumentsWorkspace() {
   const { data: pendingHandoffs = [], isLoading: pendingLoading } =
     useMyPendingHandoffs();
   const { data: myHeldDocIds = [] } = useMyHeldDocumentIds();
-  const { data: pendingHandoffDocIds = [] } =
-    useDocumentsWithPendingHandoffs();
   const respondHandoff = useRespondHandoff();
 
   const profileById = useMemo(
@@ -114,24 +100,9 @@ export function DocumentsWorkspace() {
     [offices],
   );
   const myProfile = me ? profileById.get(me.id) : undefined;
-  const isLeaderOrAdmin = me?.role === "admin" || me?.role === "leader";
+  const canManage = !!me?.can_manage_documents;
 
   const heldSet = useMemo(() => new Set(myHeldDocIds), [myHeldDocIds]);
-  const pendingHandoffSet = useMemo(
-    () => new Set(pendingHandoffDocIds),
-    [pendingHandoffDocIds],
-  );
-
-  const canShipDoc = useMemo(() => {
-    return (doc: DocumentRecord) => {
-      if (!me) return false;
-      if (NON_SHIPPABLE_DOCUMENT_STATUSES.has(doc.status)) return false;
-      if (pendingHandoffSet.has(doc.id)) return false;
-      if (isLeaderOrAdmin) return true;
-      return doc.current_holder_id === me.id || heldSet.has(doc.id);
-    };
-  }, [me, isLeaderOrAdmin, heldSet, pendingHandoffSet]);
-
   const holdingDocuments = useMemo(() => {
     if (!me) return [];
     return documents.filter(
@@ -174,28 +145,9 @@ export function DocumentsWorkspace() {
     setSearch("");
   }
 
-  function toggleSelectDoc(docId: string) {
-    setSelectedDocIds((prev) =>
-      prev.includes(docId)
-        ? prev.filter((id) => id !== docId)
-        : [...prev, docId],
-    );
-  }
-
-  function toggleSelectMany(docIds: string[]) {
-    if (docIds.length === 0) return;
-    const allSelected = docIds.every((id) => selectedDocIds.includes(id));
-    if (allSelected) {
-      const removeSet = new Set(docIds);
-      setSelectedDocIds((prev) => prev.filter((id) => !removeSet.has(id)));
-    } else {
-      setSelectedDocIds((prev) => Array.from(new Set([...prev, ...docIds])));
-    }
-  }
-
   return (
     <div className="space-y-4">
-      {/* Toolbar: search, filters, bulk ship action, and create button */}
+      {/* Toolbar: search, filters and create button */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1 basis-full sm:basis-auto">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -254,31 +206,14 @@ export function DocumentsWorkspace() {
         )}
 
         <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          {selectedDocIds.length > 0 && (
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => setShipmentOpen(true)}
-                className="flex-1 sm:flex-initial"
-              >
-                <Truck className="h-4 w-4" /> Gửi đi ({selectedDocIds.length})
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedDocIds([])}
-                className="text-muted-foreground"
-              >
-                Bỏ chọn
-              </Button>
-            </>
+          {canManage && (
+            <Button
+              onClick={() => setCreateOpen(true)}
+              className="flex-1 sm:flex-initial"
+            >
+              <Plus className="h-4 w-4" /> Tiếp nhận hồ sơ
+            </Button>
           )}
-          <Button
-            onClick={() => setCreateOpen(true)}
-            className="flex-1 sm:flex-initial"
-          >
-            <Plus className="h-4 w-4" /> Tạo hồ sơ
-          </Button>
         </div>
       </div>
 
@@ -374,12 +309,6 @@ export function DocumentsWorkspace() {
           ) : (
             <DocumentsListView
               documents={holdingDocuments}
-              currentUserId={me?.id ?? null}
-              heldSet={heldSet}
-              selectedIds={selectedDocIds}
-              canShipDoc={canShipDoc}
-              onToggleSelect={toggleSelectDoc}
-              onToggleSelectMany={toggleSelectMany}
               nameOf={(id) =>
                 id
                   ? (profileById.get(id)?.full_name ??
@@ -390,7 +319,6 @@ export function DocumentsWorkspace() {
               avatarOf={(id) =>
                 id ? (profileById.get(id)?.avatar_url ?? null) : null
               }
-              officeById={officeById}
             />
           )}
         </TabsContent>
@@ -407,18 +335,12 @@ export function DocumentsWorkspace() {
               message={
                 hasFilters
                   ? "Không tìm thấy hồ sơ nào khớp bộ lọc."
-                  : "Chưa có hồ sơ nào. Bấm Tạo hồ sơ để bắt đầu."
+                  : "Chưa có hồ sơ nào."
               }
             />
           ) : (
             <DocumentsListView
               documents={documents}
-              currentUserId={me?.id ?? null}
-              heldSet={heldSet}
-              selectedIds={selectedDocIds}
-              canShipDoc={canShipDoc}
-              onToggleSelect={toggleSelectDoc}
-              onToggleSelectMany={toggleSelectMany}
               nameOf={(id) =>
                 id
                   ? (profileById.get(id)?.full_name ??
@@ -429,7 +351,6 @@ export function DocumentsWorkspace() {
               avatarOf={(id) =>
                 id ? (profileById.get(id)?.avatar_url ?? null) : null
               }
-              officeById={officeById}
             />
           )}
         </TabsContent>
@@ -440,14 +361,6 @@ export function DocumentsWorkspace() {
         onOpenChange={setCreateOpen}
         defaultOfficeId={myProfile?.office_id ?? null}
         navigateOnCreate
-      />
-
-      <ShipmentFormDialog
-        open={shipmentOpen}
-        onOpenChange={setShipmentOpen}
-        defaultDocumentIds={selectedDocIds}
-        navigateOnCreate
-        onCreated={() => setSelectedDocIds([])}
       />
 
       <RespondHandoffDialog
@@ -719,381 +632,136 @@ function PendingHandoffsView({
   );
 }
 
+
 function DocumentsListView({
   documents,
-  currentUserId,
-  heldSet,
-  selectedIds,
-  canShipDoc,
-  onToggleSelect,
-  onToggleSelectMany,
   nameOf,
   avatarOf,
-  officeById,
 }: {
   documents: DocumentRecord[];
-  currentUserId: string | null;
-  heldSet: Set<string>;
-  selectedIds: string[];
-  canShipDoc: (doc: DocumentRecord) => boolean;
-  onToggleSelect: (id: string) => void;
-  onToggleSelectMany: (ids: string[]) => void;
   nameOf: (id: string | null) => string | null;
   avatarOf: (id: string | null) => string | null;
-  officeById: Map<string, Office>;
 }) {
-  const shippableIds = useMemo(
-    () => documents.filter(canShipDoc).map((d) => d.id),
-    [documents, canShipDoc],
-  );
-  const allShippableSelected =
-    shippableIds.length > 0 &&
-    shippableIds.every((id) => selectedIds.includes(id));
-
   return (
     <>
       {/* Mobile cards */}
       <div className="divide-y rounded-lg border bg-background md:hidden">
         {documents.map((doc) => {
-          const statusMeta = DOCUMENT_STATUS_META[doc.status];
-          const priorityMeta = DOCUMENT_PRIORITY_META[doc.priority];
-          const holderName = nameOf(doc.current_holder_id);
-          const holderAvatar = avatarOf(doc.current_holder_id);
-          const currentOffice = doc.current_office_id
-            ? officeById.get(doc.current_office_id)
-            : undefined;
-          const isDone = doc.status === "done" || doc.status === "archived";
-          const due = dueLabel(doc.due_date, { done: isDone });
-          const isPrimaryHolder =
-            !!currentUserId && doc.current_holder_id === currentUserId;
-          const isCopyHolder = !isPrimaryHolder && heldSet.has(doc.id);
-          const shippable = canShipDoc(doc);
-          const checked = selectedIds.includes(doc.id);
-
+          const name = nameOf(doc.delivered_to);
+          const avatar = avatarOf(doc.delivered_to);
           return (
-            <div
+            <Link
               key={doc.id}
-              className={cn(
-                "flex items-start gap-2.5 p-3 transition-colors hover:bg-muted/30",
-                checked && "bg-primary/5",
-              )}
+              href={`/documents/${doc.id}`}
+              className="block space-y-1.5 p-3 hover:bg-muted/30"
             >
-              {shippable && (
-                <button
-                  type="button"
-                  onClick={() => onToggleSelect(doc.id)}
-                  className="mt-0.5 shrink-0"
-                  aria-label="Chọn hồ sơ để gửi đi"
-                >
-                  <span
-                    className={cn(
-                      "flex h-5 w-5 items-center justify-center rounded border",
-                      checked
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background",
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-mono text-xs font-semibold text-primary">
+                  {doc.code}
+                </span>
+                {doc.category && (
+                  <Badge variant="outline" className="text-[11px] font-normal">
+                    {doc.category}
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  SL: {doc.quantity}
+                </span>
+              </div>
+              <p className="font-medium leading-snug">{doc.title}</p>
+              <p className="text-xs text-muted-foreground">
+                Tiếp nhận: {formatDate(doc.received_at)}
+              </p>
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                {name ? (
+                  <>
+                    <Avatar className="h-4 w-4">
+                      {avatar && <AvatarImage src={avatar} alt={name} />}
+                      <AvatarFallback className="text-[9px]">
+                        {initials(name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium text-foreground">{name}</span>
+                    {doc.delivered_at && (
+                      <span>· {formatDate(doc.delivered_at)}</span>
                     )}
-                  >
-                    {checked && <Check className="h-3.5 w-3.5" />}
-                  </span>
-                </button>
-              )}
-
-              <Link
-                href={`/documents/${doc.id}`}
-                className="min-w-0 flex-1 space-y-2"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-xs font-semibold text-primary">
-                      {doc.code}
-                    </span>
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium",
-                        statusMeta.badge,
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "h-1.5 w-1.5 rounded-full",
-                          statusMeta.dot,
-                        )}
-                      />
-                      {statusMeta.label}
-                    </span>
-                    {doc.category && (
-                      <Badge
-                        variant="outline"
-                        className="text-[11px] font-normal"
-                      >
-                        {doc.category}
-                      </Badge>
-                    )}
-                    {isCopyHolder && (
-                      <Badge
-                        variant="secondary"
-                        className="text-[11px] font-normal"
-                      >
-                        Giữ bản sao
-                      </Badge>
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
-                      priorityMeta.badge,
-                    )}
-                  >
-                    {priorityMeta.label}
-                  </span>
-                </div>
-
-                <p className="font-medium leading-snug">{doc.title}</p>
-
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  {currentOffice && (
-                    <span className="inline-flex items-center gap-1">
-                      <Building2 className="h-3.5 w-3.5" />
-                      {currentOffice.code}
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1.5">
-                    {holderName ? (
-                      <>
-                        <Avatar className="h-4 w-4">
-                          {holderAvatar && (
-                            <AvatarImage src={holderAvatar} alt={holderName} />
-                          )}
-                          <AvatarFallback className="text-[9px]">
-                            {initials(holderName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-foreground">{holderName}</span>
-                      </>
-                    ) : (
-                      <>
-                        <User className="h-3.5 w-3.5" /> Chưa có người giữ
-                      </>
-                    )}
-                  </span>
-                  {doc.due_date && (
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1",
-                        due.tone === "overdue" && "font-medium text-red-600",
-                        due.tone === "today" && "font-medium text-amber-600",
-                      )}
-                    >
-                      <CalendarClock className="h-3.5 w-3.5" />
-                      {due.text}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            </div>
+                  </>
+                ) : (
+                  "Chưa có người nhận"
+                )}
+              </p>
+            </Link>
           );
         })}
       </div>
 
       {/* Desktop table */}
       <div className="hidden overflow-x-auto rounded-lg border bg-background md:block">
-        <table className="w-full min-w-[940px] text-sm">
+        <table className="w-full min-w-[820px] text-sm">
           <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="w-10 px-3 py-2.5 text-center">
-                {shippableIds.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onToggleSelectMany(shippableIds)}
-                    title="Chọn tất cả hồ sơ có thể gửi"
-                    className="inline-flex items-center justify-center"
-                  >
-                    <span
-                      className={cn(
-                        "flex h-4 w-4 items-center justify-center rounded border",
-                        allShippableSelected
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-input bg-background",
-                      )}
-                    >
-                      {allShippableSelected && <Check className="h-3 w-3" />}
-                    </span>
-                  </button>
-                )}
-              </th>
               <th className="px-4 py-2.5 text-left font-medium">Mã hồ sơ</th>
-              <th className="px-4 py-2.5 text-left font-medium">Tiêu đề</th>
-              <th className="px-4 py-2.5 text-left font-medium">Loại</th>
-              <th className="px-4 py-2.5 text-left font-medium">Trạng thái</th>
-              <th className="px-4 py-2.5 text-left font-medium">Văn phòng</th>
               <th className="px-4 py-2.5 text-left font-medium">
-                Người đang giữ
+                Ngày tiếp nhận hồ sơ
               </th>
-              <th className="px-4 py-2.5 text-left font-medium">Ưu tiên</th>
-              <th className="px-4 py-2.5 text-left font-medium">Hạn xử lý</th>
-              <th className="px-4 py-2.5 text-left font-medium">Ngày tạo</th>
-              <th className="w-10 px-4 py-2.5" />
+              <th className="px-4 py-2.5 text-left font-medium">Loại hồ sơ</th>
+              <th className="px-4 py-2.5 text-right font-medium">Số lượng</th>
+              <th className="px-4 py-2.5 text-left font-medium">
+                Ngày nhận hồ sơ
+              </th>
+              <th className="px-4 py-2.5 text-left font-medium">Người nhận</th>
             </tr>
           </thead>
           <tbody>
             {documents.map((doc) => {
-              const statusMeta = DOCUMENT_STATUS_META[doc.status];
-              const priorityMeta = DOCUMENT_PRIORITY_META[doc.priority];
-              const holderName = nameOf(doc.current_holder_id);
-              const holderAvatar = avatarOf(doc.current_holder_id);
-              const currentOffice = doc.current_office_id
-                ? officeById.get(doc.current_office_id)
-                : undefined;
-              const isDone =
-                doc.status === "done" || doc.status === "archived";
-              const due = dueLabel(doc.due_date, { done: isDone });
-              const isPrimaryHolder =
-                !!currentUserId && doc.current_holder_id === currentUserId;
-              const isCopyHolder = !isPrimaryHolder && heldSet.has(doc.id);
-              const shippable = canShipDoc(doc);
-              const checked = selectedIds.includes(doc.id);
-
+              const name = nameOf(doc.delivered_to);
+              const avatar = avatarOf(doc.delivered_to);
               return (
                 <tr
                   key={doc.id}
-                  className={cn(
-                    "border-b last:border-0 hover:bg-muted/30",
-                    checked && "bg-primary/5",
-                  )}
+                  className="border-b last:border-0 hover:bg-muted/30"
                 >
-                  <td className="px-3 py-3 text-center">
-                    {shippable ? (
-                      <button
-                        type="button"
-                        onClick={() => onToggleSelect(doc.id)}
-                        className="inline-flex items-center justify-center"
-                        aria-label={`Chọn hồ sơ ${doc.code}`}
-                      >
-                        <span
-                          className={cn(
-                            "flex h-4 w-4 items-center justify-center rounded border",
-                            checked
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-input bg-background",
-                          )}
-                        >
-                          {checked && <Check className="h-3 w-3" />}
-                        </span>
-                      </button>
-                    ) : null}
-                  </td>
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold">
                     <Link
                       href={`/documents/${doc.id}`}
                       className="text-primary hover:underline"
+                      title={doc.title}
                     >
                       {doc.code}
                     </Link>
                   </td>
-                  <td className="max-w-xs px-4 py-3">
-                    <Link
-                      href={`/documents/${doc.id}`}
-                      className="line-clamp-2 font-medium hover:underline"
-                    >
-                      {doc.title}
-                    </Link>
-                    {isCopyHolder && (
-                      <span className="mt-0.5 inline-block text-[11px] text-muted-foreground">
-                        (Đang giữ bản sao)
-                      </span>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {formatDate(doc.received_at)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {doc.category ?? (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                    {doc.category || <span className="text-xs">—</span>}
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {doc.quantity}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium",
-                        statusMeta.badge,
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "h-1.5 w-1.5 rounded-full",
-                          statusMeta.dot,
-                        )}
-                      />
-                      {statusMeta.label}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {currentOffice ? (
-                      <Badge
-                        variant="secondary"
-                        className="font-normal"
-                        title={currentOffice.name}
-                      >
-                        {currentOffice.code}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {holderName ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          {holderAvatar && (
-                            <AvatarImage src={holderAvatar} alt={holderName} />
-                          )}
-                          <AvatarFallback className="text-[10px]">
-                            {initials(holderName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="truncate">{holderName}</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium",
-                        priorityMeta.badge,
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "h-1.5 w-1.5 rounded-full",
-                          priorityMeta.dot,
-                        )}
-                      />
-                      {priorityMeta.label}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs">
-                    {doc.due_date ? (
-                      <span
-                        className={cn(
-                          due.tone === "overdue" && "font-medium text-red-600",
-                          due.tone === "today" && "font-medium text-amber-600",
-                          due.tone === "normal" && "text-muted-foreground",
-                        )}
-                      >
-                        {due.text}
-                      </span>
+                    {doc.delivered_at ? (
+                      formatDate(doc.delivered_at)
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                    {formatDate(doc.created_at)}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    <Link
-                      href={`/documents/${doc.id}`}
-                      className="inline-flex items-center text-muted-foreground hover:text-foreground"
-                      title="Xem chi tiết"
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    {name ? (
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          {avatar && <AvatarImage src={avatar} alt={name} />}
+                          <AvatarFallback className="text-[10px]">
+                            {initials(name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </td>
                 </tr>
               );

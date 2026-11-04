@@ -44,6 +44,11 @@ function toDateInput(iso: string | null | undefined): string {
   return iso ? iso.slice(0, 10) : "";
 }
 
+/** Local calendar date (YYYY-MM-DD) of a timestamp. */
+function toLocalDateInput(iso: string | null | undefined): string {
+  return new Date(iso ?? Date.now()).toLocaleDateString("sv-SE");
+}
+
 export function DocumentFormDialog({
   open,
   onOpenChange,
@@ -69,6 +74,8 @@ export function DocumentFormDialog({
   const [originOfficeId, setOriginOfficeId] = useState<string>(NO_OFFICE);
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [dueDate, setDueDate] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [receivedDate, setReceivedDate] = useState("");
   const [description, setDescription] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
@@ -84,6 +91,8 @@ export function DocumentFormDialog({
     );
     setPriority(document?.priority ?? "medium");
     setDueDate(toDateInput(document?.due_date));
+    setQuantity(String(document?.quantity ?? 1));
+    setReceivedDate(toLocalDateInput(document?.received_at));
     setDescription(document?.description ?? "");
     setFiles([]);
   }, [open, document, defaultOfficeId]);
@@ -106,6 +115,10 @@ export function DocumentFormDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
+    const qty = Math.max(1, Math.floor(Number(quantity)) || 1);
+    const receivedAt = receivedDate
+      ? new Date(`${receivedDate}T00:00:00`).toISOString()
+      : undefined;
 
     if (isEdit && document) {
       try {
@@ -116,6 +129,8 @@ export function DocumentFormDialog({
           priority,
           due_date: dueDate || null,
           description: description.trim() || null,
+          quantity: qty,
+          received_at: receivedAt,
         });
       } catch {
         return;
@@ -133,6 +148,8 @@ export function DocumentFormDialog({
         priority,
         due_date: dueDate || null,
         description: description.trim() || null,
+        quantity: qty,
+        received_at: receivedAt ?? null,
       });
     } catch {
       return;
@@ -168,7 +185,7 @@ export function DocumentFormDialog({
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle className="text-lg">
-            {isEdit ? "Chỉnh sửa hồ sơ" : "Tạo hồ sơ mới"}
+            {isEdit ? "Chỉnh sửa hồ sơ" : "Tiếp nhận hồ sơ mới"}
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
             {isEdit
@@ -192,6 +209,29 @@ export function DocumentFormDialog({
                 autoFocus
                 required
               />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="doc-received">Ngày tiếp nhận hồ sơ</Label>
+                <Input
+                  id="doc-received"
+                  type="date"
+                  value={receivedDate}
+                  onChange={(e) => setReceivedDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="doc-quantity">Số lượng</Label>
+                <Input
+                  id="doc-quantity"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

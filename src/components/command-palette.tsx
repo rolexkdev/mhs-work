@@ -8,7 +8,6 @@ import {
   ListChecks,
   CalendarDays,
   FileText,
-  Truck,
 } from "lucide-react";
 import {
   Dialog,
@@ -18,13 +17,10 @@ import {
 import { useTasks } from "@/modules/tasks/hooks";
 import { useMeetings } from "@/modules/meetings/hooks";
 import { useDocuments } from "@/modules/documents/hooks";
-import { useShipments } from "@/modules/documents/shipment-hooks";
 import { FEATURES } from "@/lib/features";
 import { TASK_STATUS_META } from "@/modules/tasks/constants";
 import {
   DOCUMENT_STATUS_META,
-  SHIPMENT_METHOD_META,
-  shipmentStatusMeta,
 } from "@/modules/documents/constants";
 import { formatDateTime } from "@/lib/format";
 
@@ -35,7 +31,6 @@ export function CommandPalette() {
   const { data: tasks = [] } = useTasks();
   const { data: meetings = [] } = useMeetings();
   const { data: documents = [] } = useDocuments();
-  const { data: shipments = [] } = useShipments();
 
   // Phím tắt Ctrl/Cmd + K
   useEffect(() => {
@@ -100,35 +95,6 @@ export function CommandPalette() {
                     <span className="flex-1 truncate">{doc.title}</span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {DOCUMENT_STATUS_META[doc.status].label}
-                    </span>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
-
-            {FEATURES.documents && shipments.length > 0 && (
-              <Command.Group
-                heading="Chuyến vận chuyển"
-                className="px-1 text-xs font-medium text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5"
-              >
-                {shipments.map((s) => (
-                  <Command.Item
-                    key={s.id}
-                    value={`shipment ${s.code} ${s.tracking_no ?? ""} ${s.carrier ?? ""} ${s.id}`}
-                    onSelect={() => go(`/documents/shipments/${s.id}`)}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm text-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
-                  >
-                    <Truck className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="shrink-0 font-mono text-xs font-semibold text-primary">
-                      {s.code}
-                    </span>
-                    <span className="flex-1 truncate">
-                      {SHIPMENT_METHOD_META[s.method].label}
-                      {s.tracking_no ? ` · Vận đơn: ${s.tracking_no}` : ""}
-                      {s.carrier ? ` (${s.carrier})` : ""}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {shipmentStatusMeta(s).label}
                     </span>
                   </Command.Item>
                 ))}

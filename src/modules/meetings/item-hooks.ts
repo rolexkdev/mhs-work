@@ -20,7 +20,10 @@ type TaskInsert = Database["public"]["Tables"]["tasks"]["Insert"];
 export function useMe() {
   return useQuery({
     queryKey: ["me"],
-    queryFn: async (): Promise<Pick<Profile, "id" | "role"> | null> => {
+    queryFn: async (): Promise<Pick<
+      Profile,
+      "id" | "role" | "can_manage_documents"
+    > | null> => {
       const supabase = createClient();
       const {
         data: { user },
@@ -28,10 +31,12 @@ export function useMe() {
       if (!user) return null;
       const { data } = await supabase
         .from("profiles")
-        .select("id, role")
+        .select("id, role, can_manage_documents")
         .eq("id", user.id)
         .maybeSingle();
-      return data ?? { id: user.id, role: "member" };
+      return (
+        data ?? { id: user.id, role: "member", can_manage_documents: false }
+      );
     },
     staleTime: Infinity,
   });

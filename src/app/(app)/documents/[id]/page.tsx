@@ -1,4 +1,3 @@
-import { DocumentsNav } from "@/modules/documents/documents-nav";
 import { DocumentDetail } from "@/modules/documents/document-detail";
 
 export default async function DocumentDetailPage({
@@ -9,7 +8,6 @@ export default async function DocumentDetailPage({
   const { id } = await params;
   return (
     <div className="space-y-4">
-      <DocumentsNav />
       <DocumentDetail id={id} />
     </div>
   );
