@@ -61,7 +61,7 @@ export function DocumentsWorkspace() {
   const { data: profiles = [] } = useProfiles();
   const { data: offices = [] } = useOffices();
 
-  const [tab, setTab] = useState<"pending" | "holding" | "all">("pending");
+  const [tab, setTab] = useState<"all" | "holding" | "pending">("all");
   const [statusFilter, setStatusFilter] = useState<string>(ALL);
   const [officeFilter, setOfficeFilter] = useState<string>(ALL);
   const [categorySearch, setCategorySearch] = useState("");
@@ -220,16 +220,14 @@ export function DocumentsWorkspace() {
       {/* Tabs */}
       <Tabs
         value={tab}
-        onValueChange={(v) => setTab(v as "pending" | "holding" | "all")}
+        onValueChange={(v) => setTab(v as "all" | "holding" | "pending")}
       >
         <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">
-          <TabsTrigger value="pending" className="gap-1.5">
-            <span>Cần tôi xác nhận</span>
-            {pendingHandoffs.length > 0 && (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-semibold text-white">
-                {pendingHandoffs.length}
-              </span>
-            )}
+          <TabsTrigger value="all" className="gap-1.5">
+            <span>Tất cả</span>
+            <span className="text-xs text-muted-foreground">
+              ({documents.length})
+            </span>
           </TabsTrigger>
           <TabsTrigger value="holding" className="gap-1.5">
             <span>Tôi đang giữ</span>
@@ -239,13 +237,79 @@ export function DocumentsWorkspace() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="all" className="gap-1.5">
-            <span>Tất cả</span>
-            <span className="text-xs text-muted-foreground">
-              ({documents.length})
-            </span>
+          <TabsTrigger value="pending" className="gap-1.5">
+            <span>Cần tôi xác nhận</span>
+            {pendingHandoffs.length > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-semibold text-white">
+                {pendingHandoffs.length}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="all">
+          {docsLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : documents.length === 0 ? (
+            <EmptyState
+              message={
+                hasFilters
+                  ? "Không tìm thấy hồ sơ nào khớp bộ lọc."
+                  : "Chưa có hồ sơ nào."
+              }
+            />
+          ) : (
+            <DocumentsListView
+              documents={documents}
+              nameOf={(id) =>
+                id
+                  ? (profileById.get(id)?.full_name ??
+                    profileById.get(id)?.email ??
+                    null)
+                  : null
+              }
+              avatarOf={(id) =>
+                id ? (profileById.get(id)?.avatar_url ?? null) : null
+              }
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="holding">
+          {docsLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : holdingDocuments.length === 0 ? (
+            <EmptyState
+              message={
+                hasFilters
+                  ? "Không có hồ sơ bạn đang giữ khớp bộ lọc."
+                  : "Hiện bạn không giữ bản chính hay bản sao của hồ sơ nào."
+              }
+            />
+          ) : (
+            <DocumentsListView
+              documents={holdingDocuments}
+              nameOf={(id) =>
+                id
+                  ? (profileById.get(id)?.full_name ??
+                    profileById.get(id)?.email ??
+                    null)
+                  : null
+              }
+              avatarOf={(id) =>
+                id ? (profileById.get(id)?.avatar_url ?? null) : null
+              }
+            />
+          )}
+        </TabsContent>
 
         <TabsContent value="pending">
           {pendingLoading ? (
@@ -286,70 +350,6 @@ export function DocumentsWorkspace() {
               }
               onOpenRespondDialog={(h, accept) =>
                 setRespondTarget({ handoff: h, accept })
-              }
-            />
-          )}
-        </TabsContent>
-
-        <TabsContent value="holding">
-          {docsLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : holdingDocuments.length === 0 ? (
-            <EmptyState
-              message={
-                hasFilters
-                  ? "Không có hồ sơ bạn đang giữ khớp bộ lọc."
-                  : "Hiện bạn không giữ bản chính hay bản sao của hồ sơ nào."
-              }
-            />
-          ) : (
-            <DocumentsListView
-              documents={holdingDocuments}
-              nameOf={(id) =>
-                id
-                  ? (profileById.get(id)?.full_name ??
-                    profileById.get(id)?.email ??
-                    null)
-                  : null
-              }
-              avatarOf={(id) =>
-                id ? (profileById.get(id)?.avatar_url ?? null) : null
-              }
-            />
-          )}
-        </TabsContent>
-
-        <TabsContent value="all">
-          {docsLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : documents.length === 0 ? (
-            <EmptyState
-              message={
-                hasFilters
-                  ? "Không tìm thấy hồ sơ nào khớp bộ lọc."
-                  : "Chưa có hồ sơ nào."
-              }
-            />
-          ) : (
-            <DocumentsListView
-              documents={documents}
-              nameOf={(id) =>
-                id
-                  ? (profileById.get(id)?.full_name ??
-                    profileById.get(id)?.email ??
-                    null)
-                  : null
-              }
-              avatarOf={(id) =>
-                id ? (profileById.get(id)?.avatar_url ?? null) : null
               }
             />
           )}
