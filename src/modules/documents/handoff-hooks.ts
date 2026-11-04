@@ -113,6 +113,25 @@ export function useMyHeldDocumentIds() {
   });
 }
 
+/**
+ * Document IDs that currently have at least one `pending` handoff.
+ * Used to exclude documents with open handoffs from being shipped.
+ */
+export function useDocumentsWithPendingHandoffs() {
+  return useQuery({
+    queryKey: queryKeys.documentsWithPendingHandoffs,
+    queryFn: async (): Promise<string[]> => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("document_handoffs")
+        .select("document_id")
+        .eq("status", "pending");
+      if (error) throw error;
+      return Array.from(new Set((data ?? []).map((r) => r.document_id)));
+    },
+  });
+}
+
 export interface CreateHandoffInput {
   documentId: string;
   toUsers: string[];
@@ -150,6 +169,9 @@ export function useCreateHandoff() {
       });
       qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
       qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
+      qc.invalidateQueries({
+        queryKey: queryKeys.documentsWithPendingHandoffs,
+      });
       toast.success("Đã tạo lượt bàn giao");
     },
     onError: (e: Error) => toast.error(friendlyError(e)),
@@ -189,6 +211,9 @@ export function useRespondHandoff() {
       qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
       qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
       qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
+      qc.invalidateQueries({
+        queryKey: queryKeys.documentsWithPendingHandoffs,
+      });
       toast.success(
         vars.accept ? "Đã xác nhận nhận hồ sơ" : "Đã từ chối nhận hồ sơ",
       );
@@ -226,6 +251,9 @@ export function useCancelHandoff() {
       qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
       qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
       qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
+      qc.invalidateQueries({
+        queryKey: queryKeys.documentsWithPendingHandoffs,
+      });
       toast.success("Đã huỷ lượt bàn giao");
     },
     onError: (e: Error) => toast.error(friendlyError(e)),

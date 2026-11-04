@@ -1,5 +1,10 @@
 import type { TaskFilters } from "@/store/ui-store";
-import type { DocumentStatus, TaskPriority } from "@/types/database";
+import type {
+  DocumentStatus,
+  ShipmentMethod,
+  ShipmentStatus,
+  TaskPriority,
+} from "@/types/database";
 
 export interface DocumentQueryFilters {
   status?: DocumentStatus | null;
@@ -7,6 +12,16 @@ export interface DocumentQueryFilters {
   category?: string | null;
   search?: string | null;
   priority?: TaskPriority | null;
+}
+
+export type ShipmentDirectionFilter = "outgoing_office" | "external";
+
+export interface ShipmentQueryFilters {
+  status?: ShipmentStatus | null;
+  method?: ShipmentMethod | null;
+  direction?: ShipmentDirectionFilter | null;
+  mine?: boolean | null;
+  search?: string | null;
 }
 
 export const queryKeys = {
@@ -26,8 +41,22 @@ export const queryKeys = {
   document: (id: string) => ["documents", "detail", id] as const,
   documentHandoffs: (id: string) => ["document-handoffs", id] as const,
   myPendingHandoffs: ["my-pending-handoffs"] as const,
+  documentsWithPendingHandoffs: ["documents-with-pending-handoffs"] as const,
   documentHoldersAll: ["document-holders"] as const,
   documentHolders: (id: string) => ["document-holders", id] as const,
   documentAttachments: (id: string) => ["document-attachments", id] as const,
   documentLogs: (id: string) => ["document-logs", id] as const,
+  shipmentsAll: ["shipments"] as const,
+  shipments: (filters?: ShipmentQueryFilters) =>
+    ["shipments", filters ?? {}] as const,
+  shipment: (id: string) => ["shipments", "detail", id] as const,
+  shipmentItemsAll: ["shipment-items"] as const,
+  shipmentItems: (id: string) => ["shipment-items", id] as const,
+  documentShipmentsAll: ["document-shipments"] as const,
+  documentShipments: (id: string) => ["document-shipments", id] as const,
+  myShipmentConfirmations: ["my-shipment-confirmations"] as const,
+  externalUnitsAll: ["external-units"] as const,
+  externalUnits: (opts?: { includeInactive?: boolean }) =>
+    ["external-units", opts ?? {}] as const,
+  shipmentAttachments: (id: string) => ["shipment-attachments", id] as const,
 };

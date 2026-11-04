@@ -6,6 +6,9 @@ import type {
   DocumentStatus,
   HandoffKind,
   HandoffStatus,
+  ShipmentItemStatus,
+  ShipmentMethod,
+  ShipmentStatus,
   TaskPriority,
 } from "@/types/database";
 
@@ -75,6 +78,23 @@ export const DOCUMENT_STATUS_ORDER: DocumentStatus[] = [
   "lost",
 ];
 
+export const NON_SHIPPABLE_DOCUMENT_STATUSES: ReadonlySet<DocumentStatus> =
+  new Set<DocumentStatus>([
+    "in_transit",
+    "distributing",
+    "lost",
+    "archived",
+    "delivered_external",
+  ]);
+
+export const NON_HANDOFFABLE_DOCUMENT_STATUSES: ReadonlySet<DocumentStatus> =
+  new Set<DocumentStatus>([
+    "in_transit",
+    "lost",
+    "delivered_external",
+    "archived",
+  ]);
+
 export const HANDOFF_KIND_META: Record<
   HandoffKind,
   DocumentMeta & { description: string }
@@ -141,6 +161,130 @@ export const HANDOFF_STATUS_ORDER: HandoffStatus[] = [
   "rejected",
   "cancelled",
 ];
+
+export const SHIPMENT_METHOD_META: Record<ShipmentMethod, DocumentMeta> = {
+  courier: {
+    label: "Chuyển phát nhanh",
+    badge: "bg-blue-100 text-blue-700 border-blue-200",
+    dot: "bg-blue-500",
+  },
+  company_car: {
+    label: "Xe công ty",
+    badge: "bg-sky-100 text-sky-700 border-sky-200",
+    dot: "bg-sky-500",
+  },
+  hand: {
+    label: "Gửi tay",
+    badge: "bg-purple-100 text-purple-700 border-purple-200",
+    dot: "bg-purple-500",
+  },
+  post: {
+    label: "Bưu điện",
+    badge: "bg-teal-100 text-teal-700 border-teal-200",
+    dot: "bg-teal-500",
+  },
+};
+
+export const SHIPMENT_METHOD_ORDER: ShipmentMethod[] = [
+  "courier",
+  "company_car",
+  "hand",
+  "post",
+];
+
+export const SHIPMENT_STATUS_META: Record<ShipmentStatus, DocumentMeta> = {
+  in_transit: {
+    label: "Đang vận chuyển",
+    badge: "bg-amber-100 text-amber-800 border-amber-200",
+    dot: "bg-amber-500",
+  },
+  delivered: {
+    label: "Đã đến nơi",
+    badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    dot: "bg-emerald-500",
+  },
+  lost: {
+    label: "Thất lạc",
+    badge: "bg-red-100 text-red-700 border-red-200",
+    dot: "bg-red-500",
+  },
+  cancelled: {
+    label: "Đã huỷ",
+    badge: "bg-slate-100 text-slate-600 border-slate-200",
+    dot: "bg-slate-400",
+  },
+};
+
+export const SHIPMENT_STATUS_ORDER: ShipmentStatus[] = [
+  "in_transit",
+  "delivered",
+  "lost",
+  "cancelled",
+];
+
+export function shipmentStatusMeta(shipment: {
+  status: ShipmentStatus;
+  to_external_unit_id?: string | null;
+}): DocumentMeta {
+  const base = SHIPMENT_STATUS_META[shipment.status];
+  if (shipment.status === "delivered" && shipment.to_external_unit_id) {
+    return {
+      ...base,
+      label: "Đã giao",
+    };
+  }
+  return base;
+}
+
+export const SHIPMENT_ITEM_STATUS_META: Record<
+  ShipmentItemStatus,
+  DocumentMeta
+> = {
+  in_transit: {
+    label: "Đang vận chuyển",
+    badge: "bg-amber-100 text-amber-800 border-amber-200",
+    dot: "bg-amber-500",
+  },
+  received: {
+    label: "Đã nhận",
+    badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    dot: "bg-emerald-500",
+  },
+  lost: {
+    label: "Thất lạc",
+    badge: "bg-red-100 text-red-700 border-red-200",
+    dot: "bg-red-500",
+  },
+  cancelled: {
+    label: "Đã huỷ",
+    badge: "bg-slate-100 text-slate-600 border-slate-200",
+    dot: "bg-slate-400",
+  },
+};
+
+export const SHIPMENT_ITEM_STATUS_ORDER: ShipmentItemStatus[] = [
+  "in_transit",
+  "received",
+  "lost",
+  "cancelled",
+];
+
+export const DOCUMENT_LOG_ACTION_LABELS: Record<string, string> = {
+  created: "Tạo hồ sơ",
+  status: "Đổi trạng thái",
+  current_holder_id: "Chuyển người giữ chính",
+  title: "Đổi tiêu đề",
+  due_date: "Đổi hạn xử lý",
+  handoff_created: "Tạo lượt bàn giao",
+  handoff_accepted: "Xác nhận nhận bàn giao",
+  handoff_rejected: "Từ chối bàn giao",
+  handoff_cancelled: "Huỷ bàn giao",
+  shipment_sent: "Gửi vận chuyển",
+  shipment_received: "Xác nhận nhận vận chuyển",
+  shipment_lost: "Thất lạc trong chuyến vận chuyển",
+  shipment_cancelled: "Huỷ chuyến vận chuyển",
+  marked_lost: "Báo thất lạc hồ sơ",
+};
 
 // Reuse task priority labels and badge colors
 export const DOCUMENT_PRIORITY_META: Record<TaskPriority, DocumentMeta> =

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Building2,
@@ -17,6 +18,7 @@ import {
   Plus,
   Send,
   Trash2,
+  Truck,
   User,
   Users,
   X,
@@ -30,7 +32,7 @@ import {
 } from "@/lib/format";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -39,6 +41,10 @@ import {
   DOCUMENT_PRIORITY_META,
   HANDOFF_KIND_META,
   HANDOFF_STATUS_META,
+  NON_HANDOFFABLE_DOCUMENT_STATUSES,
+  NON_SHIPPABLE_DOCUMENT_STATUSES,
+  SHIPMENT_METHOD_META,
+  shipmentStatusMeta,
 } from "@/modules/documents/constants";
 import {
   useDocument,
@@ -55,19 +61,32 @@ import {
   useDeleteDocumentAttachment,
   getDocumentAttachmentUrl,
 } from "@/modules/documents/attachment-hooks";
+import {
+  useDocumentShipments,
+  type DocumentShipmentHistoryItem,
+} from "@/modules/documents/shipment-hooks";
+import { useExternalUnits } from "@/modules/documents/external-unit-hooks";
 import { useDocumentLogs } from "@/modules/documents/log-hooks";
 import { useOffices } from "@/modules/documents/office-hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import { useMe } from "@/modules/meetings/item-hooks";
-import { AssigneeStack, peopleOf } from "@/modules/tasks/components/assignee-stack";
+import {
+  AssigneeStack,
+  peopleOf,
+} from "@/modules/tasks/components/assignee-stack";
 import { DocumentFormDialog } from "@/modules/documents/document-form-dialog";
 import { HandoffDialog } from "@/modules/documents/handoff-dialog";
 import { RespondHandoffDialog } from "@/modules/documents/respond-handoff-dialog";
+import { ShipmentFormDialog } from "@/modules/documents/shipment-form-dialog";
+import { MarkLostDialog } from "@/modules/documents/mark-lost-dialog";
 import type {
   DocumentAttachment,
   DocumentHandoff,
   DocumentLog,
   DocumentStatus,
+  ExternalUnit,
+  Office,
+  ShipmentMethod,
 } from "@/types/database";
 
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
@@ -87,15 +106,21 @@ export function DocumentDetail({ id }: { id: string }) {
   const { data: handoffs = [] } = useDocumentHandoffs(id);
   const { data: holders = [] } = useDocumentHolders(id);
   const { data: attachments = [] } = useDocumentAttachments(id);
+  const { data: documentShipments = [] } = useDocumentShipments(id);
   const { data: logs = [] } = useDocumentLogs(id);
   const { data: profiles = [] } = useProfiles();
   const { data: offices = [] } = useOffices();
+  const { data: externalUnits = [] } = useExternalUnits({
+    includeInactive: true,
+  });
 
   const deleteDocument = useDeleteDocument();
   const cancelHandoff = useCancelHandoff();
 
   const [editOpen, setEditOpen] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
+  const [shipmentOpen, setShipmentOpen] = useState(false);
+  const [markLostOpen, setMarkLostOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [cancellingHandoff, setCancellingHandoff] =
     useState<DocumentHandoff | null>(null);
@@ -111,6 +136,10 @@ export function DocumentDetail({ id }: { id: string }) {
   const officeById = useMemo(
     () => new Map(offices.map((o) => [o.id, o])),
     [offices],
+  );
+  const externalUnitById = useMemo(
+    () => new Map(externalUnits.map((u) => [u.id, u])),
+    [externalUnits],
   );
 
   const nameOf = (userId: string | null | undefined) => {
@@ -144,16 +173,48 @@ export function DocumentDetail({ id }: { id: string }) {
     );
   }
 
+  const myProfile = me ? profileById.get(me.id) : undefined;
   const isLeaderOrAdmin = me?.role === "admin" || me?.role === "leader";
   const isAdmin = me?.role === "admin";
   const isCreator = !!me && document.created_by === me.id;
   const isCurrentHolder = !!me && document.current_holder_id === me.id;
-  const isCopyHolder =
-    !!me && holders.some((h) => h.user_id === me.id);
+  const isCopyHolder = !!me && holders.some((h) => h.user_id === me.id);
+
+  const pendingRecipientIds = handoffs
+    .filter((h) => h.status === "pending")
+    .map((h) => h.to_user);
+  const hasPendingHandoff = pendingRecipientIds.length > 0;
+
+  const openShipmentEntry =
+    documentShipments.find(
+      (entry) =>
+        entry.status === "in_transit" &&
+        entry.shipment.status === "in_transit",
+    ) ?? null;
+  const openShipment = openShipmentEntry?.shipment ?? null;
 
   const canCreateHandoff =
-    isCurrentHolder || isCopyHolder || isLeaderOrAdmin;
-  const canDelete = isCreator || isAdmin;
+    (isCurrentHolder || isCopyHolder || isLeaderOrAdmin) &&
+    !NON_HANDOFFABLE_DOCUMENT_STATUSES.has(document.status);
+
+  const canShipDocument =
+    (isCurrentHolder || isCopyHolder || isLeaderOrAdmin) &&
+    !NON_SHIPPABLE_DOCUMENT_STATUSES.has(document.status) &&
+    !hasPendingHandoff &&
+    !openShipment;
+
+  const canMarkLost =
+    document.status !== "lost" &&
+    (isCurrentHolder ||
+      isCopyHolder ||
+      isLeaderOrAdmin ||
+      (!!openShipment &&
+        ((!!me && openShipment.sent_by === me.id) ||
+          (!!openShipment.to_office_id &&
+            !!myProfile?.office_id &&
+            myProfile.office_id === openShipment.to_office_id))));
+
+  const canDelete = (isCreator || isAdmin) && documentShipments.length === 0;
   const canEdit =
     isCreator || isCurrentHolder || isCopyHolder || isLeaderOrAdmin;
 
@@ -161,10 +222,6 @@ export function DocumentDetail({ id }: { id: string }) {
     ? handoffs.find((h) => h.to_user === me.id && h.status === "pending") ??
       null
     : null;
-
-  const pendingRecipientIds = handoffs
-    .filter((h) => h.status === "pending")
-    .map((h) => h.to_user);
 
   const statusMeta = DOCUMENT_STATUS_META[document.status];
   const priorityMeta = DOCUMENT_PRIORITY_META[document.priority];
@@ -184,14 +241,92 @@ export function DocumentDetail({ id }: { id: string }) {
     new Set(holders.map((h) => h.user_id)),
   );
 
+  const formatShipmentDestination = (s: {
+    to_office_id?: string | null;
+    to_external_unit_id?: string | null;
+  }) => {
+    if (s.to_office_id) {
+      const off = officeById.get(s.to_office_id);
+      return off ? `${off.code} — ${off.name}` : "Văn phòng";
+    }
+    if (s.to_external_unit_id) {
+      const ext = externalUnitById.get(s.to_external_unit_id);
+      return ext ? ext.name : "Đơn vị bên ngoài";
+    }
+    return "—";
+  };
+
   return (
     <div className="space-y-6">
       <Link
         href="/documents"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> Hồ sơ – Công văn
+        <ArrowLeft className="h-4 w-4" /> Danh sách hồ sơ
       </Link>
+
+      {/* Banner when the document is in an open shipment */}
+      {openShipment && (
+        <div className="flex flex-col justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50/90 p-4 sm:flex-row sm:items-center">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-amber-900">
+              <Truck className="h-4 w-4 shrink-0" />
+              <span>
+                Đang vận chuyển trong chuyến{" "}
+                <Link
+                  href={`/documents/shipments/${openShipment.id}`}
+                  className="font-mono underline hover:text-primary"
+                >
+                  {openShipment.code}
+                </Link>{" "}
+                → {formatShipmentDestination(openShipment)}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium",
+                  shipmentStatusMeta(openShipment).badge,
+                )}
+              >
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    shipmentStatusMeta(openShipment).dot,
+                  )}
+                />
+                {shipmentStatusMeta(openShipment).label}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium",
+                  SHIPMENT_METHOD_META[openShipment.method].badge,
+                )}
+              >
+                {SHIPMENT_METHOD_META[openShipment.method].label}
+              </span>
+            </div>
+            <p className="text-xs text-amber-800">
+              Người gửi:{" "}
+              <span className="font-medium">
+                {nameOf(openShipment.sent_by) ?? "—"}
+              </span>{" "}
+              · {formatDateTime(openShipment.sent_at)}
+              {openShipment.tracking_no &&
+                ` · Mã vận đơn: ${openShipment.tracking_no}`}
+            </p>
+          </div>
+          <div className="shrink-0">
+            <Link
+              href={`/documents/shipments/${openShipment.id}`}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "bg-white",
+              )}
+            >
+              Xem chuyến gửi <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Banner for my pending handoff on this document */}
       {myPendingHandoff && (
@@ -295,10 +430,19 @@ export function DocumentDetail({ id }: { id: string }) {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               {canCreateHandoff && (
                 <Button size="sm" onClick={() => setHandoffOpen(true)}>
                   <Send className="h-4 w-4" /> Bàn giao
+                </Button>
+              )}
+              {canShipDocument && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setShipmentOpen(true)}
+                >
+                  <Truck className="h-4 w-4" /> Gửi đi
                 </Button>
               )}
               {canEdit && (
@@ -308,6 +452,16 @@ export function DocumentDetail({ id }: { id: string }) {
                   onClick={() => setEditOpen(true)}
                 >
                   <Pencil className="h-4 w-4" /> Sửa
+                </Button>
+              )}
+              {canMarkLost && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                  onClick={() => setMarkLostOpen(true)}
+                >
+                  <AlertTriangle className="h-4 w-4" /> Báo thất lạc
                 </Button>
               )}
               {canDelete && (
@@ -357,12 +511,11 @@ export function DocumentDetail({ id }: { id: string }) {
                 ) : (
                   <span className="text-muted-foreground">—</span>
                 )}
-                {originOffice &&
-                  originOffice.id !== currentOffice?.id && (
-                    <span className="text-xs font-normal text-muted-foreground">
-                      (Khởi tạo: {originOffice.code})
-                    </span>
-                  )}
+                {originOffice && originOffice.id !== currentOffice?.id && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (Khởi tạo: {originOffice.code})
+                  </span>
+                )}
               </div>
             </div>
 
@@ -414,13 +567,21 @@ export function DocumentDetail({ id }: { id: string }) {
             isLeaderOrAdmin={isLeaderOrAdmin}
             nameOf={nameOf}
             avatarOf={avatarOf}
+            officeById={officeById}
+            externalUnitById={externalUnitById}
             onRespond={(h, accept) => setRespondState({ handoff: h, accept })}
             onCancel={(h) => setCancellingHandoff(h)}
           />
         </div>
 
-        {/* Right column: Attachments */}
+        {/* Right column: Shipments history + Attachments */}
         <div className="space-y-4">
+          <DocumentShipmentsCard
+            entries={documentShipments}
+            officeById={officeById}
+            externalUnitById={externalUnitById}
+            nameOf={nameOf}
+          />
           <AttachmentsCard
             documentId={document.id}
             attachments={attachments}
@@ -443,6 +604,22 @@ export function DocumentDetail({ id }: { id: string }) {
         documentId={document.id}
         currentUserId={me?.id ?? null}
         pendingRecipientIds={pendingRecipientIds}
+      />
+
+      <ShipmentFormDialog
+        open={shipmentOpen}
+        onOpenChange={setShipmentOpen}
+        defaultDocumentIds={[document.id]}
+        navigateOnCreate
+      />
+
+      <MarkLostDialog
+        open={markLostOpen}
+        onOpenChange={setMarkLostOpen}
+        documentId={document.id}
+        documentCode={document.code}
+        documentTitle={document.title}
+        shipmentId={openShipment?.id ?? null}
       />
 
       <RespondHandoffDialog
@@ -482,11 +659,137 @@ export function DocumentDetail({ id }: { id: string }) {
         confirmLabel="Xoá hồ sơ"
         destructive
         onConfirm={async () => {
-          await deleteDocument.mutateAsync(document.id);
+          try {
+            await deleteDocument.mutateAsync(document.id);
+          } catch {
+            return;
+          }
           router.push("/documents");
         }}
       />
     </div>
+  );
+}
+
+function DocumentShipmentsCard({
+  entries,
+  officeById,
+  externalUnitById,
+  nameOf,
+}: {
+  entries: DocumentShipmentHistoryItem[];
+  officeById: Map<string, Office>;
+  externalUnitById: Map<string, ExternalUnit>;
+  nameOf: (id: string | null | undefined) => string | null;
+}) {
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-4 sm:p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <Truck className="h-4 w-4 text-muted-foreground" />
+            Vận chuyển ({entries.length})
+          </h2>
+          <Link
+            href="/documents/shipments"
+            className="text-xs text-primary hover:underline"
+          >
+            Tất cả chuyến
+          </Link>
+        </div>
+
+        {entries.length === 0 ? (
+          <p className="py-5 text-center text-xs text-muted-foreground">
+            Hồ sơ này chưa từng nằm trong chuyến vận chuyển nào.
+          </p>
+        ) : (
+          <div className="space-y-2.5">
+            {entries.map((entry) => {
+              const s = entry.shipment;
+              const statusMeta = shipmentStatusMeta(s);
+              const methodMeta = SHIPMENT_METHOD_META[s.method];
+              const fromOffice = officeById.get(s.from_office_id);
+              const toOffice = s.to_office_id
+                ? officeById.get(s.to_office_id)
+                : undefined;
+              const toExternal = s.to_external_unit_id
+                ? externalUnitById.get(s.to_external_unit_id)
+                : undefined;
+
+              return (
+                <div
+                  key={entry.shipment_id}
+                  className="space-y-1.5 rounded-lg border bg-muted/20 p-3 text-xs"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                    <Link
+                      href={`/documents/shipments/${s.id}`}
+                      className="font-mono font-semibold text-primary hover:underline"
+                    >
+                      {s.code}
+                    </Link>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium",
+                          methodMeta.badge,
+                        )}
+                      >
+                        {methodMeta.label}
+                      </span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium",
+                          statusMeta.badge,
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "h-1.5 w-1.5 rounded-full",
+                            statusMeta.dot,
+                          )}
+                        />
+                        {statusMeta.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1 font-medium text-foreground">
+                    <span>{fromOffice?.code ?? "—"}</span>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    <span>
+                      {toOffice
+                        ? `${toOffice.code} (${toOffice.name})`
+                        : (toExternal?.name ?? "Đơn vị bên ngoài")}
+                    </span>
+                  </div>
+
+                  <p className="text-muted-foreground">
+                    Gửi bởi {nameOf(s.sent_by) ?? "—"} ·{" "}
+                    {formatDateTime(s.sent_at)}
+                  </p>
+
+                  {entry.status === "received" && entry.received_at && (
+                    <p className="text-emerald-700">
+                      {s.to_external_unit_id ? "Đã giao lúc " : "Đã nhận lúc "}
+                      {formatDateTime(entry.received_at)}
+                      {entry.received_by &&
+                        ` bởi ${nameOf(entry.received_by) ?? "—"}`}
+                    </p>
+                  )}
+
+                  {entry.status === "lost" && entry.lost_reason && (
+                    <p className="text-red-600">
+                      Thất lạc: {entry.lost_reason}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -512,6 +815,8 @@ function TimelineSection({
   isLeaderOrAdmin,
   nameOf,
   avatarOf,
+  officeById,
+  externalUnitById,
   onRespond,
   onCancel,
 }: {
@@ -522,6 +827,8 @@ function TimelineSection({
   isLeaderOrAdmin: boolean;
   nameOf: (id: string | null | undefined) => string | null;
   avatarOf: (id: string | null | undefined) => string | null;
+  officeById: Map<string, Office>;
+  externalUnitById: Map<string, ExternalUnit>;
   onRespond: (h: DocumentHandoff, accept: boolean) => void;
   onCancel: (h: DocumentHandoff) => void;
 }) {
@@ -582,7 +889,7 @@ function TimelineSection({
             Chưa có hoạt động hay lượt bàn giao nào.
           </p>
         ) : (
-          <ol className="relative space-y-4 border-l border-border pl-4 ml-2">
+          <ol className="relative ml-2 space-y-4 border-l border-border pl-4">
             {timeline.map((entry) => {
               if (entry.type === "handoff") {
                 const h = entry.handoff;
@@ -754,7 +1061,12 @@ function TimelineSection({
                       <span className="font-medium text-foreground">
                         {actorName}
                       </span>{" "}
-                      {describeDocumentLog(log, nameOf)}{" "}
+                      {describeDocumentLog(
+                        log,
+                        nameOf,
+                        officeById,
+                        externalUnitById,
+                      )}{" "}
                       <span className="whitespace-nowrap">
                         · {formatDateTime(log.created_at)}
                       </span>
@@ -773,6 +1085,8 @@ function TimelineSection({
 function describeDocumentLog(
   log: DocumentLog,
   nameOf: (id: string | null | undefined) => string | null,
+  officeById: Map<string, Office>,
+  externalUnitById: Map<string, ExternalUnit>,
 ): React.ReactNode {
   const oldV = log.old_value;
   const newV = log.new_value;
@@ -784,6 +1098,53 @@ function describeDocumentLog(
     typeof v === "string" ? (nameOf(v) ?? "—") : "trống";
   const dateLabel = (v: unknown) =>
     typeof v === "string" && v ? formatDate(v) : "trống";
+
+  const payload =
+    newV && typeof newV === "object"
+      ? (newV as Record<string, unknown>)
+      : null;
+
+  const resolveDestination = (obj: Record<string, unknown> | null): string => {
+    if (!obj) return "nơi nhận";
+    const toOfficeId =
+      typeof obj.to_office_id === "string" ? obj.to_office_id : null;
+    const toExternalId =
+      typeof obj.to_external_unit_id === "string"
+        ? obj.to_external_unit_id
+        : null;
+    if (toOfficeId) {
+      const off = officeById.get(toOfficeId);
+      return off ? `${off.code} (${off.name})` : "văn phòng nhận";
+    }
+    if (toExternalId) {
+      const ext = externalUnitById.get(toExternalId);
+      return ext ? ext.name : "đơn vị bên ngoài";
+    }
+    return "nơi nhận";
+  };
+
+  const renderShipmentLink = (obj: Record<string, unknown> | null) => {
+    if (!obj) return null;
+    const shipmentId =
+      typeof obj.shipment_id === "string" ? obj.shipment_id : null;
+    const code = typeof obj.code === "string" ? obj.code : null;
+    if (shipmentId && code) {
+      return (
+        <Link
+          href={`/documents/shipments/${shipmentId}`}
+          className="font-mono font-semibold text-primary hover:underline"
+        >
+          {code}
+        </Link>
+      );
+    }
+    if (code) {
+      return (
+        <span className="font-mono font-semibold text-foreground">{code}</span>
+      );
+    }
+    return null;
+  };
 
   switch (log.action) {
     case "created":
@@ -832,6 +1193,92 @@ function describeDocumentLog(
           <span className="font-medium text-foreground">{dateLabel(newV)}</span>
         </>
       );
+    case "shipment_sent": {
+      const methodKey =
+        typeof payload?.method === "string"
+          ? (payload.method as ShipmentMethod)
+          : null;
+      const methodLabel = methodKey
+        ? SHIPMENT_METHOD_META[methodKey]?.label
+        : null;
+      return (
+        <>
+          đã gửi hồ sơ trong chuyến {renderShipmentLink(payload)} đến{" "}
+          <span className="font-medium text-foreground">
+            {resolveDestination(payload)}
+          </span>
+          {methodLabel && ` (${methodLabel})`}
+        </>
+      );
+    }
+    case "shipment_received": {
+      const recipientName =
+        typeof payload?.recipient_name === "string" && payload.recipient_name
+          ? payload.recipient_name
+          : null;
+      return (
+        <>
+          đã xác nhận hồ sơ trong chuyến {renderShipmentLink(payload)} đến{" "}
+          <span className="font-medium text-foreground">
+            {resolveDestination(payload)}
+          </span>
+          {recipientName && ` (người nhận: ${recipientName})`}
+        </>
+      );
+    }
+    case "shipment_lost": {
+      const reason =
+        typeof payload?.lost_reason === "string" ? payload.lost_reason : null;
+      return (
+        <>
+          ghi nhận thất lạc trong chuyến {renderShipmentLink(payload)} đến{" "}
+          <span className="font-medium text-foreground">
+            {resolveDestination(payload)}
+          </span>
+          {reason && (
+            <>
+              {" "}
+              — Lý do:{" "}
+              <span className="font-medium text-red-600">
+                &ldquo;{reason}&rdquo;
+              </span>
+            </>
+          )}
+        </>
+      );
+    }
+    case "shipment_cancelled": {
+      const note =
+        typeof payload?.note === "string" && payload.note
+          ? payload.note
+          : null;
+      return (
+        <>
+          đã huỷ chuyến vận chuyển {renderShipmentLink(payload)} (đến{" "}
+          <span className="font-medium text-foreground">
+            {resolveDestination(payload)}
+          </span>
+          ){note && ` · Ghi chú: "${note}"`}
+        </>
+      );
+    }
+    case "marked_lost": {
+      const reason =
+        typeof payload?.reason === "string" ? payload.reason : null;
+      return (
+        <>
+          đã báo thất lạc hồ sơ
+          {reason && (
+            <>
+              :{" "}
+              <span className="font-medium text-red-600">
+                &ldquo;{reason}&rdquo;
+              </span>
+            </>
+          )}
+        </>
+      );
+    }
     default:
       return <>cập nhật hồ sơ</>;
   }

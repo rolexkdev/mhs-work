@@ -168,6 +168,9 @@ export function useDeleteDocument() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
       qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
+      qc.invalidateQueries({
+        queryKey: queryKeys.documentsWithPendingHandoffs,
+      });
       toast.success("Đã xoá hồ sơ");
     },
     onError: (e: Error) => toast.error(friendlyError(e)),
