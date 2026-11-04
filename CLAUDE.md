@@ -51,7 +51,7 @@ There is no test suite. After changing code, run `npm run typecheck` and `npm ru
 - Use the `@/` path alias. Combine class names with `cn()` from `@/lib/utils`. Add new UI
   primitives via shadcn (`components.json`) rather than writing them from scratch.
 - User-facing text is in **Vietnamese**; code identifiers are in English.
-- Database changes: add a new migration with the next number (e.g. `0016_<name>.sql`),
+- Database changes: add a new migration with the next number (e.g. `0018_<name>.sql`),
   keep it idempotent (`drop ... if exists` / `create or replace`), and update
   `src/types/database.ts` to match. Migrations are applied manually in the Supabase SQL
   Editor — do not assume they have been run.

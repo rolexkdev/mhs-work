@@ -1,7 +1,19 @@
--- 0019_document_intake_refactor.sql
+-- =============================================================
+-- 0017 — Document intake refactor (replaces old 0017–0019)
+--
+-- Consolidates and replaces:
+--   * 0017_document_holder_handoffs.sql
+--   * 0018_document_shipments.sql
+--   * 0019_document_intake_refactor.sql
 --
 -- Refactors the document flow around two intake staff:
---   * Removes shipments, external units and lost reporting (0018).
+--   * Removes shipments, external units and lost reporting if the former
+--     0018_document_shipments.sql was applied, and drops the unused
+--     document_attachments.shipment_id column from 0016.
+--   * Updates public.create_handoff so copy holders (public.document_holders)
+--     are recognised and non-handoffable statuses ('in_transit', 'lost',
+--     'delivered_external', 'archived') are rejected with
+--     detail = 'handoff_document_unavailable'.
 --   * Adds profiles.can_manage_documents; only flagged users (and only they)
 --     may create / edit / delete documents or start / cancel handoffs.
 --     Everyone else can view and search. Recipients may still answer their
@@ -10,8 +22,11 @@
 --     delivered_at / delivered_to (set when a recipient accepts a handoff).
 --
 -- BACK UP document_shipments, document_shipment_items and external_units
--- before applying: the drops below are irreversible.
--- Idempotent: safe to run more than once.
+-- before applying if 0018 was previously run: the drops below are irreversible.
+-- Run in the Supabase SQL Editor (or supabase db push).
+-- Idempotent: safe to run more than once (whether only 0016, or any subset of
+-- the old 0017–0019 migrations, was previously applied).
+-- =============================================================
 
 -- ---------- 1. Remap documents out of the removed statuses ----------
 -- Enum labels in_transit / delivered_external / lost stay in the type
@@ -58,9 +73,13 @@ begin
   end if;
 end $$;
 
-alter table public.document_attachments drop column if exists shipment_id;
 alter table public.document_attachments
   drop constraint if exists chk_document_attachments_target;
+alter table public.document_attachments
+  drop constraint if exists document_attachments_shipment_id_fkey;
+drop index if exists public.idx_document_attachments_shipment;
+alter table public.document_attachments
+  drop column if exists shipment_id;
 alter table public.document_attachments
   alter column document_id set not null;
 
@@ -190,7 +209,112 @@ create trigger trg_document_handoff_delivery
   after update on public.document_handoffs
   for each row execute function public.record_document_delivery();
 
--- ---------- 6. Only intake staff may start / cancel handoffs ----------
+-- ---------- 6. Handoff RPC & staff-only guard ----------
+-- Includes the copy-holder check from old 0017 and the unavailable-status
+-- guard ('in_transit', 'lost', 'delivered_external', 'archived') from old 0018.
+create or replace function public.create_handoff(
+  p_document_id uuid,
+  p_to_users    uuid[],
+  p_kind        public.handoff_kind,
+  p_note        text default null
+)
+returns setof public.document_handoffs
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid        uuid := auth.uid();
+  v_doc        public.documents%rowtype;
+  v_recipients uuid[];
+begin
+  if v_uid is null then
+    raise exception 'Authentication required to create a handoff.';
+  end if;
+
+  select array_agg(distinct u)
+    into v_recipients
+    from unnest(p_to_users) as u
+   where u is not null;
+
+  if v_recipients is null or coalesce(array_length(v_recipients, 1), 0) = 0 then
+    raise exception 'At least one recipient (p_to_users) is required.';
+  end if;
+
+  if v_uid = any(v_recipients) then
+    raise exception 'Cannot create a handoff to yourself.';
+  end if;
+
+  select *
+    into v_doc
+    from public.documents
+   where id = p_document_id
+     for update;
+
+  if not found then
+    raise exception 'Document % not found.', p_document_id;
+  end if;
+
+  if v_doc.status in ('in_transit', 'lost', 'delivered_external', 'archived') then
+    raise exception 'Document % cannot be handed off in status %.', v_doc.code, v_doc.status
+      using detail = 'handoff_document_unavailable';
+  end if;
+
+  if v_doc.current_holder_id is distinct from v_uid
+     and not exists (
+       select 1
+         from public.document_holders dh
+        where dh.document_id = p_document_id
+          and dh.user_id = v_uid
+     )
+     and not public.is_leader_or_admin() then
+    raise exception 'Only the current document holder, a copy holder, a leader, or an admin may create a handoff.';
+  end if;
+
+  if exists (
+    select 1
+      from public.document_handoffs
+     where document_id = p_document_id
+       and to_user = any(v_recipients)
+       and status = 'pending'
+  ) then
+    raise exception 'One or more recipients already have a pending handoff for this document.';
+  end if;
+
+  perform set_config('app.documents_rpc', 'on', true);
+
+  -- Multi-recipient distribution: set document status to 'distributing' while
+  -- keeping current_holder_id as the sender (coordinator stays accountable).
+  -- The transition to 'distributing' is logged by trg_document_log so the prior
+  -- status can be restored if all distribution handoffs are rejected/cancelled.
+  if array_length(v_recipients, 1) > 1 then
+    update public.documents
+       set status = 'distributing'
+     where id = p_document_id
+       and status is distinct from 'distributing';
+  end if;
+
+  return query
+  insert into public.document_handoffs (
+    document_id,
+    from_user,
+    to_user,
+    kind,
+    status,
+    note
+  )
+  select
+    p_document_id,
+    v_uid,
+    u,
+    p_kind,
+    'pending'::public.handoff_status,
+    p_note
+  from unnest(v_recipients) as u
+  returning *;
+end;
+$$;
+
+grant execute on function public.create_handoff(uuid, uuid[], public.handoff_kind, text) to authenticated;
+
+-- Only intake staff may start / cancel handoffs.
 -- create_handoff / cancel_handoff are security definer RPCs; auth.uid() still
 -- reflects the caller, so the guard sits on the table. A null auth.uid()
 -- (SQL Editor / service role) is allowed for maintenance.
@@ -202,15 +326,16 @@ begin
     return new;
   end if;
 
-  if tg_op = 'INSERT' and not public.can_manage_documents() then
-    raise exception 'Only document intake staff may create handoffs.';
-  end if;
-
-  if tg_op = 'UPDATE'
-     and new.status = 'cancelled'
-     and old.status is distinct from 'cancelled'
-     and not public.can_manage_documents() then
-    raise exception 'Only document intake staff may cancel handoffs.';
+  if tg_op = 'INSERT' then
+    if not public.can_manage_documents() then
+      raise exception 'Only document intake staff may create handoffs.';
+    end if;
+  elsif tg_op = 'UPDATE' then
+    if new.status = 'cancelled'
+       and old.status is distinct from 'cancelled'
+       and not public.can_manage_documents() then
+      raise exception 'Only document intake staff may cancel handoffs.';
+    end if;
   end if;
 
   return new;
