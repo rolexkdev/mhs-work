@@ -139,7 +139,7 @@ export interface CreateHandoffInput {
   note?: string | null;
 }
 
-export function useCreateHandoff() {
+export function useCreateHandoff(options?: { silentToast?: boolean }) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (
@@ -172,9 +172,15 @@ export function useCreateHandoff() {
       qc.invalidateQueries({
         queryKey: queryKeys.documentsWithPendingHandoffs,
       });
-      toast.success("Đã tạo lượt bàn giao");
+      if (!options?.silentToast) {
+        toast.success("Đã tạo lượt bàn giao");
+      }
     },
-    onError: (e: Error) => toast.error(friendlyError(e)),
+    onError: (e: Error) => {
+      if (!options?.silentToast) {
+        toast.error(friendlyError(e));
+      }
+    },
   });
 }
 

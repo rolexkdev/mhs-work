@@ -23,14 +23,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  dueLabel,
   formatDate,
   formatDateTime,
   initials,
 } from "@/lib/format";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -72,7 +71,6 @@ import type {
   DocumentHandoff,
   DocumentLog,
   DocumentStatus,
-  Office,
 } from "@/types/database";
 
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
@@ -177,9 +175,6 @@ export function DocumentDetail({ id }: { id: string }) {
     : undefined;
   const holderName = nameOf(document.current_holder_id);
   const holderAvatar = avatarOf(document.current_holder_id);
-  const isDone =
-    document.status === "done" || document.status === "archived";
-  const due = dueLabel(document.due_date, { done: isDone });
 
   const copyHolderUserIds = Array.from(
     new Set(holders.map((h) => h.user_id)),
@@ -325,7 +320,7 @@ export function DocumentDetail({ id }: { id: string }) {
           </div>
 
           {/* Metadata grid */}
-          <div className="grid gap-3 border-t pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 border-t pt-4 text-sm sm:grid-cols-2 lg:grid-cols-5">
             <div className="space-y-1">
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <User className="h-3.5 w-3.5" /> Người đang giữ chính
@@ -396,26 +391,7 @@ export function DocumentDetail({ id }: { id: string }) {
               )}
             </div>
 
-            <div className="space-y-1">
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <CalendarClock className="h-3.5 w-3.5" /> Hạn xử lý
-              </p>
-              {document.due_date ? (
-                <p
-                  className={cn(
-                    "font-medium",
-                    due.tone === "overdue" && "text-red-600",
-                    due.tone === "today" && "text-amber-600",
-                  )}
-                >
-                  {formatDate(document.due_date)} ({due.text})
-                </p>
-              ) : (
-                <p className="text-muted-foreground">Không đặt hạn</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-2 lg:col-span-1">
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Users className="h-3.5 w-3.5" /> Người đang giữ bản sao (
                 {copyHolderUserIds.length})
@@ -444,7 +420,6 @@ export function DocumentDetail({ id }: { id: string }) {
             canManage={canManage}
             nameOf={nameOf}
             avatarOf={avatarOf}
-            officeById={officeById}
             onRespond={(h, accept) => setRespondState({ handoff: h, accept })}
             onCancel={(h) => setCancellingHandoff(h)}
           />
@@ -547,7 +522,6 @@ function TimelineSection({
   canManage,
   nameOf,
   avatarOf,
-  officeById,
   onRespond,
   onCancel,
 }: {
@@ -558,7 +532,6 @@ function TimelineSection({
   canManage: boolean;
   nameOf: (id: string | null | undefined) => string | null;
   avatarOf: (id: string | null | undefined) => string | null;
-  officeById: Map<string, Office>;
   onRespond: (h: DocumentHandoff, accept: boolean) => void;
   onCancel: (h: DocumentHandoff) => void;
 }) {
@@ -822,8 +795,6 @@ function describeDocumentLog(
       : "—";
   const personLabel = (v: unknown) =>
     typeof v === "string" ? (nameOf(v) ?? "—") : "trống";
-  const dateLabel = (v: unknown) =>
-    typeof v === "string" && v ? formatDate(v) : "trống";
 
   switch (log.action) {
     case "created":
@@ -861,15 +832,6 @@ function describeDocumentLog(
           <span className="font-medium text-foreground">
             &ldquo;{String(newV ?? "")}&rdquo;
           </span>
-        </>
-      );
-    case "due_date":
-      return (
-        <>
-          đổi hạn xử lý{" "}
-          <span className="font-medium text-foreground">{dateLabel(oldV)}</span>{" "}
-          →{" "}
-          <span className="font-medium text-foreground">{dateLabel(newV)}</span>
         </>
       );
     default:

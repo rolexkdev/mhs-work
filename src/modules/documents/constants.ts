@@ -127,7 +127,6 @@ export const DOCUMENT_LOG_ACTION_LABELS: Record<string, string> = {
   status: "Đổi trạng thái",
   current_holder_id: "Chuyển người giữ chính",
   title: "Đổi tiêu đề",
-  due_date: "Đổi hạn xử lý",
   handoff_created: "Tạo lượt bàn giao",
   handoff_accepted: "Xác nhận nhận bàn giao",
   handoff_rejected: "Từ chối bàn giao",
