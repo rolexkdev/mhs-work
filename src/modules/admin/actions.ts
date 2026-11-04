@@ -61,7 +61,7 @@ export async function listAccounts(): Promise<{
   const { data: profiles, error } = await guard.admin
     .from("profiles")
     .select(
-      "id, email, full_name, role, office_id, department, avatar_url, created_at",
+      "id, email, full_name, role, office_id, department, can_manage_documents, avatar_url, created_at",
     );
   if (error) return { error: error.message };
 
@@ -90,6 +90,7 @@ export async function listAccounts(): Promise<{
       role: p.role,
       officeId: p.office_id ?? null,
       department: p.department ?? null,
+      canManageDocuments: p.can_manage_documents ?? false,
       avatarUrl: p.avatar_url,
       createdAt: p.created_at,
       lastSignInAt: authById.get(p.id)?.lastSignInAt ?? null,
@@ -112,6 +113,7 @@ async function createOne(
     role: UserRole;
     officeId?: string | null;
     department?: string | null;
+    canManageDocuments?: boolean;
     password?: string;
   },
 ): Promise<{ error?: string }> {
@@ -153,6 +155,7 @@ async function createOne(
         role: input.role,
         office_id: officeId,
         department,
+        can_manage_documents: input.canManageDocuments ?? false,
       },
       { onConflict: "id" },
     );
@@ -167,6 +170,7 @@ export async function createAccount(input: {
   role: UserRole;
   officeId?: string | null;
   department?: string | null;
+  canManageDocuments?: boolean;
   password?: string;
 }): Promise<{ error?: string }> {
   const guard = await requireAdmin();
@@ -214,6 +218,7 @@ export async function updateAccount(input: {
   role: UserRole;
   officeId?: string | null;
   department?: string | null;
+  canManageDocuments?: boolean;
 }): Promise<{ error?: string }> {
   const guard = await requireAdmin();
   if (!guard.ok) return { error: guard.error };
@@ -239,6 +244,9 @@ export async function updateAccount(input: {
       role: input.role,
       office_id: officeId,
       department,
+      ...(input.canManageDocuments === undefined
+        ? {}
+        : { can_manage_documents: input.canManageDocuments }),
     })
     .eq("id", input.userId);
 

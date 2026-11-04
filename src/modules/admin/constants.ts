@@ -38,6 +38,7 @@ export type AccountRow = {
   role: UserRole;
   officeId: string | null;
   department: string | null;
+  canManageDocuments: boolean;
   avatarUrl: string | null;
   createdAt: string;
   /** null = chưa đăng nhập lần nào. */
