@@ -25,14 +25,23 @@ function useRefreshAccounts() {
 }
 
 export function useAccounts() {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.accounts,
-    queryFn: async (): Promise<AccountRow[]> => {
+    queryFn: async (): Promise<{
+      accounts: AccountRow[];
+      warning?: string;
+    }> => {
       const res = await listAccounts();
       if (res.error) throw new Error(res.error);
-      return res.accounts ?? [];
+      return { accounts: res.accounts ?? [], warning: res.warning };
     },
   });
+
+  return {
+    ...query,
+    data: query.data?.accounts,
+    warning: query.data?.warning,
+  };
 }
 
 export function useCreateAccount() {
