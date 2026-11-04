@@ -108,26 +108,35 @@ export function DocumentFormDialog({
     if (!title.trim()) return;
 
     if (isEdit && document) {
-      await updateDocument.mutateAsync({
-        id: document.id,
-        title: title.trim(),
-        category: category.trim() || null,
-        priority,
-        due_date: dueDate || null,
-        description: description.trim() || null,
-      });
+      try {
+        await updateDocument.mutateAsync({
+          id: document.id,
+          title: title.trim(),
+          category: category.trim() || null,
+          priority,
+          due_date: dueDate || null,
+          description: description.trim() || null,
+        });
+      } catch {
+        return;
+      }
       onOpenChange(false);
       return;
     }
 
-    const created = await createDocument.mutateAsync({
-      title: title.trim(),
-      category: category.trim() || null,
-      origin_office_id: originOfficeId === NO_OFFICE ? null : originOfficeId,
-      priority,
-      due_date: dueDate || null,
-      description: description.trim() || null,
-    });
+    let created: DocumentRecord;
+    try {
+      created = await createDocument.mutateAsync({
+        title: title.trim(),
+        category: category.trim() || null,
+        origin_office_id: originOfficeId === NO_OFFICE ? null : originOfficeId,
+        priority,
+        due_date: dueDate || null,
+        description: description.trim() || null,
+      });
+    } catch {
+      return;
+    }
 
     if (files.length > 0) {
       setUploadingFiles(true);

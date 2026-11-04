@@ -113,12 +113,16 @@ export function HandoffDialog({
     e.preventDefault();
     if (selectedIds.length === 0) return;
 
-    await createHandoff.mutateAsync({
-      documentId,
-      toUsers: selectedIds,
-      kind,
-      note: note.trim() || null,
-    });
+    try {
+      await createHandoff.mutateAsync({
+        documentId,
+        toUsers: selectedIds,
+        kind,
+        note: note.trim() || null,
+      });
+    } catch {
+      return;
+    }
     onOpenChange(false);
   }
 

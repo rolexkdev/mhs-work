@@ -68,12 +68,16 @@ export function RespondHandoffDialog({
     e.preventDefault();
     if (!handoff) return;
 
-    await respondHandoff.mutateAsync({
-      handoffId: handoff.id,
-      accept,
-      note: note.trim() || null,
-      documentId: handoff.document_id,
-    });
+    try {
+      await respondHandoff.mutateAsync({
+        handoffId: handoff.id,
+        accept,
+        note: note.trim() || null,
+        documentId: handoff.document_id,
+      });
+    } catch {
+      return;
+    }
 
     if (files.length > 0) {
       setUploading(true);
