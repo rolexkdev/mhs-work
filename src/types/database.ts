@@ -165,6 +165,8 @@ export type DocumentRecord = Timestamps & {
   origin_office_id: string | null;
   current_office_id: string | null;
   current_holder_id: string | null;
+  /** Intended final recipient, informational only — no handoff. */
+  intended_recipient_id: string | null;
   status: DocumentStatus;
   priority: TaskPriority;
   due_date: string | null;
@@ -349,6 +351,7 @@ export interface Database {
           | "origin_office_id"
           | "current_office_id"
           | "current_holder_id"
+          | "intended_recipient_id"
           | "status"
           | "priority"
           | "due_date"

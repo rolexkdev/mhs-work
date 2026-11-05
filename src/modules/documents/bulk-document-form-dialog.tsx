@@ -10,7 +10,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -30,20 +29,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { queryKeys } from "@/lib/query-keys";
 import {
   DOCUMENT_PRIORITY_META,
   DOCUMENT_PRIORITY_ORDER,
   DOCUMENT_CATEGORY_SUGGESTIONS,
 } from "@/modules/documents/constants";
 import { useCreateDocuments } from "@/modules/documents/hooks";
-import { useCreateHandoff } from "@/modules/documents/handoff-hooks";
 import { useOffices } from "@/modules/documents/office-hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import { useMe } from "@/modules/meetings/item-hooks";
-import type { DocumentRecord, TaskPriority } from "@/types/database";
+import type { TaskPriority } from "@/types/database";
 
 const NO_OFFICE = "__none__";
+const NO_RECEIVER = "__no_receiver__";
 const INITIAL_ROW_COUNT = 5;
 const MAX_ROWS = 50;
 const BULK_CATEGORY_DATALIST_ID = "bulk-doc-category-suggestions";
@@ -67,29 +65,28 @@ function ReceiverSelect({
   value,
   onChange,
   options,
-  placeholder = "Chọn người nhận",
-  invalid = false,
+  placeholder = "Chưa chọn",
   className,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: ReceiverOption[];
   placeholder?: string;
-  invalid?: boolean;
   className?: string;
 }) {
+  // Radix Select cannot hold an empty value, so "no receiver" uses a sentinel.
   return (
-    <Select value={value || undefined} onValueChange={onChange}>
-      <SelectTrigger
-        className={cn(
-          "h-10",
-          invalid && "border-destructive focus:ring-destructive",
-          className,
-        )}
-      >
+    <Select
+      value={value || NO_RECEIVER}
+      onValueChange={(v) => onChange(v === NO_RECEIVER ? "" : v)}
+    >
+      <SelectTrigger className={cn("h-10", className)}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
+        <SelectItem value={NO_RECEIVER}>
+          <span className="text-muted-foreground">{placeholder}</span>
+        </SelectItem>
         {options.length === 0 ? (
           <div className="px-2 py-3 text-center text-xs text-muted-foreground">
             Không có người nhận khả dụng
@@ -121,22 +118,11 @@ function isRowEmpty(row: BulkDocumentRow): boolean {
 }
 
 function isRowInvalid(row: BulkDocumentRow): boolean {
-  return !isRowEmpty(row) && (!row.title.trim() || !row.receiverId);
+  return !isRowEmpty(row) && !row.title.trim();
 }
 
 function isRowValid(row: BulkDocumentRow): boolean {
-  return (
-    !isRowEmpty(row) && Boolean(row.title.trim()) && Boolean(row.receiverId)
-  );
-}
-
-function makeDocumentSignature(doc: {
-  title: string;
-  category?: string | null;
-  quantity?: number | null;
-  description?: string | null;
-}): string {
-  return `${doc.title}|${doc.category ?? ""}|${doc.quantity ?? 1}|${doc.description ?? ""}`;
+  return !isRowEmpty(row) && Boolean(row.title.trim());
 }
 
 export function BulkDocumentFormDialog({
@@ -148,12 +134,10 @@ export function BulkDocumentFormDialog({
   onOpenChange: (v: boolean) => void;
   defaultOfficeId?: string | null;
 }) {
-  const qc = useQueryClient();
   const { data: me } = useMe();
   const { data: profiles = [] } = useProfiles();
   const { data: offices = [] } = useOffices();
   const createDocuments = useCreateDocuments();
-  const createHandoff = useCreateHandoff({ silentToast: true });
 
   const keyCounterRef = useRef(0);
   const makeRow = (
@@ -177,7 +161,6 @@ export function BulkDocumentFormDialog({
   const [rows, setRows] = useState<BulkDocumentRow[]>([]);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
-  const [submittingHandoffs, setSubmittingHandoffs] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -188,7 +171,6 @@ export function BulkDocumentFormDialog({
     setRows(Array.from({ length: INITIAL_ROW_COUNT }, () => makeRow()));
     setPasteOpen(false);
     setPasteText("");
-    setSubmittingHandoffs(false);
   }, [open, defaultOfficeId]);
 
   const officeById = useMemo(
@@ -234,16 +216,15 @@ export function BulkDocumentFormDialog({
 
   const missingHint = useMemo(() => {
     if (invalidRowCount > 0) {
-      return `Có ${invalidRowCount} dòng thiếu tiêu đề hoặc người nhận.`;
+      return `Có ${invalidRowCount} dòng thiếu tiêu đề.`;
     }
     if (validRows.length === 0) {
-      return "Vui lòng nhập ít nhất 1 hồ sơ và chọn người nhận.";
+      return "Vui lòng nhập ít nhất 1 hồ sơ.";
     }
     return null;
   }, [invalidRowCount, validRows.length]);
 
-  const pending =
-    createDocuments.isPending || createHandoff.isPending || submittingHandoffs;
+  const pending = createDocuments.isPending;
 
   function updateRow(
     key: string,
@@ -352,27 +333,6 @@ export function BulkDocumentFormDialog({
     }
   }
 
-  function invalidateBulkQueries(docIds: string[]) {
-    for (const docId of docIds) {
-      qc.invalidateQueries({
-        queryKey: queryKeys.documentHandoffs(docId),
-      });
-      qc.invalidateQueries({
-        queryKey: queryKeys.documentHolders(docId),
-      });
-      qc.invalidateQueries({ queryKey: queryKeys.document(docId) });
-      qc.invalidateQueries({
-        queryKey: queryKeys.documentLogs(docId),
-      });
-    }
-    qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
-    qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
-    qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
-    qc.invalidateQueries({
-      queryKey: queryKeys.documentsWithPendingHandoffs,
-    });
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit || pending) return;
@@ -382,83 +342,25 @@ export function BulkDocumentFormDialog({
       : null;
     const officeId = originOfficeId === NO_OFFICE ? null : originOfficeId;
 
-    const items = validRows.map((row) => {
-      const payload = {
-        title: row.title.trim(),
-        category: row.category.trim() || null,
-        quantity: Math.max(1, Math.floor(Number(row.quantity)) || 1),
-        description: row.note.trim() || null,
-        origin_office_id: officeId,
-        priority,
-        received_at: receivedAt,
-      };
-      return {
-        payload,
-        receiverId: row.receiverId,
-        signature: makeDocumentSignature(payload),
-        used: false,
-      };
-    });
+    // Creating documents never hands them off: the intended recipient is only
+    // recorded so intake staff know who the document is ultimately for.
+    const payloads = validRows.map((row) => ({
+      title: row.title.trim(),
+      category: row.category.trim() || null,
+      quantity: Math.max(1, Math.floor(Number(row.quantity)) || 1),
+      description: row.note.trim() || null,
+      origin_office_id: officeId,
+      intended_recipient_id: row.receiverId || null,
+      priority,
+      received_at: receivedAt,
+    }));
 
-    let created: DocumentRecord[];
     try {
-      created = await createDocuments.mutateAsync(
-        items.map((item) => item.payload),
-      );
+      const created = await createDocuments.mutateAsync(payloads);
+      toast.success(`Đã tạo ${created.length} hồ sơ`);
     } catch {
       return;
     }
-
-    setSubmittingHandoffs(true);
-    const failedCodes: string[] = [];
-    try {
-      for (let i = 0; i < created.length; i += 1) {
-        const doc = created[i];
-        const docSig = makeDocumentSignature(doc);
-        let matched = items.find(
-          (item) => !item.used && item.signature === docSig,
-        );
-        if (!matched) {
-          const fallbackByIdx = items[i];
-          if (fallbackByIdx && !fallbackByIdx.used) {
-            matched = fallbackByIdx;
-          } else {
-            matched = items.find((item) => !item.used);
-          }
-        }
-        if (matched) {
-          matched.used = true;
-        }
-        const targetReceiverId = matched?.receiverId;
-        if (!targetReceiverId) {
-          failedCodes.push(doc.code);
-          continue;
-        }
-        try {
-          await createHandoff.mutateAsync({
-            documentId: doc.id,
-            toUsers: [targetReceiverId],
-            kind: "assign",
-          });
-        } catch {
-          failedCodes.push(doc.code);
-        }
-      }
-    } finally {
-      setSubmittingHandoffs(false);
-      invalidateBulkQueries(created.map((d) => d.id));
-    }
-
-    if (failedCodes.length === 0) {
-      toast.success(
-        `Đã tạo ${created.length} hồ sơ và tạo lượt bàn giao cho từng người nhận`,
-      );
-    } else {
-      toast.error(
-        `Đã tạo ${created.length} hồ sơ nhưng ${failedCodes.length} hồ sơ bàn giao thất bại: ${failedCodes.join(", ")}. Vui lòng bàn giao lại trong trang chi tiết.`,
-      );
-    }
-
     onOpenChange(false);
   }
 
@@ -475,7 +377,8 @@ export function BulkDocumentFormDialog({
         <DialogHeader className="shrink-0 border-b px-4 py-3.5 sm:px-6 sm:py-4">
           <DialogTitle className="text-lg">Tiếp nhận nhiều hồ sơ</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Nhập danh sách hồ sơ cùng tiếp nhận, mỗi hồ sơ chọn một người nhận.
+            Nhập danh sách hồ sơ cùng tiếp nhận. Người nhận dự kiến chỉ để ghi chú,
+            hồ sơ chưa được bàn giao khi tạo.
           </p>
         </DialogHeader>
 
@@ -541,7 +444,7 @@ export function BulkDocumentFormDialog({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <Label>Người nhận mặc định</Label>
+                <Label>Người nhận dự kiến mặc định</Label>
                 {defaultReceiverId && (
                   <button
                     type="button"
@@ -558,7 +461,7 @@ export function BulkDocumentFormDialog({
                     value={defaultReceiverId}
                     onChange={setDefaultReceiverId}
                     options={receiverOptions}
-                    placeholder="Chọn người nhận mặc định (tuỳ chọn)"
+                    placeholder="Không chọn"
                   />
                 </div>
                 <Button
@@ -603,7 +506,7 @@ export function BulkDocumentFormDialog({
                     Dán các dòng từ Excel (các cột cách nhau bằng phím TAB theo
                     thứ tự:{" "}
                     <span className="font-medium text-foreground">
-                      Tiêu đề · Loại hồ sơ · Số lượng · Người nhận · Ghi chú
+                      Tiêu đề · Loại hồ sơ · Số lượng · Người nhận dự kiến · Ghi chú
                     </span>
                     ).
                   </p>
@@ -647,7 +550,7 @@ export function BulkDocumentFormDialog({
                         Tiêu đề *
                       </th>
                       <th className="w-64 px-3 py-2.5 text-left font-medium">
-                        Người nhận *
+                        Người nhận dự kiến
                       </th>
                       <th className="w-44 px-3 py-2.5 text-left font-medium">
                         Loại hồ sơ
@@ -665,7 +568,6 @@ export function BulkDocumentFormDialog({
                     {rows.map((row, index) => {
                       const empty = isRowEmpty(row);
                       const missingTitle = !empty && !row.title.trim();
-                      const missingReceiver = !empty && !row.receiverId;
                       return (
                         <tr key={row.key} className="align-top">
                           <td className="px-3 py-2.5 text-center text-xs leading-10 text-muted-foreground">
@@ -692,7 +594,6 @@ export function BulkDocumentFormDialog({
                                 updateRow(row.key, { receiverId: v })
                               }
                               options={receiverOptions}
-                              invalid={missingReceiver}
                             />
                           </td>
                           <td className="px-3 py-2.5">
@@ -767,7 +668,6 @@ export function BulkDocumentFormDialog({
                 {rows.map((row, index) => {
                   const empty = isRowEmpty(row);
                   const missingTitle = !empty && !row.title.trim();
-                  const missingReceiver = !empty && !row.receiverId;
                   return (
                     <div
                       key={row.key}
@@ -805,14 +705,13 @@ export function BulkDocumentFormDialog({
                       </div>
 
                       <div className="space-y-1">
-                        <Label className="text-xs">Người nhận *</Label>
+                        <Label className="text-xs">Người nhận dự kiến</Label>
                         <ReceiverSelect
                           value={row.receiverId}
                           onChange={(v) =>
                             updateRow(row.key, { receiverId: v })
                           }
                           options={receiverOptions}
-                          invalid={missingReceiver}
                         />
                       </div>
 

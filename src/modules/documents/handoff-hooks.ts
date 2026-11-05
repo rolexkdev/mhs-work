@@ -11,7 +11,6 @@ import { queryKeys } from "@/lib/query-keys";
 import { friendlyError } from "@/lib/errors";
 import type {
   DocumentHandoff,
-  DocumentHolder,
   DocumentRecord,
   HandoffKind,
 } from "@/types/database";
@@ -69,23 +68,6 @@ export function useMyPendingHandoffs() {
         document: docById.get(h.document_id) ?? null,
       }));
     },
-  });
-}
-
-export function useDocumentHolders(documentId: string | null) {
-  return useQuery({
-    queryKey: queryKeys.documentHolders(documentId ?? ""),
-    queryFn: async (): Promise<DocumentHolder[]> => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("document_holders")
-        .select("*")
-        .eq("document_id", documentId!)
-        .order("accepted_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!documentId,
   });
 }
 
