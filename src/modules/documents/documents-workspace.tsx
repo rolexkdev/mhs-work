@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Check,
   X,
@@ -10,19 +10,17 @@ import {
   Search,
   FileText,
   Filter,
+  Layers,
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  formatDate,
-  formatDateTime,
-  initials,
-} from "@/lib/format";
+import { formatDateTime, initials } from "@/lib/format";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Select,
   SelectContent,
@@ -41,8 +39,18 @@ import {
   DOCUMENT_FLOW_STATUS_ORDER,
   getDocumentFlowStatus,
 } from "@/modules/documents/constants";
-import { DocumentFlowStatusBadge } from "@/modules/documents/document-flow-status-badge";
-import { useDocuments } from "@/modules/documents/hooks";
+import {
+  useDocuments,
+  useDeleteDocument,
+  useUpdateDocument,
+} from "@/modules/documents/hooks";
+import {
+  DocumentListView,
+  type DocumentGroupBy,
+  type DocumentPatch,
+} from "@/modules/documents/document-list-view";
+import { DocumentDetailPanel } from "@/modules/documents/document-detail-panel";
+import { HandoffDialog } from "@/modules/documents/handoff-dialog";
 import {
   useMyPendingHandoffs,
   useMyHeldDocumentIds,
@@ -57,6 +65,13 @@ import { DocumentFormDialog } from "@/modules/documents/document-form-dialog";
 import { BulkDocumentFormDialog } from "@/modules/documents/bulk-document-form-dialog";
 import { RespondHandoffDialog } from "@/modules/documents/respond-handoff-dialog";
 import type { DocumentRecord, Office } from "@/types/database";
+
+const GROUP_OPTIONS: { value: DocumentGroupBy; label: string }[] = [
+  { value: "none", label: "Không nhóm" },
+  { value: "status", label: "Trạng thái" },
+  { value: "office", label: "Văn phòng" },
+  { value: "category", label: "Loại hồ sơ" },
+];
 
 const ALL = "__all__";
 const EMPTY_RECIPIENTS_MAP = new Map<string, string[]>();
@@ -73,6 +88,35 @@ export function DocumentsWorkspace() {
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
+
+  const [groupBy, setGroupBy] = useState<DocumentGroupBy>("status");
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [handoffDoc, setHandoffDoc] = useState<DocumentRecord | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DocumentRecord | null>(
+    null,
+  );
+
+  // Open the detail panel for ?doc=<id> (old /documents/<id> links redirect here).
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get("doc");
+    if (id) {
+      setDetailId(id);
+      setDetailOpen(true);
+    }
+  }, [searchParams]);
+
+  function openDetail(id: string) {
+    setDetailId(id);
+    setDetailOpen(true);
+    // Put ?doc=<id> in the address bar so the link can be shared.
+    window.history.replaceState(null, "", `${window.location.pathname}?doc=${id}`);
+  }
+  function handleDetailOpenChange(v: boolean) {
+    setDetailOpen(v);
+    if (!v) window.history.replaceState(null, "", window.location.pathname);
+  }
 
   const [respondTarget, setRespondTarget] = useState<{
     handoff: PendingHandoffWithDocument;
@@ -96,6 +140,12 @@ export function DocumentsWorkspace() {
   const { data: pendingRecipientsByDoc = EMPTY_RECIPIENTS_MAP } =
     usePendingHandoffRecipients();
   const respondHandoff = useRespondHandoff();
+  const updateDocument = useUpdateDocument();
+  const deleteDocument = useDeleteDocument();
+
+  function handlePatch(id: string, patch: DocumentPatch) {
+    updateDocument.mutate({ id, ...patch });
+  }
 
   const profileById = useMemo(
     () => new Map(profiles.map((p) => [p.id, p])),
@@ -227,6 +277,25 @@ export function DocumentsWorkspace() {
           </SelectContent>
         </Select>
 
+        <div className="flex w-full items-center gap-1.5 sm:w-auto">
+          <Layers className="hidden h-4 w-4 text-muted-foreground sm:block" />
+          <Select
+            value={groupBy}
+            onValueChange={(v) => setGroupBy(v as DocumentGroupBy)}
+          >
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {GROUP_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  Nhóm: {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {hasFilters && (
           <Button
             variant="ghost"
@@ -305,21 +374,18 @@ export function DocumentsWorkspace() {
               }
             />
           ) : (
-            <DocumentsListView
+            <DocumentListView
               documents={filteredDocuments}
-              officeById={officeById}
+              groupBy={groupBy}
+              profiles={profiles}
+              offices={offices}
               pendingRecipientsByDoc={pendingRecipientsByDoc}
               isDocumentManager={isDocumentManager}
-              nameOf={(id) =>
-                id
-                  ? (profileById.get(id)?.full_name ??
-                    profileById.get(id)?.email ??
-                    null)
-                  : null
-              }
-              avatarOf={(id) =>
-                id ? (profileById.get(id)?.avatar_url ?? null) : null
-              }
+              canManage={canManage}
+              onOpen={(doc) => openDetail(doc.id)}
+              onPatch={handlePatch}
+              onHandoff={setHandoffDoc}
+              onDelete={setPendingDelete}
             />
           )}
         </TabsContent>
@@ -340,21 +406,18 @@ export function DocumentsWorkspace() {
               }
             />
           ) : (
-            <DocumentsListView
+            <DocumentListView
               documents={holdingDocuments}
-              officeById={officeById}
+              groupBy={groupBy}
+              profiles={profiles}
+              offices={offices}
               pendingRecipientsByDoc={pendingRecipientsByDoc}
               isDocumentManager={isDocumentManager}
-              nameOf={(id) =>
-                id
-                  ? (profileById.get(id)?.full_name ??
-                    profileById.get(id)?.email ??
-                    null)
-                  : null
-              }
-              avatarOf={(id) =>
-                id ? (profileById.get(id)?.avatar_url ?? null) : null
-              }
+              canManage={canManage}
+              onOpen={(doc) => openDetail(doc.id)}
+              onPatch={handlePatch}
+              onHandoff={setHandoffDoc}
+              onDelete={setPendingDelete}
             />
           )}
         </TabsContent>
@@ -388,6 +451,7 @@ export function DocumentsWorkspace() {
                 id ? (profileById.get(id)?.avatar_url ?? null) : null
               }
               officeById={officeById}
+              onOpen={openDetail}
               isResponding={respondHandoff.isPending}
               onQuickAccept={(h) =>
                 respondHandoff.mutate({
@@ -408,7 +472,7 @@ export function DocumentsWorkspace() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         defaultOfficeId={myProfile?.office_id ?? null}
-        navigateOnCreate
+        onCreated={(doc) => openDetail(doc.id)}
       />
 
       <BulkDocumentFormDialog
@@ -428,6 +492,45 @@ export function DocumentsWorkspace() {
         }
         defaultAccept={respondTarget?.accept ?? true}
       />
+
+      <DocumentDetailPanel
+        documentId={detailId}
+        open={detailOpen}
+        onOpenChange={handleDetailOpenChange}
+      />
+
+      {handoffDoc && (
+        <HandoffDialog
+          open={!!handoffDoc}
+          onOpenChange={(v) => !v && setHandoffDoc(null)}
+          documentId={handoffDoc.id}
+          currentUserId={me?.id ?? null}
+          pendingRecipientIds={pendingRecipientsByDoc.get(handoffDoc.id) ?? []}
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(v) => !v && setPendingDelete(null)}
+        title="Xoá hồ sơ?"
+        description={
+          pendingDelete
+            ? `Hồ sơ "${pendingDelete.code} — ${pendingDelete.title}" sẽ bị xoá vĩnh viễn cùng lịch sử bàn giao và tệp đính kèm.`
+            : undefined
+        }
+        confirmLabel="Xoá hồ sơ"
+        destructive
+        onConfirm={async () => {
+          if (!pendingDelete) return;
+          const id = pendingDelete.id;
+          try {
+            await deleteDocument.mutateAsync(id);
+          } catch {
+            return;
+          }
+          if (detailId === id) handleDetailOpenChange(false);
+        }}
+      />
     </div>
   );
 }
@@ -446,6 +549,7 @@ function PendingHandoffsView({
   nameOf,
   avatarOf,
   officeById,
+  onOpen,
   isResponding,
   onQuickAccept,
   onOpenRespondDialog,
@@ -454,6 +558,7 @@ function PendingHandoffsView({
   nameOf: (id: string | null) => string | null;
   avatarOf: (id: string | null) => string | null;
   officeById: Map<string, Office>;
+  onOpen: (documentId: string) => void;
   isResponding: boolean;
   onQuickAccept: (h: PendingHandoffWithDocument) => void;
   onOpenRespondDialog: (h: PendingHandoffWithDocument, accept: boolean) => void;
@@ -474,12 +579,12 @@ function PendingHandoffsView({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Link
-                      href={`/documents/${h.document_id}`}
+                    <button
+                      onClick={() => onOpen(h.document_id)}
                       className="font-mono text-xs font-semibold text-primary hover:underline"
                     >
                       {doc?.code ?? "—"}
-                    </Link>
+                    </button>
                     {office && (
                       <Badge
                         variant="secondary"
@@ -489,12 +594,12 @@ function PendingHandoffsView({
                       </Badge>
                     )}
                   </div>
-                  <Link
-                    href={`/documents/${h.document_id}`}
-                    className="mt-1 block font-medium leading-snug hover:underline"
+                  <button
+                    onClick={() => onOpen(h.document_id)}
+                    className="mt-1 block text-left font-medium leading-snug hover:underline"
                   >
                     {doc?.title ?? "Hồ sơ không xác định"}
-                  </Link>
+                  </button>
                 </div>
               </div>
 
@@ -584,20 +689,20 @@ function PendingHandoffsView({
                   className="border-b last:border-0 hover:bg-muted/30"
                 >
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold">
-                    <Link
-                      href={`/documents/${h.document_id}`}
+                    <button
+                      onClick={() => onOpen(h.document_id)}
                       className="text-primary hover:underline"
                     >
                       {doc?.code ?? "—"}
-                    </Link>
+                    </button>
                   </td>
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/documents/${h.document_id}`}
-                      className="font-medium hover:underline"
+                    <button
+                      onClick={() => onOpen(h.document_id)}
+                      className="text-left font-medium hover:underline"
                     >
                       {doc?.title ?? "Hồ sơ không xác định"}
-                    </Link>
+                    </button>
                     {h.note && (
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         Ghi chú: {h.note}
@@ -648,207 +753,6 @@ function PendingHandoffsView({
                         <X className="h-3.5 w-3.5" /> Từ chối
                       </Button>
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-function DocumentsListView({
-  documents,
-  officeById,
-  pendingRecipientsByDoc,
-  isDocumentManager,
-  nameOf,
-  avatarOf,
-}: {
-  documents: DocumentRecord[];
-  officeById: Map<string, Office>;
-  pendingRecipientsByDoc: Map<string, string[]>;
-  isDocumentManager: (userId: string) => boolean;
-  nameOf: (id: string | null) => string | null;
-  avatarOf: (id: string | null) => string | null;
-}) {
-  return (
-    <>
-      {/* Mobile cards */}
-      <div className="divide-y rounded-lg border bg-background md:hidden">
-        {documents.map((doc) => {
-          const hasFinalReceiver =
-            Boolean(doc.delivered_to) && !isDocumentManager(doc.delivered_to!);
-          const finalReceiverId = hasFinalReceiver ? doc.delivered_to : null;
-          const finalDeliveredAt = hasFinalReceiver ? doc.delivered_at : null;
-          const name = nameOf(finalReceiverId);
-          const avatar = avatarOf(finalReceiverId);
-          const pendingRecipientIds = pendingRecipientsByDoc.get(doc.id) ?? [];
-          const hasPending = pendingRecipientsByDoc.has(doc.id);
-          const flowStatus = getDocumentFlowStatus(
-            doc,
-            hasPending,
-            isDocumentManager,
-          );
-          const office = doc.current_office_id
-            ? officeById.get(doc.current_office_id)
-            : undefined;
-          const recipientNames = pendingRecipientIds
-            .map((uid) => nameOf(uid))
-            .filter((n): n is string => Boolean(n));
-
-          return (
-            <Link
-              key={doc.id}
-              href={`/documents/${doc.id}`}
-              className="block space-y-1.5 p-3 hover:bg-muted/30"
-            >
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-mono text-xs font-semibold text-primary">
-                  {doc.code}
-                </span>
-                <DocumentFlowStatusBadge
-                  status={flowStatus}
-                  office={office}
-                  recipientNames={recipientNames}
-                />
-                {doc.category && (
-                  <Badge variant="outline" className="text-[11px] font-normal">
-                    {doc.category}
-                  </Badge>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  SL: {doc.quantity}
-                </span>
-              </div>
-              <p className="font-medium leading-snug">{doc.title}</p>
-              <p className="text-xs text-muted-foreground">
-                Tiếp nhận: {formatDate(doc.received_at)}
-              </p>
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                {name ? (
-                  <>
-                    <Avatar className="h-4 w-4">
-                      {avatar && <AvatarImage src={avatar} alt={name} />}
-                      <AvatarFallback className="text-[9px]">
-                        {initials(name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium text-foreground">{name}</span>
-                    {finalDeliveredAt && (
-                      <span>· {formatDate(finalDeliveredAt)}</span>
-                    )}
-                  </>
-                ) : (
-                  "Chưa có người nhận"
-                )}
-              </p>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Desktop table */}
-      <div className="hidden overflow-x-auto rounded-lg border bg-background md:block">
-        <table className="w-full min-w-[960px] text-sm">
-          <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2.5 text-left font-medium">Mã hồ sơ</th>
-              <th className="px-4 py-2.5 text-left font-medium">Trạng thái</th>
-              <th className="px-4 py-2.5 text-left font-medium">
-                Ngày tiếp nhận hồ sơ
-              </th>
-              <th className="px-4 py-2.5 text-left font-medium">Loại hồ sơ</th>
-              <th className="px-4 py-2.5 text-right font-medium">Số lượng</th>
-              <th className="px-4 py-2.5 text-left font-medium">
-                Ngày nhận hồ sơ
-              </th>
-              <th className="px-4 py-2.5 text-left font-medium">Người nhận</th>
-            </tr>
-          </thead>
-          <tbody>
-            {documents.map((doc) => {
-              const hasFinalReceiver =
-                Boolean(doc.delivered_to) &&
-                !isDocumentManager(doc.delivered_to!);
-              const finalReceiverId = hasFinalReceiver
-                ? doc.delivered_to
-                : null;
-              const finalDeliveredAt = hasFinalReceiver
-                ? doc.delivered_at
-                : null;
-              const name = nameOf(finalReceiverId);
-              const avatar = avatarOf(finalReceiverId);
-              const pendingRecipientIds =
-                pendingRecipientsByDoc.get(doc.id) ?? [];
-              const hasPending = pendingRecipientsByDoc.has(doc.id);
-              const flowStatus = getDocumentFlowStatus(
-                doc,
-                hasPending,
-                isDocumentManager,
-              );
-              const office = doc.current_office_id
-                ? officeById.get(doc.current_office_id)
-                : undefined;
-              const recipientNames = pendingRecipientIds
-                .map((uid) => nameOf(uid))
-                .filter((n): n is string => Boolean(n));
-
-              return (
-                <tr
-                  key={doc.id}
-                  className="border-b last:border-0 hover:bg-muted/30"
-                >
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold">
-                    <Link
-                      href={`/documents/${doc.id}`}
-                      className="text-primary hover:underline"
-                      title={doc.title}
-                    >
-                      {doc.code}
-                    </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <DocumentFlowStatusBadge
-                      status={flowStatus}
-                      office={office}
-                      recipientNames={recipientNames}
-                    />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {formatDate(doc.received_at)}
-                  </td>
-                  <td className="px-4 py-3">
-                    {doc.category ?? (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {doc.quantity}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {finalDeliveredAt ? (
-                      formatDate(finalDeliveredAt)
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    {name ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          {avatar && <AvatarImage src={avatar} alt={name} />}
-                          <AvatarFallback className="text-[10px]">
-                            {initials(name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span>{name}</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
                   </td>
                 </tr>
               );

@@ -106,7 +106,7 @@ export function CommandPalette() {
                     <Command.Item
                       key={doc.id}
                       value={`document ${doc.code} ${doc.title} ${doc.id}`}
-                      onSelect={() => go(`/documents/${doc.id}`)}
+                      onSelect={() => go(`/documents?doc=${doc.id}`)}
                       className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm text-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
                     >
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
