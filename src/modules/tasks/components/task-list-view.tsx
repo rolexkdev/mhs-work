@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { dueLabel, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { EditableTitle, InlineDateCell } from "@/components/inline-edit-cells";
 import { ProgressDial } from "@/modules/tasks/components/progress-dial";
 import {
   DropdownMenu,
@@ -652,72 +653,6 @@ function MobileTaskRow({
   );
 }
 
-/** Tiêu đề: click mở chi tiết, double-click để đổi tên ngay tại dòng. */
-function EditableTitle({
-  value,
-  isDone,
-  onOpen,
-  onRename,
-}: {
-  value: string;
-  isDone: boolean;
-  onOpen: () => void;
-  onRename: (title: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing) inputRef.current?.select();
-  }, [editing]);
-
-  function commit() {
-    const v = draft.trim();
-    if (v && v !== value) onRename(v);
-    else setDraft(value);
-    setEditing(false);
-  }
-
-  if (editing) {
-    return (
-      <input
-        ref={inputRef}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit();
-          } else if (e.key === "Escape") {
-            setDraft(value);
-            setEditing(false);
-          }
-        }}
-        className="w-full rounded border border-input bg-background px-1.5 py-0.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      />
-    );
-  }
-
-  return (
-    <button
-      onClick={onOpen}
-      onDoubleClick={() => {
-        setDraft(value);
-        setEditing(true);
-      }}
-      title="Bấm để mở chi tiết · bấm đúp để đổi tên"
-      className={cn(
-        "block min-w-0 max-w-full truncate text-left text-sm font-medium hover:underline",
-        isDone && "text-muted-foreground line-through",
-      )}
-    >
-      {value}
-    </button>
-  );
-}
-
 /**
  * Báo cáo mới nhất: người dùng hay gõ danh sách nhiều dòng ("1. ... 2. ...")
  * nên hiển thị 2 dòng đầu (giữ nguyên xuống dòng), có nút mở rộng tại chỗ để
@@ -762,48 +697,5 @@ function LatestUpdateCell({
         </button>
       )}
     </div>
-  );
-}
-
-/** Ngày: hiển thị nhãn, click để chọn ngày qua input date. */
-function InlineDateCell({
-  value,
-  label,
-  className,
-  onChange,
-}: {
-  value: string | null;
-  label: string;
-  className?: string;
-  onChange: (iso: string | null) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-
-  if (editing) {
-    return (
-      <input
-        type="date"
-        autoFocus
-        defaultValue={value ? value.slice(0, 10) : ""}
-        onBlur={() => setEditing(false)}
-        onChange={(e) =>
-          onChange(e.target.value ? new Date(e.target.value).toISOString() : null)
-        }
-        className="w-full rounded border border-input bg-background px-1 py-0.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      />
-    );
-  }
-
-  return (
-    <button
-      onClick={() => setEditing(true)}
-      title="Bấm để đổi ngày"
-      className={cn(
-        "truncate rounded px-1 py-0.5 text-left text-xs hover:bg-muted/60",
-        className,
-      )}
-    >
-      {label}
-    </button>
   );
 }
