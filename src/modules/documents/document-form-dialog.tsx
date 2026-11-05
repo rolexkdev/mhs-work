@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Paperclip, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,17 +28,8 @@ import {
   DOCUMENT_PRIORITY_META,
   DOCUMENT_PRIORITY_ORDER,
   DOCUMENT_CATEGORY_SUGGESTIONS,
-  NON_HANDOFFABLE_DOCUMENT_STATUSES,
 } from "@/modules/documents/constants";
-import {
-  useCreateDocument,
-  useUpdateDocument,
-} from "@/modules/documents/hooks";
-import {
-  useDocumentHandoffs,
-  useCreateHandoff,
-  useCancelHandoff,
-} from "@/modules/documents/handoff-hooks";
+import { useCreateDocument } from "@/modules/documents/hooks";
 import { RecipientPickerList } from "@/modules/documents/handoff-dialog";
 import { uploadDocumentFile } from "@/modules/documents/attachment-hooks";
 import { useOffices } from "@/modules/documents/office-hooks";
@@ -50,36 +40,32 @@ import type { DocumentRecord, TaskPriority } from "@/types/database";
 const NO_OFFICE = "__none__";
 
 /** Local calendar date (YYYY-MM-DD) of a timestamp. */
-function toLocalDateInput(iso: string | null | undefined): string {
+function toLocalDateInput(iso?: string | null): string {
   return new Date(iso ?? Date.now()).toLocaleDateString("sv-SE");
 }
 
+/**
+ * Create a single document. Creating never hands the document off: the
+ * optional recipient is stored as `intended_recipient_id` so intake staff know
+ * who it is ultimately for. Editing happens inline in the table and the detail
+ * panel.
+ */
 export function DocumentFormDialog({
   open,
   onOpenChange,
-  document,
   defaultOfficeId,
-  navigateOnCreate = false,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  document?: DocumentRecord | null;
   defaultOfficeId?: string | null;
-  navigateOnCreate?: boolean;
+  onCreated?: (doc: DocumentRecord) => void;
 }) {
-  const isEdit = !!document;
-  const router = useRouter();
   const qc = useQueryClient();
   const { data: me } = useMe();
   const { data: profiles = [] } = useProfiles();
   const { data: offices = [] } = useOffices();
-  const { data: handoffs } = useDocumentHandoffs(
-    isEdit && document ? document.id : null,
-  );
   const createDocument = useCreateDocument();
-  const updateDocument = useUpdateDocument();
-  const createHandoff = useCreateHandoff({ silentToast: true });
-  const cancelHandoff = useCancelHandoff({ silentToast: true });
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -94,111 +80,29 @@ export function DocumentFormDialog({
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const receiverTouchedRef = useRef(false);
-  const receiverSeededFromHandoffsRef = useRef(false);
-
-  const pendingHandoff = useMemo(
-    () => (handoffs ?? []).find((h) => h.status === "pending") ?? null,
-    [handoffs],
-  );
-
-  const profileById = useMemo(
-    () => new Map(profiles.map((p) => [p.id, p])),
-    [profiles],
-  );
-
-  const isDocumentManager = useCallback(
-    (id: string) => profileById.get(id)?.can_manage_documents ?? true,
-    [profileById],
-  );
-
-  const currentReceiverId = useMemo(() => {
-    if (!isEdit || !document) return null;
-    if (pendingHandoff) return pendingHandoff.to_user;
-    if (
-      document.current_holder_id &&
-      !isDocumentManager(document.current_holder_id)
-    ) {
-      return document.current_holder_id;
-    }
-    return null;
-  }, [isEdit, document, pendingHandoff, isDocumentManager]);
-
-  const hintUserId = useMemo(() => {
-    if (!isEdit || !document) return null;
-    return currentReceiverId ?? document.current_holder_id ?? null;
-  }, [isEdit, document, currentReceiverId]);
-
-  const hintUserName = useMemo(() => {
-    if (!hintUserId) return null;
-    const p = profileById.get(hintUserId);
-    return p ? (p.full_name ?? p.email) : null;
-  }, [profileById, hintUserId]);
-
-  const hintStatusLabel = pendingHandoff
-    ? "Đang chuyển"
-    : currentReceiverId
-      ? "Đã nhận"
-      : "Tại văn phòng";
-
-  const isHandoffDisabled =
-    isEdit &&
-    !!document &&
-    NON_HANDOFFABLE_DOCUMENT_STATUSES.has(document.status);
 
   useEffect(() => {
-    if (!open) {
-      receiverTouchedRef.current = false;
-      receiverSeededFromHandoffsRef.current = false;
-      return;
-    }
-    receiverTouchedRef.current = false;
-    receiverSeededFromHandoffsRef.current = false;
-    setTitle(document?.title ?? "");
-    setCategory(document?.category ?? "");
-    setOriginOfficeId(
-      document?.origin_office_id ?? defaultOfficeId ?? NO_OFFICE,
-    );
-    setPriority(document?.priority ?? "medium");
-    setQuantity(String(document?.quantity ?? 1));
-    setReceivedDate(toLocalDateInput(document?.received_at));
+    if (!open) return;
+    setTitle("");
+    setCategory("");
+    setOriginOfficeId(defaultOfficeId ?? NO_OFFICE);
+    setPriority("medium");
+    setQuantity("1");
+    setReceivedDate(toLocalDateInput());
     setReceiverId("");
     setReceiverSearch("");
-    setDescription(document?.description ?? "");
+    setDescription("");
     setFiles([]);
-  }, [open, document, defaultOfficeId]);
-
-  useEffect(() => {
-    if (!open || !isEdit || handoffs === undefined) return;
-    if (receiverSeededFromHandoffsRef.current) return;
-    receiverSeededFromHandoffsRef.current = true;
-    if (!receiverTouchedRef.current) {
-      setReceiverId(currentReceiverId ?? "");
-    }
-  }, [open, isEdit, handoffs, currentReceiverId]);
+  }, [open, defaultOfficeId]);
 
   const selectedReceiver = useMemo(
     () => (receiverId ? profiles.find((p) => p.id === receiverId) ?? null : null),
     [profiles, receiverId],
   );
 
-  const pending =
-    createDocument.isPending ||
-    updateDocument.isPending ||
-    uploadingFiles ||
-    cancelHandoff.isPending ||
-    createHandoff.isPending;
-
+  const pending = createDocument.isPending || uploadingFiles;
   const trimmedTitle = title.trim();
-  const hasReceiver = isEdit || Boolean(receiverId);
-  const canSubmit = Boolean(trimmedTitle) && hasReceiver;
-  const missingHint = !trimmedTitle && !hasReceiver
-    ? "Vui lòng nhập tiêu đề và chọn người nhận hồ sơ."
-    : !trimmedTitle
-      ? "Vui lòng nhập tiêu đề hồ sơ."
-      : !hasReceiver
-        ? "Vui lòng chọn người nhận hồ sơ."
-        : null;
+  const canSubmit = Boolean(trimmedTitle);
 
   function handleSelectFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
@@ -212,89 +116,13 @@ export function DocumentFormDialog({
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function invalidateHandoffQueries(docId: string) {
-    qc.invalidateQueries({
-      queryKey: queryKeys.documentHandoffs(docId),
-    });
-    qc.invalidateQueries({
-      queryKey: queryKeys.documentHolders(docId),
-    });
-    qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
-    qc.invalidateQueries({ queryKey: queryKeys.document(docId) });
-    qc.invalidateQueries({
-      queryKey: queryKeys.documentLogs(docId),
-    });
-    qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
-    qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
-    qc.invalidateQueries({
-      queryKey: queryKeys.documentsWithPendingHandoffs,
-    });
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || pending) return;
     const qty = Math.max(1, Math.floor(Number(quantity)) || 1);
     const receivedAt = receivedDate
       ? new Date(`${receivedDate}T00:00:00`).toISOString()
-      : undefined;
-
-    if (isEdit && document) {
-      try {
-        await updateDocument.mutateAsync({
-          id: document.id,
-          title: trimmedTitle,
-          category: category.trim() || null,
-          priority,
-          description: description.trim() || null,
-          quantity: qty,
-          received_at: receivedAt,
-        });
-      } catch {
-        return;
-      }
-
-      const shouldChangeReceiver =
-        !isHandoffDisabled &&
-        Boolean(receiverId) &&
-        receiverId !== currentReceiverId;
-
-      if (shouldChangeReceiver) {
-        try {
-          const alreadyPendingForSelected = (handoffs ?? []).some(
-            (h) => h.status === "pending" && h.to_user === receiverId,
-          );
-          if (!alreadyPendingForSelected) {
-            await createHandoff.mutateAsync({
-              documentId: document.id,
-              toUsers: [receiverId],
-              kind: "assign",
-            });
-          }
-
-          const pendingToCancel = (handoffs ?? []).filter(
-            (h) => h.status === "pending" && h.to_user !== receiverId,
-          );
-          for (const h of pendingToCancel) {
-            await cancelHandoff.mutateAsync({
-              handoffId: h.id,
-              note: "Đổi người nhận",
-              documentId: document.id,
-            });
-          }
-        } catch (err) {
-          toast.error(
-            "Đã lưu thông tin nhưng đổi người nhận thất bại: " +
-              friendlyError(err, "Vui lòng thử lại bằng nút Bàn giao."),
-          );
-        } finally {
-          invalidateHandoffQueries(document.id);
-        }
-      }
-
-      onOpenChange(false);
-      return;
-    }
+      : null;
 
     let created: DocumentRecord;
     try {
@@ -302,10 +130,11 @@ export function DocumentFormDialog({
         title: trimmedTitle,
         category: category.trim() || null,
         origin_office_id: originOfficeId === NO_OFFICE ? null : originOfficeId,
+        intended_recipient_id: receiverId || null,
         priority,
         description: description.trim() || null,
         quantity: qty,
-        received_at: receivedAt ?? null,
+        received_at: receivedAt,
       });
     } catch {
       return;
@@ -315,64 +144,39 @@ export function DocumentFormDialog({
       setUploadingFiles(true);
       try {
         for (const file of files) {
-          await uploadDocumentFile({
-            documentId: created.id,
-            file,
-          });
+          await uploadDocumentFile({ documentId: created.id, file });
         }
-        qc.invalidateQueries({
-          queryKey: queryKeys.documentAttachments(created.id),
-        });
       } catch (err) {
         toast.error(friendlyError(err, "Tải tệp đính kèm thất bại."));
       } finally {
+        qc.invalidateQueries({
+          queryKey: queryKeys.documentAttachments(created.id),
+        });
         setUploadingFiles(false);
       }
     }
 
-    let handoffFailed = false;
-    try {
-      await createHandoff.mutateAsync({
-        documentId: created.id,
-        toUsers: [receiverId],
-        kind: "assign",
-      });
-    } catch (err) {
-      handoffFailed = true;
-      toast.error(
-        `Đã tạo hồ sơ nhưng bàn giao thất bại: ${friendlyError(
-          err,
-          "Vui lòng thử lại bằng nút Bàn giao.",
-        )}`,
-      );
-    } finally {
-      invalidateHandoffQueries(created.id);
-    }
-
     onOpenChange(false);
-    if (navigateOnCreate || handoffFailed) {
-      router.push(`/documents/${created.id}`);
-    }
+    onCreated?.(created);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!pending) onOpenChange(v);
+      }}
+    >
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="border-b px-6 py-4">
-          <DialogTitle className="text-lg">
-            {isEdit ? "Chỉnh sửa hồ sơ" : "Tiếp nhận hồ sơ mới"}
-          </DialogTitle>
+          <DialogTitle className="text-lg">Tiếp nhận hồ sơ mới</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            {isEdit
-              ? "Cập nhật thông tin hồ sơ – công văn."
-              : "Nhập thông tin hồ sơ, chọn người nhận để bàn giao và đính kèm bản scan nếu có."}
+            Nhập thông tin hồ sơ, chọn người nhận dự kiến (nếu có) và đính kèm
+            bản scan.
           </p>
         </DialogHeader>
 
-        <form
-          onSubmit={handleSubmit}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
             <div className="space-y-1.5">
               <Label htmlFor="doc-title">Tiêu đề hồ sơ *</Label>
@@ -411,8 +215,8 @@ export function DocumentFormDialog({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label>{isEdit ? "Người nhận" : "Người nhận *"}</Label>
-                {selectedReceiver ? (
+                <Label>Người nhận dự kiến</Label>
+                {selectedReceiver && (
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-muted-foreground">
                       Đã chọn:{" "}
@@ -420,53 +224,32 @@ export function DocumentFormDialog({
                         {selectedReceiver.full_name ?? selectedReceiver.email}
                       </span>
                     </span>
-                    {!isHandoffDisabled && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          receiverTouchedRef.current = true;
-                          setReceiverId("");
-                        }}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        Bỏ chọn
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => setReceiverId("")}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      Bỏ chọn
+                    </button>
                   </div>
-                ) : !isEdit ? (
-                  <span className="text-xs text-amber-600">
-                    Bắt buộc chọn 1 người nhận
-                  </span>
-                ) : null}
+                )}
               </div>
-
-              {isEdit && (
-                <p className="text-xs text-muted-foreground">
-                  {hintUserId
-                    ? `Hiện tại: ${hintUserName ?? "—"} (${hintStatusLabel})`
-                    : "Chưa có người nhận"}
-                </p>
-              )}
-
-              {isHandoffDisabled && (
-                <p className="text-xs text-amber-600">
-                  Hồ sơ đã lưu trữ nên không thể đổi người nhận.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                Chỉ lưu thông tin để nhân viên đầu mối biết cần bàn giao cho ai.
+                Hồ sơ chưa được bàn giao khi tạo.
+              </p>
 
               <RecipientPickerList
                 profiles={profiles}
                 offices={offices}
                 currentUserId={me?.id ?? null}
                 selectedIds={receiverId ? [receiverId] : []}
-                onSelect={(userId) => {
-                  receiverTouchedRef.current = true;
-                  setReceiverId((prev) => (prev === userId ? "" : userId));
-                }}
+                onSelect={(userId) =>
+                  setReceiverId((prev) => (prev === userId ? "" : userId))
+                }
                 search={receiverSearch}
                 onSearchChange={setReceiverSearch}
                 maxHeightClassName="max-h-48"
-                disabled={isHandoffDisabled}
               />
             </div>
 
@@ -487,35 +270,26 @@ export function DocumentFormDialog({
                 </datalist>
               </div>
 
-              {!isEdit && (
-                <div className="space-y-1.5">
-                  <Label>Văn phòng khởi tạo</Label>
-                  <Select
-                    value={originOfficeId}
-                    onValueChange={setOriginOfficeId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn văn phòng" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_OFFICE}>
-                        Theo văn phòng của tôi
+              <div className="space-y-1.5">
+                <Label>Văn phòng khởi tạo</Label>
+                <Select value={originOfficeId} onValueChange={setOriginOfficeId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn văn phòng" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_OFFICE}>
+                      Theo văn phòng của tôi
+                    </SelectItem>
+                    {offices.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.code} — {o.name}
                       </SelectItem>
-                      {offices.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>
-                          {o.code} — {o.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <div
-                className={
-                  !isEdit ? "space-y-1.5 sm:col-span-2" : "space-y-1.5"
-                }
-              >
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label>Độ ưu tiên</Label>
                 <Select
                   value={priority}
@@ -546,58 +320,58 @@ export function DocumentFormDialog({
               />
             </div>
 
-            {!isEdit && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Bản scan / Tệp đính kèm</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Paperclip className="h-3.5 w-3.5" /> Chọn tệp
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={handleSelectFiles}
-                  />
-                </div>
-
-                {files.length > 0 ? (
-                  <ul className="space-y-1 rounded-md border bg-muted/20 p-2">
-                    {files.map((f, idx) => (
-                      <li
-                        key={`${f.name}-${idx}`}
-                        className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs hover:bg-muted/50"
-                      >
-                        <span className="truncate">{f.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(idx)}
-                          className="text-muted-foreground hover:text-destructive"
-                          aria-label="Bỏ tệp"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Có thể chọn một hoặc nhiều file ảnh/PDF bản scan để tải lên
-                    ngay sau khi tạo.
-                  </p>
-                )}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Bản scan / Tệp đính kèm</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="h-3.5 w-3.5" /> Chọn tệp
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleSelectFiles}
+                />
               </div>
-            )}
+
+              {files.length > 0 ? (
+                <ul className="space-y-1 rounded-md border bg-muted/20 p-2">
+                  {files.map((f, idx) => (
+                    <li
+                      key={`${f.name}-${idx}`}
+                      className="flex items-center justify-between gap-2 rounded px-2 py-1 text-xs hover:bg-muted/50"
+                    >
+                      <span className="truncate">{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(idx)}
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label="Bỏ tệp"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Có thể chọn một hoặc nhiều file ảnh/PDF bản scan để tải lên
+                  ngay sau khi tạo.
+                </p>
+              )}
+            </div>
           </div>
 
           <DialogFooter className="flex-col items-stretch gap-2 border-t bg-muted/30 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs text-amber-600">{missingHint}</div>
+            <div className="text-xs text-amber-600">
+              {!trimmedTitle && "Vui lòng nhập tiêu đề hồ sơ."}
+            </div>
             <div className="flex items-center justify-end gap-2">
               <Button
                 type="button"
@@ -609,11 +383,7 @@ export function DocumentFormDialog({
               </Button>
               <Button type="submit" disabled={pending || !canSubmit}>
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {pending
-                  ? "Đang lưu..."
-                  : isEdit
-                    ? "Lưu thay đổi"
-                    : "Tạo hồ sơ"}
+                {pending ? "Đang lưu..." : "Tạo hồ sơ"}
               </Button>
             </div>
           </DialogFooter>

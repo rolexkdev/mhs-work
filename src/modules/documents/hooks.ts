@@ -74,6 +74,7 @@ export interface CreateDocumentInput {
   description?: string | null;
   category?: string | null;
   origin_office_id?: string | null;
+  intended_recipient_id?: string | null;
   priority?: TaskPriority;
   quantity?: number;
   received_at?: string | null;
@@ -91,6 +92,7 @@ export function useCreateDocument() {
         description: input.description ?? null,
         category: input.category ?? null,
         origin_office_id: input.origin_office_id ?? null,
+        intended_recipient_id: input.intended_recipient_id ?? null,
         priority: input.priority ?? ("medium" as TaskPriority),
         quantity: input.quantity ?? 1,
         ...(input.received_at ? { received_at: input.received_at } : {}),
@@ -124,6 +126,7 @@ export function useCreateDocuments() {
         description: input.description ?? null,
         category: input.category ?? null,
         origin_office_id: input.origin_office_id ?? null,
+        intended_recipient_id: input.intended_recipient_id ?? null,
         priority: input.priority ?? ("medium" as TaskPriority),
         quantity: input.quantity ?? 1,
         ...(input.received_at ? { received_at: input.received_at } : {}),
@@ -147,6 +150,7 @@ export interface UpdateDocumentInput {
   title?: string;
   description?: string | null;
   category?: string | null;
+  intended_recipient_id?: string | null;
   priority?: TaskPriority;
   quantity?: number;
   received_at?: string;
@@ -158,11 +162,12 @@ export function useUpdateDocument() {
     mutationFn: async (input: UpdateDocumentInput): Promise<DocumentRecord> => {
       const supabase = createClient();
       // Never send protected/immutable columns (status, current_holder_id,
-      // current_office_id, created_by, code).
+      // current_office_id, delivered_at, delivered_to, created_by, code).
       const patch: {
         title?: string;
         description?: string | null;
         category?: string | null;
+        intended_recipient_id?: string | null;
         priority?: TaskPriority;
         quantity?: number;
         received_at?: string;
@@ -170,6 +175,9 @@ export function useUpdateDocument() {
       if (input.title !== undefined) patch.title = input.title;
       if (input.description !== undefined) patch.description = input.description;
       if (input.category !== undefined) patch.category = input.category;
+      if (input.intended_recipient_id !== undefined) {
+        patch.intended_recipient_id = input.intended_recipient_id;
+      }
       if (input.priority !== undefined) patch.priority = input.priority;
       if (input.quantity !== undefined) patch.quantity = input.quantity;
       if (input.received_at !== undefined) patch.received_at = input.received_at;
@@ -183,13 +191,40 @@ export function useUpdateDocument() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (doc) => {
-      qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
-      qc.invalidateQueries({ queryKey: queryKeys.document(doc.id) });
-      qc.invalidateQueries({ queryKey: queryKeys.documentLogs(doc.id) });
-      toast.success("Đã cập nhật hồ sơ");
+    // Optimistic update covering both list queries (DocumentRecord[]) and
+    // detail queries (DocumentRecord | null) under queryKeys.documentsAll.
+    onMutate: async ({ id, ...patch }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.documentsAll });
+      const snapshots = qc.getQueriesData({ queryKey: queryKeys.documentsAll });
+      for (const [key, data] of snapshots) {
+        if (!data) continue;
+        if (Array.isArray(data)) {
+          qc.setQueryData<DocumentRecord[]>(
+            key,
+            (data as DocumentRecord[]).map((doc) =>
+              doc.id === id ? { ...doc, ...patch } : doc,
+            ),
+          );
+        } else if (
+          typeof data === "object" &&
+          (data as DocumentRecord).id === id
+        ) {
+          qc.setQueryData<DocumentRecord>(key, {
+            ...(data as DocumentRecord),
+            ...patch,
+          });
+        }
+      }
+      return { snapshots };
     },
-    onError: (e: Error) => toast.error(friendlyError(e)),
+    onError: (e: Error, _vars, ctx) => {
+      ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
+      toast.error(friendlyError(e));
+    },
+    onSettled: (_data, _error, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
+      qc.invalidateQueries({ queryKey: queryKeys.documentLogs(vars.id) });
+    },
   });
 }
 
