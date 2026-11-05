@@ -6,6 +6,7 @@ import {
   Check,
   X,
   Plus,
+  ListPlus,
   Search,
   FileText,
   Filter,
@@ -36,14 +37,16 @@ import {
   TabsContent,
 } from "@/components/ui/tabs";
 import {
-  DOCUMENT_STATUS_META,
-  DOCUMENT_STATUS_ORDER,
-  HANDOFF_KIND_META,
+  DOCUMENT_FLOW_STATUS_META,
+  DOCUMENT_FLOW_STATUS_ORDER,
+  getDocumentFlowStatus,
 } from "@/modules/documents/constants";
+import { DocumentFlowStatusBadge } from "@/modules/documents/document-flow-status-badge";
 import { useDocuments } from "@/modules/documents/hooks";
 import {
   useMyPendingHandoffs,
   useMyHeldDocumentIds,
+  usePendingHandoffRecipients,
   useRespondHandoff,
   type PendingHandoffWithDocument,
 } from "@/modules/documents/handoff-hooks";
@@ -51,10 +54,12 @@ import { useOffices } from "@/modules/documents/office-hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import { useMe } from "@/modules/meetings/item-hooks";
 import { DocumentFormDialog } from "@/modules/documents/document-form-dialog";
+import { BulkDocumentFormDialog } from "@/modules/documents/bulk-document-form-dialog";
 import { RespondHandoffDialog } from "@/modules/documents/respond-handoff-dialog";
-import type { DocumentRecord, DocumentStatus, Office } from "@/types/database";
+import type { DocumentRecord, Office } from "@/types/database";
 
 const ALL = "__all__";
+const EMPTY_RECIPIENTS_MAP = new Map<string, string[]>();
 
 export function DocumentsWorkspace() {
   const { data: me } = useMe();
@@ -67,6 +72,7 @@ export function DocumentsWorkspace() {
   const [categorySearch, setCategorySearch] = useState("");
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
 
   const [respondTarget, setRespondTarget] = useState<{
     handoff: PendingHandoffWithDocument;
@@ -75,13 +81,11 @@ export function DocumentsWorkspace() {
 
   const queryFilters = useMemo(
     () => ({
-      status:
-        statusFilter === ALL ? null : (statusFilter as DocumentStatus),
       officeId: officeFilter === ALL ? null : officeFilter,
       category: categorySearch.trim() || null,
       search: search.trim() || null,
     }),
-    [statusFilter, officeFilter, categorySearch, search],
+    [officeFilter, categorySearch, search],
   );
 
   const { data: documents = [], isLoading: docsLoading } =
@@ -89,6 +93,8 @@ export function DocumentsWorkspace() {
   const { data: pendingHandoffs = [], isLoading: pendingLoading } =
     useMyPendingHandoffs();
   const { data: myHeldDocIds = [] } = useMyHeldDocumentIds();
+  const { data: pendingRecipientsByDoc = EMPTY_RECIPIENTS_MAP } =
+    usePendingHandoffRecipients();
   const respondHandoff = useRespondHandoff();
 
   const profileById = useMemo(
@@ -101,14 +107,29 @@ export function DocumentsWorkspace() {
   );
   const myProfile = me ? profileById.get(me.id) : undefined;
   const canManage = !!me?.can_manage_documents;
+  const isDocumentManager = useMemo(
+    () => (id: string) => profileById.get(id)?.can_manage_documents ?? true,
+    [profileById],
+  );
+
+  const filteredDocuments = useMemo(() => {
+    if (statusFilter === ALL) return documents;
+    return documents.filter((doc) => {
+      const hasPending = pendingRecipientsByDoc.has(doc.id);
+      return (
+        getDocumentFlowStatus(doc, hasPending, isDocumentManager) ===
+        statusFilter
+      );
+    });
+  }, [documents, statusFilter, pendingRecipientsByDoc, isDocumentManager]);
 
   const heldSet = useMemo(() => new Set(myHeldDocIds), [myHeldDocIds]);
   const holdingDocuments = useMemo(() => {
     if (!me) return [];
-    return documents.filter(
+    return filteredDocuments.filter(
       (doc) => doc.current_holder_id === me.id || heldSet.has(doc.id),
     );
-  }, [documents, me, heldSet]);
+  }, [filteredDocuments, me, heldSet]);
 
   const filteredPending = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -116,7 +137,12 @@ export function DocumentsWorkspace() {
     return pendingHandoffs.filter((h) => {
       const doc = h.document;
       if (!doc) return false;
-      if (statusFilter !== ALL && doc.status !== statusFilter) return false;
+      if (
+        statusFilter !== ALL &&
+        getDocumentFlowStatus(doc, true, isDocumentManager) !== statusFilter
+      ) {
+        return false;
+      }
       if (officeFilter !== ALL && doc.current_office_id !== officeFilter)
         return false;
       if (cat && !(doc.category ?? "").toLowerCase().includes(cat))
@@ -130,7 +156,14 @@ export function DocumentsWorkspace() {
       }
       return true;
     });
-  }, [pendingHandoffs, statusFilter, officeFilter, categorySearch, search]);
+  }, [
+    pendingHandoffs,
+    statusFilter,
+    officeFilter,
+    categorySearch,
+    search,
+    isDocumentManager,
+  ]);
 
   const hasFilters =
     statusFilter !== ALL ||
@@ -172,9 +205,9 @@ export function DocumentsWorkspace() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL}>Tất cả trạng thái</SelectItem>
-            {DOCUMENT_STATUS_ORDER.map((s) => (
+            {DOCUMENT_FLOW_STATUS_ORDER.map((s) => (
               <SelectItem key={s} value={s}>
-                {DOCUMENT_STATUS_META[s].label}
+                {DOCUMENT_FLOW_STATUS_META[s].label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -207,12 +240,21 @@ export function DocumentsWorkspace() {
 
         <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {canManage && (
-            <Button
-              onClick={() => setCreateOpen(true)}
-              className="flex-1 sm:flex-initial"
-            >
-              <Plus className="h-4 w-4" /> Tiếp nhận hồ sơ
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setBulkCreateOpen(true)}
+                className="flex-1 sm:flex-initial"
+              >
+                <ListPlus className="h-4 w-4" /> Tiếp nhận nhiều hồ sơ
+              </Button>
+              <Button
+                onClick={() => setCreateOpen(true)}
+                className="flex-1 sm:flex-initial"
+              >
+                <Plus className="h-4 w-4" /> Tiếp nhận hồ sơ
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -226,7 +268,7 @@ export function DocumentsWorkspace() {
           <TabsTrigger value="all" className="gap-1.5">
             <span>Tất cả</span>
             <span className="text-xs text-muted-foreground">
-              ({documents.length})
+              ({filteredDocuments.length})
             </span>
           </TabsTrigger>
           <TabsTrigger value="holding" className="gap-1.5">
@@ -254,7 +296,7 @@ export function DocumentsWorkspace() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : documents.length === 0 ? (
+          ) : filteredDocuments.length === 0 ? (
             <EmptyState
               message={
                 hasFilters
@@ -264,7 +306,10 @@ export function DocumentsWorkspace() {
             />
           ) : (
             <DocumentsListView
-              documents={documents}
+              documents={filteredDocuments}
+              officeById={officeById}
+              pendingRecipientsByDoc={pendingRecipientsByDoc}
+              isDocumentManager={isDocumentManager}
               nameOf={(id) =>
                 id
                   ? (profileById.get(id)?.full_name ??
@@ -297,6 +342,9 @@ export function DocumentsWorkspace() {
           ) : (
             <DocumentsListView
               documents={holdingDocuments}
+              officeById={officeById}
+              pendingRecipientsByDoc={pendingRecipientsByDoc}
+              isDocumentManager={isDocumentManager}
               nameOf={(id) =>
                 id
                   ? (profileById.get(id)?.full_name ??
@@ -363,6 +411,12 @@ export function DocumentsWorkspace() {
         navigateOnCreate
       />
 
+      <BulkDocumentFormDialog
+        open={bulkCreateOpen}
+        onOpenChange={setBulkCreateOpen}
+        defaultOfficeId={myProfile?.office_id ?? null}
+      />
+
       <RespondHandoffDialog
         open={!!respondTarget}
         onOpenChange={(v) => !v && setRespondTarget(null)}
@@ -410,7 +464,6 @@ function PendingHandoffsView({
       <div className="divide-y rounded-lg border bg-background md:hidden">
         {items.map((h) => {
           const doc = h.document;
-          const kindMeta = HANDOFF_KIND_META[h.kind];
           const senderName = nameOf(h.from_user) ?? "—";
           const senderAvatar = avatarOf(h.from_user);
           const office = doc?.current_office_id
@@ -427,17 +480,6 @@ function PendingHandoffsView({
                     >
                       {doc?.code ?? "—"}
                     </Link>
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium",
-                        kindMeta.badge,
-                      )}
-                    >
-                      <span
-                        className={cn("h-1.5 w-1.5 rounded-full", kindMeta.dot)}
-                      />
-                      {kindMeta.label}
-                    </span>
                     {office && (
                       <Badge
                         variant="secondary"
@@ -526,7 +568,6 @@ function PendingHandoffsView({
               <th className="px-4 py-2.5 text-left font-medium">
                 Tiêu đề &amp; Ghi chú
               </th>
-              <th className="px-4 py-2.5 text-left font-medium">Hình thức</th>
               <th className="px-4 py-2.5 text-left font-medium">Người giao</th>
               <th className="px-4 py-2.5 text-left font-medium">Thời gian</th>
               <th className="px-4 py-2.5 text-right font-medium">Xác nhận</th>
@@ -535,7 +576,6 @@ function PendingHandoffsView({
           <tbody>
             {items.map((h) => {
               const doc = h.document;
-              const kindMeta = HANDOFF_KIND_META[h.kind];
               const senderName = nameOf(h.from_user) ?? "—";
               const senderAvatar = avatarOf(h.from_user);
               return (
@@ -563,19 +603,6 @@ function PendingHandoffsView({
                         Ghi chú: {h.note}
                       </p>
                     )}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium",
-                        kindMeta.badge,
-                      )}
-                    >
-                      <span
-                        className={cn("h-1.5 w-1.5 rounded-full", kindMeta.dot)}
-                      />
-                      {kindMeta.label}
-                    </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -632,13 +659,18 @@ function PendingHandoffsView({
   );
 }
 
-
 function DocumentsListView({
   documents,
+  officeById,
+  pendingRecipientsByDoc,
+  isDocumentManager,
   nameOf,
   avatarOf,
 }: {
   documents: DocumentRecord[];
+  officeById: Map<string, Office>;
+  pendingRecipientsByDoc: Map<string, string[]>;
+  isDocumentManager: (userId: string) => boolean;
   nameOf: (id: string | null) => string | null;
   avatarOf: (id: string | null) => string | null;
 }) {
@@ -647,8 +679,26 @@ function DocumentsListView({
       {/* Mobile cards */}
       <div className="divide-y rounded-lg border bg-background md:hidden">
         {documents.map((doc) => {
-          const name = nameOf(doc.delivered_to);
-          const avatar = avatarOf(doc.delivered_to);
+          const hasFinalReceiver =
+            Boolean(doc.delivered_to) && !isDocumentManager(doc.delivered_to!);
+          const finalReceiverId = hasFinalReceiver ? doc.delivered_to : null;
+          const finalDeliveredAt = hasFinalReceiver ? doc.delivered_at : null;
+          const name = nameOf(finalReceiverId);
+          const avatar = avatarOf(finalReceiverId);
+          const pendingRecipientIds = pendingRecipientsByDoc.get(doc.id) ?? [];
+          const hasPending = pendingRecipientsByDoc.has(doc.id);
+          const flowStatus = getDocumentFlowStatus(
+            doc,
+            hasPending,
+            isDocumentManager,
+          );
+          const office = doc.current_office_id
+            ? officeById.get(doc.current_office_id)
+            : undefined;
+          const recipientNames = pendingRecipientIds
+            .map((uid) => nameOf(uid))
+            .filter((n): n is string => Boolean(n));
+
           return (
             <Link
               key={doc.id}
@@ -659,6 +709,11 @@ function DocumentsListView({
                 <span className="font-mono text-xs font-semibold text-primary">
                   {doc.code}
                 </span>
+                <DocumentFlowStatusBadge
+                  status={flowStatus}
+                  office={office}
+                  recipientNames={recipientNames}
+                />
                 {doc.category && (
                   <Badge variant="outline" className="text-[11px] font-normal">
                     {doc.category}
@@ -682,8 +737,8 @@ function DocumentsListView({
                       </AvatarFallback>
                     </Avatar>
                     <span className="font-medium text-foreground">{name}</span>
-                    {doc.delivered_at && (
-                      <span>· {formatDate(doc.delivered_at)}</span>
+                    {finalDeliveredAt && (
+                      <span>· {formatDate(finalDeliveredAt)}</span>
                     )}
                   </>
                 ) : (
@@ -697,10 +752,11 @@ function DocumentsListView({
 
       {/* Desktop table */}
       <div className="hidden overflow-x-auto rounded-lg border bg-background md:block">
-        <table className="w-full min-w-[820px] text-sm">
+        <table className="w-full min-w-[960px] text-sm">
           <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="px-4 py-2.5 text-left font-medium">Mã hồ sơ</th>
+              <th className="px-4 py-2.5 text-left font-medium">Trạng thái</th>
               <th className="px-4 py-2.5 text-left font-medium">
                 Ngày tiếp nhận hồ sơ
               </th>
@@ -714,8 +770,32 @@ function DocumentsListView({
           </thead>
           <tbody>
             {documents.map((doc) => {
-              const name = nameOf(doc.delivered_to);
-              const avatar = avatarOf(doc.delivered_to);
+              const hasFinalReceiver =
+                Boolean(doc.delivered_to) &&
+                !isDocumentManager(doc.delivered_to!);
+              const finalReceiverId = hasFinalReceiver
+                ? doc.delivered_to
+                : null;
+              const finalDeliveredAt = hasFinalReceiver
+                ? doc.delivered_at
+                : null;
+              const name = nameOf(finalReceiverId);
+              const avatar = avatarOf(finalReceiverId);
+              const pendingRecipientIds =
+                pendingRecipientsByDoc.get(doc.id) ?? [];
+              const hasPending = pendingRecipientsByDoc.has(doc.id);
+              const flowStatus = getDocumentFlowStatus(
+                doc,
+                hasPending,
+                isDocumentManager,
+              );
+              const office = doc.current_office_id
+                ? officeById.get(doc.current_office_id)
+                : undefined;
+              const recipientNames = pendingRecipientIds
+                .map((uid) => nameOf(uid))
+                .filter((n): n is string => Boolean(n));
+
               return (
                 <tr
                   key={doc.id}
@@ -731,6 +811,13 @@ function DocumentsListView({
                     </Link>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
+                    <DocumentFlowStatusBadge
+                      status={flowStatus}
+                      office={office}
+                      recipientNames={recipientNames}
+                    />
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
                     {formatDate(doc.received_at)}
                   </td>
                   <td className="px-4 py-3">
@@ -742,8 +829,8 @@ function DocumentsListView({
                     {doc.quantity}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    {doc.delivered_at ? (
-                      formatDate(doc.delivered_at)
+                    {finalDeliveredAt ? (
+                      formatDate(finalDeliveredAt)
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

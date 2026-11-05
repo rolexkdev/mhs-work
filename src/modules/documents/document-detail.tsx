@@ -39,7 +39,9 @@ import {
   HANDOFF_KIND_META,
   HANDOFF_STATUS_META,
   NON_HANDOFFABLE_DOCUMENT_STATUSES,
+  getDocumentFlowStatus,
 } from "@/modules/documents/constants";
+import { DocumentFlowStatusBadge } from "@/modules/documents/document-flow-status-badge";
 import {
   useDocument,
   useDeleteDocument,
@@ -165,7 +167,18 @@ export function DocumentDetail({ id }: { id: string }) {
       null
     : null;
 
-  const statusMeta = DOCUMENT_STATUS_META[document.status];
+  const isDocumentManager = (userId: string) =>
+    profileById.get(userId)?.can_manage_documents ?? true;
+  const flowStatus = getDocumentFlowStatus(
+    document,
+    pendingRecipientIds.length > 0,
+    isDocumentManager,
+  );
+  const hasFinalReceiver =
+    Boolean(document.delivered_to) && !isDocumentManager(document.delivered_to!);
+  const pendingRecipientNames = pendingRecipientIds
+    .map((uid) => nameOf(uid))
+    .filter((n): n is string => Boolean(n));
   const priorityMeta = DOCUMENT_PRIORITY_META[document.priority];
   const originOffice = document.origin_office_id
     ? officeById.get(document.origin_office_id)
@@ -196,14 +209,6 @@ export function DocumentDetail({ id }: { id: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-amber-900">
                 Hồ sơ đang chờ bạn xác nhận nhận bàn giao
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium",
-                  HANDOFF_KIND_META[myPendingHandoff.kind].badge,
-                )}
-              >
-                {HANDOFF_KIND_META[myPendingHandoff.kind].label}
               </span>
             </div>
             <p className="text-xs text-amber-800">
@@ -248,17 +253,11 @@ export function DocumentDetail({ id }: { id: string }) {
                 <span className="rounded bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
                   {document.code}
                 </span>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium",
-                    statusMeta.badge,
-                  )}
-                >
-                  <span
-                    className={cn("h-1.5 w-1.5 rounded-full", statusMeta.dot)}
-                  />
-                  {statusMeta.label}
-                </span>
+                <DocumentFlowStatusBadge
+                  status={flowStatus}
+                  office={currentOffice}
+                  recipientNames={pendingRecipientNames}
+                />
                 <span
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium",
@@ -377,7 +376,7 @@ export function DocumentDetail({ id }: { id: string }) {
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <User className="h-3.5 w-3.5" /> Ngày nhận / Người nhận
               </p>
-              {document.delivered_at ? (
+              {hasFinalReceiver && document.delivered_at ? (
                 <>
                   <p className="font-medium">
                     {formatDate(document.delivered_at)}

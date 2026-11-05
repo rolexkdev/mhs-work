@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,12 +29,17 @@ import {
   DOCUMENT_PRIORITY_META,
   DOCUMENT_PRIORITY_ORDER,
   DOCUMENT_CATEGORY_SUGGESTIONS,
+  NON_HANDOFFABLE_DOCUMENT_STATUSES,
 } from "@/modules/documents/constants";
 import {
   useCreateDocument,
   useUpdateDocument,
 } from "@/modules/documents/hooks";
-import { useCreateHandoff } from "@/modules/documents/handoff-hooks";
+import {
+  useDocumentHandoffs,
+  useCreateHandoff,
+  useCancelHandoff,
+} from "@/modules/documents/handoff-hooks";
 import { RecipientPickerList } from "@/modules/documents/handoff-dialog";
 import { uploadDocumentFile } from "@/modules/documents/attachment-hooks";
 import { useOffices } from "@/modules/documents/office-hooks";
@@ -68,9 +73,13 @@ export function DocumentFormDialog({
   const { data: me } = useMe();
   const { data: profiles = [] } = useProfiles();
   const { data: offices = [] } = useOffices();
+  const { data: handoffs } = useDocumentHandoffs(
+    isEdit && document ? document.id : null,
+  );
   const createDocument = useCreateDocument();
   const updateDocument = useUpdateDocument();
   const createHandoff = useCreateHandoff({ silentToast: true });
+  const cancelHandoff = useCancelHandoff({ silentToast: true });
 
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -85,9 +94,66 @@ export function DocumentFormDialog({
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const receiverTouchedRef = useRef(false);
+  const receiverSeededFromHandoffsRef = useRef(false);
+
+  const pendingHandoff = useMemo(
+    () => (handoffs ?? []).find((h) => h.status === "pending") ?? null,
+    [handoffs],
+  );
+
+  const profileById = useMemo(
+    () => new Map(profiles.map((p) => [p.id, p])),
+    [profiles],
+  );
+
+  const isDocumentManager = useCallback(
+    (id: string) => profileById.get(id)?.can_manage_documents ?? true,
+    [profileById],
+  );
+
+  const currentReceiverId = useMemo(() => {
+    if (!isEdit || !document) return null;
+    if (pendingHandoff) return pendingHandoff.to_user;
+    if (
+      document.current_holder_id &&
+      !isDocumentManager(document.current_holder_id)
+    ) {
+      return document.current_holder_id;
+    }
+    return null;
+  }, [isEdit, document, pendingHandoff, isDocumentManager]);
+
+  const hintUserId = useMemo(() => {
+    if (!isEdit || !document) return null;
+    return currentReceiverId ?? document.current_holder_id ?? null;
+  }, [isEdit, document, currentReceiverId]);
+
+  const hintUserName = useMemo(() => {
+    if (!hintUserId) return null;
+    const p = profileById.get(hintUserId);
+    return p ? (p.full_name ?? p.email) : null;
+  }, [profileById, hintUserId]);
+
+  const hintStatusLabel = pendingHandoff
+    ? "Đang chuyển"
+    : currentReceiverId
+      ? "Đã nhận"
+      : "Tại văn phòng";
+
+  const isHandoffDisabled =
+    isEdit &&
+    !!document &&
+    NON_HANDOFFABLE_DOCUMENT_STATUSES.has(document.status);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      receiverTouchedRef.current = false;
+      receiverSeededFromHandoffsRef.current = false;
+      return;
+    }
+    receiverTouchedRef.current = false;
+    receiverSeededFromHandoffsRef.current = false;
     setTitle(document?.title ?? "");
     setCategory(document?.category ?? "");
     setOriginOfficeId(
@@ -102,6 +168,15 @@ export function DocumentFormDialog({
     setFiles([]);
   }, [open, document, defaultOfficeId]);
 
+  useEffect(() => {
+    if (!open || !isEdit || handoffs === undefined) return;
+    if (receiverSeededFromHandoffsRef.current) return;
+    receiverSeededFromHandoffsRef.current = true;
+    if (!receiverTouchedRef.current) {
+      setReceiverId(currentReceiverId ?? "");
+    }
+  }, [open, isEdit, handoffs, currentReceiverId]);
+
   const selectedReceiver = useMemo(
     () => (receiverId ? profiles.find((p) => p.id === receiverId) ?? null : null),
     [profiles, receiverId],
@@ -111,6 +186,7 @@ export function DocumentFormDialog({
     createDocument.isPending ||
     updateDocument.isPending ||
     uploadingFiles ||
+    cancelHandoff.isPending ||
     createHandoff.isPending;
 
   const trimmedTitle = title.trim();
@@ -136,6 +212,25 @@ export function DocumentFormDialog({
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  function invalidateHandoffQueries(docId: string) {
+    qc.invalidateQueries({
+      queryKey: queryKeys.documentHandoffs(docId),
+    });
+    qc.invalidateQueries({
+      queryKey: queryKeys.documentHolders(docId),
+    });
+    qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
+    qc.invalidateQueries({ queryKey: queryKeys.document(docId) });
+    qc.invalidateQueries({
+      queryKey: queryKeys.documentLogs(docId),
+    });
+    qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
+    qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
+    qc.invalidateQueries({
+      queryKey: queryKeys.documentsWithPendingHandoffs,
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
@@ -158,6 +253,45 @@ export function DocumentFormDialog({
       } catch {
         return;
       }
+
+      const shouldChangeReceiver =
+        !isHandoffDisabled &&
+        Boolean(receiverId) &&
+        receiverId !== currentReceiverId;
+
+      if (shouldChangeReceiver) {
+        try {
+          const alreadyPendingForSelected = (handoffs ?? []).some(
+            (h) => h.status === "pending" && h.to_user === receiverId,
+          );
+          if (!alreadyPendingForSelected) {
+            await createHandoff.mutateAsync({
+              documentId: document.id,
+              toUsers: [receiverId],
+              kind: "assign",
+            });
+          }
+
+          const pendingToCancel = (handoffs ?? []).filter(
+            (h) => h.status === "pending" && h.to_user !== receiverId,
+          );
+          for (const h of pendingToCancel) {
+            await cancelHandoff.mutateAsync({
+              handoffId: h.id,
+              note: "Đổi người nhận",
+              documentId: document.id,
+            });
+          }
+        } catch (err) {
+          toast.error(
+            "Đã lưu thông tin nhưng đổi người nhận thất bại: " +
+              friendlyError(err, "Vui lòng thử lại bằng nút Bàn giao."),
+          );
+        } finally {
+          invalidateHandoffQueries(document.id);
+        }
+      }
+
       onOpenChange(false);
       return;
     }
@@ -212,22 +346,7 @@ export function DocumentFormDialog({
         )}`,
       );
     } finally {
-      qc.invalidateQueries({
-        queryKey: queryKeys.documentHandoffs(created.id),
-      });
-      qc.invalidateQueries({
-        queryKey: queryKeys.documentHolders(created.id),
-      });
-      qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
-      qc.invalidateQueries({ queryKey: queryKeys.document(created.id) });
-      qc.invalidateQueries({
-        queryKey: queryKeys.documentLogs(created.id),
-      });
-      qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
-      qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
-      qc.invalidateQueries({
-        queryKey: queryKeys.documentsWithPendingHandoffs,
-      });
+      invalidateHandoffQueries(created.id);
     }
 
     onOpenChange(false);
@@ -290,47 +409,66 @@ export function DocumentFormDialog({
               </div>
             </div>
 
-            {!isEdit && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label>Người nhận *</Label>
-                  {selectedReceiver ? (
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-muted-foreground">
-                        Đã chọn:{" "}
-                        <span className="font-medium text-foreground">
-                          {selectedReceiver.full_name ?? selectedReceiver.email}
-                        </span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label>{isEdit ? "Người nhận" : "Người nhận *"}</Label>
+                {selectedReceiver ? (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">
+                      Đã chọn:{" "}
+                      <span className="font-medium text-foreground">
+                        {selectedReceiver.full_name ?? selectedReceiver.email}
                       </span>
+                    </span>
+                    {!isHandoffDisabled && (
                       <button
                         type="button"
-                        onClick={() => setReceiverId("")}
+                        onClick={() => {
+                          receiverTouchedRef.current = true;
+                          setReceiverId("");
+                        }}
                         className="text-muted-foreground hover:text-foreground"
                       >
                         Bỏ chọn
                       </button>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-amber-600">
-                      Bắt buộc chọn 1 người nhận
-                    </span>
-                  )}
-                </div>
-
-                <RecipientPickerList
-                  profiles={profiles}
-                  offices={offices}
-                  currentUserId={me?.id ?? null}
-                  selectedIds={receiverId ? [receiverId] : []}
-                  onSelect={(userId) =>
-                    setReceiverId((prev) => (prev === userId ? "" : userId))
-                  }
-                  search={receiverSearch}
-                  onSearchChange={setReceiverSearch}
-                  maxHeightClassName="max-h-48"
-                />
+                    )}
+                  </div>
+                ) : !isEdit ? (
+                  <span className="text-xs text-amber-600">
+                    Bắt buộc chọn 1 người nhận
+                  </span>
+                ) : null}
               </div>
-            )}
+
+              {isEdit && (
+                <p className="text-xs text-muted-foreground">
+                  {hintUserId
+                    ? `Hiện tại: ${hintUserName ?? "—"} (${hintStatusLabel})`
+                    : "Chưa có người nhận"}
+                </p>
+              )}
+
+              {isHandoffDisabled && (
+                <p className="text-xs text-amber-600">
+                  Hồ sơ đã lưu trữ nên không thể đổi người nhận.
+                </p>
+              )}
+
+              <RecipientPickerList
+                profiles={profiles}
+                offices={offices}
+                currentUserId={me?.id ?? null}
+                selectedIds={receiverId ? [receiverId] : []}
+                onSelect={(userId) => {
+                  receiverTouchedRef.current = true;
+                  setReceiverId((prev) => (prev === userId ? "" : userId));
+                }}
+                search={receiverSearch}
+                onSearchChange={setReceiverSearch}
+                maxHeightClassName="max-h-48"
+                disabled={isHandoffDisabled}
+              />
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">

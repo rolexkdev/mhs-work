@@ -111,6 +111,37 @@ export function useCreateDocument() {
   });
 }
 
+export function useCreateDocuments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      inputs: CreateDocumentInput[],
+    ): Promise<DocumentRecord[]> => {
+      if (inputs.length === 0) return [];
+      const supabase = createClient();
+      const payloads = inputs.map((input) => ({
+        title: input.title,
+        description: input.description ?? null,
+        category: input.category ?? null,
+        origin_office_id: input.origin_office_id ?? null,
+        priority: input.priority ?? ("medium" as TaskPriority),
+        quantity: input.quantity ?? 1,
+        ...(input.received_at ? { received_at: input.received_at } : {}),
+      }));
+      const { data, error } = await supabase
+        .from("documents")
+        .insert(payloads)
+        .select();
+      if (error) throw error;
+      return data ?? [];
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
+
 export interface UpdateDocumentInput {
   id: string;
   title?: string;

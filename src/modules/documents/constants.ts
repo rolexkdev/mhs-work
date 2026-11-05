@@ -3,6 +3,7 @@ import {
   TASK_PRIORITY_ORDER,
 } from "@/modules/tasks/constants";
 import type {
+  DocumentRecord,
   DocumentStatus,
   HandoffKind,
   HandoffStatus,
@@ -48,14 +49,24 @@ export const DOCUMENT_STATUS_META: Record<DocumentStatus, DocumentMeta> = {
   },
 };
 
-export const DOCUMENT_STATUS_ORDER: DocumentStatus[] = [
-  "draft",
-  "at_office",
-  "distributing",
-  "assigned",
-  "done",
-  "archived",
-];
+export type DocumentFlowStatus = "at_office" | "in_transit" | "received";
+export const DOCUMENT_FLOW_STATUS_META: Record<DocumentFlowStatus, DocumentMeta> = {
+  at_office:  { label: "Tại văn phòng", badge: "bg-sky-100 text-sky-700 border-sky-200",           dot: "bg-sky-500" },
+  in_transit: { label: "Đang chuyển",   badge: "bg-amber-100 text-amber-800 border-amber-200",     dot: "bg-amber-500" },
+  received:   { label: "Đã nhận",       badge: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" },
+};
+export const DOCUMENT_FLOW_STATUS_ORDER: DocumentFlowStatus[] = ["at_office", "in_transit", "received"];
+
+/** Derive the simplified status shown to users. */
+export function getDocumentFlowStatus(
+  doc: Pick<DocumentRecord, "status" | "current_holder_id">,
+  hasPendingHandoff: boolean,
+  isDocumentManager: (userId: string) => boolean,
+): DocumentFlowStatus {
+  if (hasPendingHandoff || doc.status === "distributing") return "in_transit";
+  if (doc.current_holder_id && !isDocumentManager(doc.current_holder_id)) return "received";
+  return "at_office";
+}
 
 export const NON_HANDOFFABLE_DOCUMENT_STATUSES: ReadonlySet<DocumentStatus> =
   new Set<DocumentStatus>(["archived"]);
@@ -71,16 +82,16 @@ export const HANDOFF_KIND_META: Record<
     dot: "bg-sky-500",
   },
   assign: {
-    label: "Phân công",
-    description: "Giao hồ sơ cho phòng ban hoặc người phụ trách xử lý",
+    label: "Bàn giao",
+    description: "Bàn giao hồ sơ cho người nhận",
     badge: "bg-blue-100 text-blue-700 border-blue-200",
     dot: "bg-blue-500",
   },
   forward: {
-    label: "Chuyển tiếp",
-    description: "Chuyển tiếp hồ sơ cho người khác tiếp tục xử lý",
-    badge: "bg-purple-100 text-purple-700 border-purple-200",
-    dot: "bg-purple-500",
+    label: "Bàn giao",
+    description: "Bàn giao hồ sơ cho người nhận",
+    badge: "bg-blue-100 text-blue-700 border-blue-200",
+    dot: "bg-blue-500",
   },
   return: {
     label: "Trả lại",
@@ -89,8 +100,6 @@ export const HANDOFF_KIND_META: Record<
     dot: "bg-orange-500",
   },
 };
-
-export const HANDOFF_KIND_ORDER: HandoffKind[] = ["assign", "forward"];
 
 export const HANDOFF_STATUS_META: Record<HandoffStatus, DocumentMeta> = {
   pending: {

@@ -27,6 +27,11 @@ export const queryKeys = {
   documentHandoffs: (id: string) => ["document-handoffs", id] as const,
   myPendingHandoffs: ["my-pending-handoffs"] as const,
   documentsWithPendingHandoffs: ["documents-with-pending-handoffs"] as const,
+  // Nested under documentsWithPendingHandoffs so invalidating that key refreshes this one too.
+  pendingHandoffRecipients: [
+    "documents-with-pending-handoffs",
+    "recipients",
+  ] as const,
   documentHoldersAll: ["document-holders"] as const,
   documentHolders: (id: string) => ["document-holders", id] as const,
   documentAttachments: (id: string) => ["document-attachments", id] as const,

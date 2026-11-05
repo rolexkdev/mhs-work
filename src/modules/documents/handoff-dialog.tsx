@@ -17,14 +17,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  HANDOFF_KIND_META,
-  HANDOFF_KIND_ORDER,
-} from "@/modules/documents/constants";
 import { useCreateHandoff } from "@/modules/documents/handoff-hooks";
 import { useOffices } from "@/modules/documents/office-hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
-import type { HandoffKind, Office, Profile } from "@/types/database";
+import type { Office, Profile } from "@/types/database";
 
 export function RecipientPickerList({
   profiles,
@@ -36,6 +32,7 @@ export function RecipientPickerList({
   search,
   onSearchChange,
   maxHeightClassName = "max-h-60",
+  disabled = false,
 }: {
   profiles: Profile[];
   offices: Office[];
@@ -46,6 +43,7 @@ export function RecipientPickerList({
   search: string;
   onSearchChange: (value: string) => void;
   maxHeightClassName?: string;
+  disabled?: boolean;
 }) {
   const officeById = useMemo(
     () => new Map(offices.map((o) => [o.id, o])),
@@ -100,6 +98,7 @@ export function RecipientPickerList({
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Tìm theo tên, email, văn phòng, phòng ban..."
           className="pl-9"
+          disabled={disabled}
         />
       </div>
 
@@ -107,6 +106,7 @@ export function RecipientPickerList({
         className={cn(
           "overflow-y-auto rounded-lg border bg-background",
           maxHeightClassName,
+          disabled && "pointer-events-none opacity-60",
         )}
       >
         {groupedCandidates.length === 0 ? (
@@ -124,6 +124,7 @@ export function RecipientPickerList({
                   const displayName = p.full_name ?? p.email;
                   const selected = selectedIds.includes(p.id);
                   const alreadyPending = pendingSet.has(p.id);
+                  const itemDisabled = disabled || alreadyPending;
                   const office = p.office_id
                     ? officeById.get(p.office_id)
                     : null;
@@ -131,11 +132,11 @@ export function RecipientPickerList({
                     <button
                       key={p.id}
                       type="button"
-                      disabled={alreadyPending}
-                      onClick={() => !alreadyPending && onSelect(p.id)}
+                      disabled={itemDisabled}
+                      onClick={() => !itemDisabled && onSelect(p.id)}
                       className={cn(
                         "flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors",
-                        alreadyPending
+                        itemDisabled
                           ? "cursor-not-allowed opacity-50"
                           : "hover:bg-accent/50",
                         selected && "bg-primary/5",
@@ -207,14 +208,12 @@ export function HandoffDialog({
   const { data: offices = [] } = useOffices();
   const createHandoff = useCreateHandoff();
 
-  const [kind, setKind] = useState<HandoffKind>("assign");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [note, setNote] = useState("");
 
   useEffect(() => {
     if (!open) return;
-    setKind("assign");
     setSelectedIds([]);
     setSearch("");
     setNote("");
@@ -236,7 +235,7 @@ export function HandoffDialog({
       await createHandoff.mutateAsync({
         documentId,
         toUsers: selectedIds,
-        kind,
+        kind: "assign",
         note: note.trim() || null,
       });
     } catch {
@@ -251,8 +250,8 @@ export function HandoffDialog({
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle className="text-lg">Bàn giao hồ sơ</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Chọn hình thức bàn giao và một hoặc nhiều người nhận. Nếu chọn nhiều
-            người, hồ sơ sẽ chuyển sang trạng thái Đang phân phối.
+            Chọn một hoặc nhiều người nhận. Nếu chọn nhiều người, hồ sơ sẽ ở
+            trạng thái Đang chuyển cho đến khi tất cả xác nhận.
           </p>
         </DialogHeader>
 
@@ -261,44 +260,6 @@ export function HandoffDialog({
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
-            <div className="space-y-2">
-              <Label>Hình thức bàn giao</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {HANDOFF_KIND_ORDER.map((k) => {
-                  const meta = HANDOFF_KIND_META[k];
-                  const active = kind === k;
-                  return (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setKind(k)}
-                      className={cn(
-                        "flex flex-col items-start rounded-lg border p-3 text-left transition-colors",
-                        active
-                          ? "border-primary bg-primary/5 ring-1 ring-primary"
-                          : "hover:bg-muted/50",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium",
-                          meta.badge,
-                        )}
-                      >
-                        <span
-                          className={cn("h-1.5 w-1.5 rounded-full", meta.dot)}
-                        />
-                        {meta.label}
-                      </span>
-                      <span className="mt-1.5 text-xs text-muted-foreground">
-                        {meta.description}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>
