@@ -50,7 +50,7 @@ function isLocked(account: AccountRow): boolean {
 }
 
 export function AccountsManager({ currentUserId }: { currentUserId: string }) {
-  const { data: accounts = [], isLoading, error } = useAccounts();
+  const { data: accounts = [], isLoading, error, warning } = useAccounts();
   const { data: offices = [] } = useOffices();
   const setLocked = useSetAccountLocked();
   const deleteAccount = useDeleteAccount();
@@ -146,6 +146,12 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
 
   return (
     <div className="space-y-4">
+      {warning && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+          {warning}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 basis-full sm:basis-auto">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

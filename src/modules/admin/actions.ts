@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, formatAdminError } from "@/lib/supabase/admin";
 import {
   DEFAULT_PASSWORD,
   MIN_PASSWORD_LENGTH,
@@ -20,11 +20,19 @@ import type { UserRole } from "@/types/database";
  * throw từ Server Action khi chạy production.
  */
 
+type CallerGuard =
+  | {
+      ok: true;
+      callerId: string;
+      supabase: Awaited<ReturnType<typeof createClient>>;
+    }
+  | { ok: false; error: string };
+
 type Guard =
   | { ok: true; callerId: string; admin: ReturnType<typeof createAdminClient> }
   | { ok: false; error: string };
 
-async function requireAdmin(): Promise<Guard> {
+async function requireAdminCaller(): Promise<CallerGuard> {
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
   const userId = claims?.claims.sub;
@@ -42,10 +50,17 @@ async function requireAdmin(): Promise<Guard> {
     return { ok: false, error: "Chỉ quản trị viên mới quản lý được tài khoản." };
   }
 
+  return { ok: true, callerId: userId, supabase };
+}
+
+async function requireAdmin(): Promise<Guard> {
+  const caller = await requireAdminCaller();
+  if (!caller.ok) return caller;
+
   try {
-    return { ok: true, callerId: userId, admin: createAdminClient() };
+    return { ok: true, callerId: caller.callerId, admin: createAdminClient() };
   } catch (e) {
-    return { ok: false, error: (e as Error).message };
+    return { ok: false, error: formatAdminError(e) };
   }
 }
 
@@ -53,34 +68,64 @@ async function requireAdmin(): Promise<Guard> {
 
 export async function listAccounts(): Promise<{
   accounts?: AccountRow[];
+  warning?: string;
   error?: string;
 }> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return { error: guard.error };
+  const caller = await requireAdminCaller();
+  if (!caller.ok) return { error: caller.error };
 
-  const { data: profiles, error } = await guard.admin
+  let admin: ReturnType<typeof createAdminClient> | null = null;
+  let warning: string | undefined;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    warning = formatAdminError(e);
+  }
+
+  const profileColumns =
+    "id, email, full_name, role, office_id, department, can_manage_documents, avatar_url, created_at" as const;
+
+  let { data: profiles, error } = await (admin ?? caller.supabase)
     .from("profiles")
-    .select(
-      "id, email, full_name, role, office_id, department, avatar_url, created_at",
-    );
-  if (error) return { error: error.message };
+    .select(profileColumns);
+
+  // Fall back to the verified admin session client if the service-role client
+  // failed or returned 0 rows (e.g. an anon key filtered out by RLS).
+  if (admin && (error || !profiles || profiles.length === 0)) {
+    const fallback = await caller.supabase
+      .from("profiles")
+      .select(profileColumns);
+    if (!fallback.error) {
+      profiles = fallback.data;
+      error = null;
+    }
+  }
+
+  if (error) return { error: formatAdminError(error) };
 
   // last_sign_in_at / banned_until chỉ có trong auth.users, không có ở profiles.
-  const { data: authList, error: authError } =
-    await guard.admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (authError) return { error: authError.message };
+  // Degrade gracefully when Auth Admin API fails so the accounts page still loads.
+  const authById = new Map<
+    string,
+    { lastSignInAt: string | null; bannedUntil: string | null }
+  >();
 
-  const authById = new Map(
-    authList.users.map((u) => [
-      u.id,
-      {
-        lastSignInAt: u.last_sign_in_at ?? null,
-        bannedUntil:
-          (u as unknown as { banned_until?: string | null }).banned_until ??
-          null,
-      },
-    ]),
-  );
+  if (admin) {
+    const { data: authList, error: authError } =
+      await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (authError) {
+      warning = formatAdminError(authError);
+    } else {
+      for (const u of authList.users) {
+        authById.set(u.id, {
+          lastSignInAt: u.last_sign_in_at ?? null,
+          bannedUntil:
+            (u as unknown as { banned_until?: string | null }).banned_until ??
+            null,
+        });
+      }
+    }
+  }
 
   const accounts: AccountRow[] = (profiles ?? [])
     .map((p) => ({
@@ -90,6 +135,7 @@ export async function listAccounts(): Promise<{
       role: p.role,
       officeId: p.office_id ?? null,
       department: p.department ?? null,
+      canManageDocuments: p.can_manage_documents ?? false,
       avatarUrl: p.avatar_url,
       createdAt: p.created_at,
       lastSignInAt: authById.get(p.id)?.lastSignInAt ?? null,
@@ -99,7 +145,7 @@ export async function listAccounts(): Promise<{
       (a.fullName ?? a.email).localeCompare(b.fullName ?? b.email, "vi"),
     );
 
-  return { accounts };
+  return { accounts, ...(warning ? { warning } : {}) };
 }
 
 // ------------------------------------------------------------------ tạo mới
@@ -112,6 +158,7 @@ async function createOne(
     role: UserRole;
     officeId?: string | null;
     department?: string | null;
+    canManageDocuments?: boolean;
     password?: string;
   },
 ): Promise<{ error?: string }> {
@@ -137,7 +184,7 @@ async function createOne(
     return {
       error: error.message.includes("already been registered")
         ? `Email ${email} đã có tài khoản.`
-        : error.message,
+        : formatAdminError(error),
     };
   }
 
@@ -153,10 +200,11 @@ async function createOne(
         role: input.role,
         office_id: officeId,
         department,
+        can_manage_documents: input.canManageDocuments ?? false,
       },
       { onConflict: "id" },
     );
-  if (profileError) return { error: profileError.message };
+  if (profileError) return { error: formatAdminError(profileError) };
 
   return {};
 }
@@ -167,6 +215,7 @@ export async function createAccount(input: {
   role: UserRole;
   officeId?: string | null;
   department?: string | null;
+  canManageDocuments?: boolean;
   password?: string;
 }): Promise<{ error?: string }> {
   const guard = await requireAdmin();
@@ -214,15 +263,16 @@ export async function updateAccount(input: {
   role: UserRole;
   officeId?: string | null;
   department?: string | null;
+  canManageDocuments?: boolean;
 }): Promise<{ error?: string }> {
-  const guard = await requireAdmin();
-  if (!guard.ok) return { error: guard.error };
+  const caller = await requireAdminCaller();
+  if (!caller.ok) return { error: caller.error };
 
   const fullName = input.fullName.trim();
   if (!fullName) return { error: "Chưa nhập họ tên." };
 
   // Tự hạ quyền chính mình sẽ mất luôn trang này giữa chừng.
-  if (input.userId === guard.callerId && input.role !== "admin") {
+  if (input.userId === caller.callerId && input.role !== "admin") {
     return {
       error:
         "Không thể tự hạ quyền của chính mình. Nhờ quản trị viên khác đổi giúp.",
@@ -232,17 +282,28 @@ export async function updateAccount(input: {
   const officeId = input.officeId?.trim() || null;
   const department = input.department?.trim() || null;
 
-  const { error } = await guard.admin
+  let admin: ReturnType<typeof createAdminClient> | null = null;
+  try {
+    admin = createAdminClient();
+  } catch {
+    // Fall back to the verified admin session client below; RLS policy
+    // profiles_admin_all and guard_profile_protected_columns allow admins.
+  }
+
+  const { error } = await (admin ?? caller.supabase)
     .from("profiles")
     .update({
       full_name: fullName,
       role: input.role,
       office_id: officeId,
       department,
+      ...(input.canManageDocuments === undefined
+        ? {}
+        : { can_manage_documents: input.canManageDocuments }),
     })
     .eq("id", input.userId);
 
-  return error ? { error: error.message } : {};
+  return error ? { error: formatAdminError(error) } : {};
 }
 
 export async function resetPassword(input: {
@@ -260,7 +321,7 @@ export async function resetPassword(input: {
   const { error } = await guard.admin.auth.admin.updateUserById(input.userId, {
     password,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: formatAdminError(error) };
 
   return { password };
 }
@@ -282,7 +343,7 @@ export async function setAccountLocked(input: {
     ban_duration: input.locked ? "876000h" : "none",
   });
 
-  return error ? { error: error.message } : {};
+  return error ? { error: formatAdminError(error) } : {};
 }
 
 // --------------------------------------------------------------------- xoá
@@ -335,5 +396,5 @@ export async function deleteAccount(input: {
   }
 
   const { error } = await guard.admin.auth.admin.deleteUser(input.userId);
-  return error ? { error: error.message } : {};
+  return error ? { error: formatAdminError(error) } : {};
 }

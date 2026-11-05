@@ -9,7 +9,6 @@ type ChangeRow = {
   id?: string;
   task_id?: string;
   document_id?: string | null;
-  shipment_id?: string | null;
 } | null;
 
 /**
@@ -28,9 +27,6 @@ export function RealtimeSync() {
 
     const documentIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
       payload.new?.document_id ?? payload.old?.document_id ?? null;
-
-    const shipmentIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
-      payload.new?.shipment_id ?? payload.old?.shipment_id ?? null;
 
     const rowIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
       payload.new?.id ?? payload.old?.id ?? null;
@@ -131,63 +127,11 @@ export function RealtimeSync() {
         { event: "*", schema: "public", table: "document_attachments" },
         (payload) => {
           const docId = documentIdFrom(payload);
-          const shipId = shipmentIdFrom(payload);
           if (docId) {
             qc.invalidateQueries({
               queryKey: queryKeys.documentAttachments(docId),
             });
           }
-          if (shipId) {
-            qc.invalidateQueries({
-              queryKey: queryKeys.shipmentAttachments(shipId),
-            });
-          }
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "document_shipments" },
-        (payload) => {
-          const id = rowIdFrom(payload);
-          qc.invalidateQueries({ queryKey: queryKeys.shipmentsAll });
-          qc.invalidateQueries({
-            queryKey: queryKeys.myShipmentConfirmations,
-          });
-          if (id) {
-            qc.invalidateQueries({ queryKey: queryKeys.shipment(id) });
-            qc.invalidateQueries({ queryKey: queryKeys.shipmentItems(id) });
-          }
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "document_shipment_items" },
-        (payload) => {
-          const shipId = shipmentIdFrom(payload);
-          const docId = documentIdFrom(payload);
-          qc.invalidateQueries({ queryKey: queryKeys.shipmentsAll });
-          qc.invalidateQueries({
-            queryKey: queryKeys.myShipmentConfirmations,
-          });
-          qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
-          if (shipId) {
-            qc.invalidateQueries({ queryKey: queryKeys.shipment(shipId) });
-            qc.invalidateQueries({ queryKey: queryKeys.shipmentItems(shipId) });
-          }
-          if (docId) {
-            qc.invalidateQueries({ queryKey: queryKeys.document(docId) });
-            qc.invalidateQueries({
-              queryKey: queryKeys.documentShipments(docId),
-            });
-            qc.invalidateQueries({ queryKey: queryKeys.documentLogs(docId) });
-          }
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "external_units" },
-        () => {
-          qc.invalidateQueries({ queryKey: queryKeys.externalUnitsAll });
         },
       );
 

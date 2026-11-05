@@ -132,6 +132,35 @@ export function useDocumentsWithPendingHandoffs() {
   });
 }
 
+/**
+ * Map of document ID -> pending recipient user IDs (`to_user`) from `document_handoffs`
+ * where status = 'pending'.
+ */
+export function usePendingHandoffRecipients() {
+  return useQuery({
+    queryKey: queryKeys.pendingHandoffRecipients,
+    queryFn: async (): Promise<Map<string, string[]>> => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("document_handoffs")
+        .select("document_id, to_user")
+        .eq("status", "pending")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      const map = new Map<string, string[]>();
+      for (const row of data ?? []) {
+        const list = map.get(row.document_id);
+        if (list) {
+          if (!list.includes(row.to_user)) list.push(row.to_user);
+        } else {
+          map.set(row.document_id, [row.to_user]);
+        }
+      }
+      return map;
+    },
+  });
+}
+
 export interface CreateHandoffInput {
   documentId: string;
   toUsers: string[];
@@ -139,7 +168,7 @@ export interface CreateHandoffInput {
   note?: string | null;
 }
 
-export function useCreateHandoff() {
+export function useCreateHandoff(options?: { silentToast?: boolean }) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (
@@ -172,9 +201,15 @@ export function useCreateHandoff() {
       qc.invalidateQueries({
         queryKey: queryKeys.documentsWithPendingHandoffs,
       });
-      toast.success("Đã tạo lượt bàn giao");
+      if (!options?.silentToast) {
+        toast.success("Đã tạo lượt bàn giao");
+      }
     },
-    onError: (e: Error) => toast.error(friendlyError(e)),
+    onError: (e: Error) => {
+      if (!options?.silentToast) {
+        toast.error(friendlyError(e));
+      }
+    },
   });
 }
 
@@ -228,7 +263,7 @@ export interface CancelHandoffInput {
   documentId?: string;
 }
 
-export function useCancelHandoff() {
+export function useCancelHandoff(options?: { silentToast?: boolean }) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CancelHandoffInput): Promise<DocumentHandoff> => {
@@ -254,8 +289,14 @@ export function useCancelHandoff() {
       qc.invalidateQueries({
         queryKey: queryKeys.documentsWithPendingHandoffs,
       });
-      toast.success("Đã huỷ lượt bàn giao");
+      if (!options?.silentToast) {
+        toast.success("Đã huỷ lượt bàn giao");
+      }
     },
-    onError: (e: Error) => toast.error(friendlyError(e)),
+    onError: (e: Error) => {
+      if (!options?.silentToast) {
+        toast.error(friendlyError(e));
+      }
+    },
   });
 }

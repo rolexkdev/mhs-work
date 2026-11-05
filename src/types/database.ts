@@ -17,28 +17,15 @@ export type TaskStatus = "todo" | "in_progress" | "review" | "done" | "blocked";
 
 export type DocumentStatus =
   | "draft"
-  | "in_transit"
   | "at_office"
   | "distributing"
   | "assigned"
   | "done"
-  | "archived"
-  | "delivered_external"
-  | "lost";
+  | "archived";
 
 export type HandoffKind = "collect" | "assign" | "forward" | "return";
 
 export type HandoffStatus = "pending" | "accepted" | "rejected" | "cancelled";
-
-export type ShipmentMethod = "courier" | "company_car" | "hand" | "post";
-
-export type ShipmentStatus = "in_transit" | "delivered" | "lost" | "cancelled";
-
-export type ShipmentItemStatus =
-  | "in_transit"
-  | "received"
-  | "lost"
-  | "cancelled";
 
 type Timestamps = {
   created_at: string;
@@ -62,6 +49,7 @@ export type Profile = Timestamps & {
   role: UserRole;
   office_id: string | null;
   department: string | null;
+  can_manage_documents: boolean;
 };
 
 export type Meeting = Timestamps & {
@@ -180,6 +168,11 @@ export type DocumentRecord = Timestamps & {
   status: DocumentStatus;
   priority: TaskPriority;
   due_date: string | null;
+  quantity: number;
+  received_at: string;
+  received_by: string | null;
+  delivered_at: string | null;
+  delivered_to: string | null;
   task_id: string | null;
   created_by: string;
   updated_at: string;
@@ -201,7 +194,6 @@ export type DocumentAttachment = Timestamps & {
   id: string;
   document_id: string | null;
   handoff_id: string | null;
-  shipment_id: string | null;
   file_name: string;
   file_url: string;
   uploaded_by: string;
@@ -222,48 +214,6 @@ export type DocumentHolder = {
   office_id: string | null;
   accepted_at: string | null;
   handoff_id: string;
-};
-
-export type ExternalUnit = Timestamps & {
-  id: string;
-  name: string;
-  address: string | null;
-  contact_name: string | null;
-  phone: string | null;
-  note: string | null;
-  is_active: boolean;
-  created_by: string;
-  updated_at: string;
-};
-
-export type DocumentShipment = Timestamps & {
-  id: string;
-  code: string;
-  method: ShipmentMethod;
-  carrier: string | null;
-  tracking_no: string | null;
-  driver_note: string | null;
-  from_office_id: string;
-  to_office_id: string | null;
-  to_external_unit_id: string | null;
-  recipient_name: string | null;
-  note: string | null;
-  status: ShipmentStatus;
-  sent_by: string;
-  sent_at: string;
-  completed_at: string | null;
-  updated_at: string;
-};
-
-export type DocumentShipmentItem = {
-  shipment_id: string;
-  document_id: string;
-  status: ShipmentItemStatus;
-  prev_status: DocumentStatus;
-  received_by: string | null;
-  received_at: string | null;
-  lost_reason: string | null;
-  note: string | null;
 };
 
 type Row<T> = T;
@@ -298,6 +248,7 @@ export interface Database {
           | "role"
           | "office_id"
           | "department"
+          | "can_manage_documents"
         >;
         Update: Update<Profile>;
         Relationships: Rel[];
@@ -401,6 +352,11 @@ export interface Database {
           | "status"
           | "priority"
           | "due_date"
+          | "quantity"
+          | "received_at"
+          | "received_by"
+          | "delivered_at"
+          | "delivered_to"
           | "task_id"
           | "created_by"
           | "created_at"
@@ -430,7 +386,6 @@ export interface Database {
           | "id"
           | "document_id"
           | "handoff_id"
-          | "shipment_id"
           | "uploaded_by"
           | "created_at"
         >;
@@ -444,54 +399,6 @@ export interface Database {
           "id" | "old_value" | "new_value" | "created_by" | "created_at"
         >;
         Update: Update<DocumentLog>;
-        Relationships: Rel[];
-      };
-      external_units: {
-        Row: Row<ExternalUnit>;
-        Insert: Insert<
-          ExternalUnit,
-          | "id"
-          | "address"
-          | "contact_name"
-          | "phone"
-          | "note"
-          | "is_active"
-          | "created_by"
-          | "created_at"
-          | "updated_at"
-        >;
-        Update: Update<ExternalUnit>;
-        Relationships: Rel[];
-      };
-      document_shipments: {
-        Row: Row<DocumentShipment>;
-        Insert: Insert<
-          DocumentShipment,
-          | "id"
-          | "code"
-          | "carrier"
-          | "tracking_no"
-          | "driver_note"
-          | "to_office_id"
-          | "to_external_unit_id"
-          | "recipient_name"
-          | "note"
-          | "status"
-          | "sent_at"
-          | "completed_at"
-          | "created_at"
-          | "updated_at"
-        >;
-        Update: Update<DocumentShipment>;
-        Relationships: Rel[];
-      };
-      document_shipment_items: {
-        Row: Row<DocumentShipmentItem>;
-        Insert: Insert<
-          DocumentShipmentItem,
-          "status" | "received_by" | "received_at" | "lost_reason" | "note"
-        >;
-        Update: Update<DocumentShipmentItem>;
         Relationships: Rel[];
       };
     };
@@ -526,43 +433,6 @@ export interface Database {
         };
         Returns: DocumentHandoff;
       };
-      create_shipment: {
-        Args: {
-          p_document_ids: string[];
-          p_method: ShipmentMethod;
-          p_to_office_id?: string | null;
-          p_to_external_unit_id?: string | null;
-          p_carrier?: string | null;
-          p_tracking_no?: string | null;
-          p_driver_note?: string | null;
-          p_note?: string | null;
-          p_from_office_id?: string | null;
-        };
-        Returns: DocumentShipment;
-      };
-      confirm_shipment_items: {
-        Args: {
-          p_shipment_id: string;
-          p_document_ids: string[];
-          p_recipient_name?: string | null;
-          p_note?: string | null;
-        };
-        Returns: DocumentShipment;
-      };
-      mark_document_lost: {
-        Args: {
-          p_document_id: string;
-          p_reason: string;
-        };
-        Returns: DocumentRecord;
-      };
-      cancel_shipment: {
-        Args: {
-          p_shipment_id: string;
-          p_note?: string | null;
-        };
-        Returns: DocumentShipment;
-      };
     };
     Enums: {
       user_role: UserRole;
@@ -573,9 +443,6 @@ export interface Database {
       document_status: DocumentStatus;
       handoff_kind: HandoffKind;
       handoff_status: HandoffStatus;
-      shipment_method: ShipmentMethod;
-      shipment_status: ShipmentStatus;
-      shipment_item_status: ShipmentItemStatus;
     };
     CompositeTypes: Record<string, never>;
   };

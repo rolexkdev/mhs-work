@@ -50,6 +50,7 @@ export function AccountFormDialog({
   const [role, setRole] = useState<UserRole>("member");
   const [officeId, setOfficeId] = useState<string>(NONE_OFFICE);
   const [department, setDepartment] = useState("");
+  const [canManageDocuments, setCanManageDocuments] = useState(false);
   const [password, setPassword] = useState(DEFAULT_PASSWORD);
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export function AccountFormDialog({
     setRole(account?.role ?? "member");
     setOfficeId(account?.officeId ?? NONE_OFFICE);
     setDepartment(account?.department ?? "");
+    setCanManageDocuments(account?.canManageDocuments ?? false);
     setPassword(DEFAULT_PASSWORD);
   }, [open, account]);
 
@@ -78,6 +80,7 @@ export function AccountFormDialog({
         role,
         officeId: resolvedOfficeId,
         department: resolvedDepartment,
+        canManageDocuments,
       });
     } else {
       await createAccount.mutateAsync({
@@ -86,6 +89,7 @@ export function AccountFormDialog({
         role,
         officeId: resolvedOfficeId,
         department: resolvedDepartment,
+        canManageDocuments,
         password,
       });
     }
@@ -183,6 +187,22 @@ export function AccountFormDialog({
               placeholder="VD: Phòng Hành chính - Nhân sự"
             />
           </div>
+
+          <label className="flex cursor-pointer items-start gap-2 rounded-md border p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4"
+              checked={canManageDocuments}
+              onChange={(e) => setCanManageDocuments(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium">Quyền tiếp nhận hồ sơ</span>
+              <span className="block text-xs text-muted-foreground">
+                Được tạo, sửa, xoá và bàn giao hồ sơ. Người khác chỉ được xem và
+                tìm kiếm.
+              </span>
+            </span>
+          </label>
 
           {!isEdit && (
             <div className="space-y-1.5">

@@ -75,7 +75,8 @@ export interface CreateDocumentInput {
   category?: string | null;
   origin_office_id?: string | null;
   priority?: TaskPriority;
-  due_date?: string | null;
+  quantity?: number;
+  received_at?: string | null;
 }
 
 export function useCreateDocument() {
@@ -91,7 +92,8 @@ export function useCreateDocument() {
         category: input.category ?? null,
         origin_office_id: input.origin_office_id ?? null,
         priority: input.priority ?? ("medium" as TaskPriority),
-        due_date: input.due_date ?? null,
+        quantity: input.quantity ?? 1,
+        ...(input.received_at ? { received_at: input.received_at } : {}),
       };
       const { data, error } = await supabase
         .from("documents")
@@ -109,13 +111,45 @@ export function useCreateDocument() {
   });
 }
 
+export function useCreateDocuments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      inputs: CreateDocumentInput[],
+    ): Promise<DocumentRecord[]> => {
+      if (inputs.length === 0) return [];
+      const supabase = createClient();
+      const payloads = inputs.map((input) => ({
+        title: input.title,
+        description: input.description ?? null,
+        category: input.category ?? null,
+        origin_office_id: input.origin_office_id ?? null,
+        priority: input.priority ?? ("medium" as TaskPriority),
+        quantity: input.quantity ?? 1,
+        ...(input.received_at ? { received_at: input.received_at } : {}),
+      }));
+      const { data, error } = await supabase
+        .from("documents")
+        .insert(payloads)
+        .select();
+      if (error) throw error;
+      return data ?? [];
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
+
 export interface UpdateDocumentInput {
   id: string;
   title?: string;
   description?: string | null;
   category?: string | null;
   priority?: TaskPriority;
-  due_date?: string | null;
+  quantity?: number;
+  received_at?: string;
 }
 
 export function useUpdateDocument() {
@@ -130,13 +164,15 @@ export function useUpdateDocument() {
         description?: string | null;
         category?: string | null;
         priority?: TaskPriority;
-        due_date?: string | null;
+        quantity?: number;
+        received_at?: string;
       } = {};
       if (input.title !== undefined) patch.title = input.title;
       if (input.description !== undefined) patch.description = input.description;
       if (input.category !== undefined) patch.category = input.category;
       if (input.priority !== undefined) patch.priority = input.priority;
-      if (input.due_date !== undefined) patch.due_date = input.due_date;
+      if (input.quantity !== undefined) patch.quantity = input.quantity;
+      if (input.received_at !== undefined) patch.received_at = input.received_at;
 
       const { data, error } = await supabase
         .from("documents")

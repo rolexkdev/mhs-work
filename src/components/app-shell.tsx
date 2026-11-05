@@ -31,7 +31,6 @@ import { RealtimeSync } from "@/components/realtime-sync";
 import { ProfileDialog } from "@/modules/auth/profile-dialog";
 import { signOut } from "@/modules/auth/actions";
 import { useMyPendingHandoffs } from "@/modules/documents/handoff-hooks";
-import { useMyShipmentConfirmations } from "@/modules/documents/shipment-hooks";
 import { FEATURES } from "@/lib/features";
 import type { UserRole } from "@/types/database";
 
@@ -100,9 +99,8 @@ export function AppShell({
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const displayName = fullName ?? email;
   const { data: pendingHandoffs = [] } = useMyPendingHandoffs();
-  const { data: pendingShipments = [] } = useMyShipmentConfirmations();
   const pendingDocumentsCount = FEATURES.documents
-    ? pendingHandoffs.length + pendingShipments.length
+    ? pendingHandoffs.length
     : 0;
 
   // Khi điều hướng hoàn tất (pathname đổi), bỏ trạng thái pending.
