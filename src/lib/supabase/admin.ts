@@ -40,7 +40,7 @@ export function formatAdminError(error: unknown): string {
   }
 
   if (lower.includes("can_manage_documents")) {
-    return "Cơ sở dữ liệu chưa có cột can_manage_documents — vui lòng chạy migration 0017_document_intake_refactor.sql trong Supabase SQL Editor.";
+    return "Cơ sở dữ liệu chưa có cột can_manage_documents — vui lòng chạy migration 0017_document_intake.sql trong Supabase SQL Editor.";
   }
 
   return message;

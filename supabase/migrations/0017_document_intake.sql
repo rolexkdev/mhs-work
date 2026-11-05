@@ -1,31 +1,27 @@
 -- =============================================================
--- 0017 — Document intake refactor (replaces old 0017–0019)
+-- 0017 — Document intake
 --
--- Consolidates and replaces:
---   * 0017_document_holder_handoffs.sql
---   * 0018_document_shipments.sql
---   * 0019_document_intake_refactor.sql
---
--- Refactors the document flow around two intake staff:
---   * Removes shipments, external units and lost reporting if the former
---     0018_document_shipments.sql was applied, and drops the unused
---     document_attachments.shipment_id column from 0016.
---   * Updates public.create_handoff so copy holders (public.document_holders)
---     are recognised and non-handoffable statuses ('in_transit', 'lost',
---     'delivered_external', 'archived') are rejected with
---     detail = 'handoff_document_unavailable'.
+-- Builds the document flow around two intake staff:
+--   * Removes the shipment, external unit and lost-reporting features, and
+--     drops the unused document_attachments.shipment_id column.
+--   * Updates public.create_handoff and public.cancel_handoff so document
+--     intake staff (public.can_manage_documents()) and copy holders
+--     (public.document_holders) are recognised, and non-handoffable statuses
+--     ('in_transit', 'lost', 'delivered_external', 'archived') are rejected
+--     with detail = 'handoff_document_unavailable'.
 --   * Adds profiles.can_manage_documents; only flagged users (and only they)
 --     may create / edit / delete documents or start / cancel handoffs.
 --     Everyone else can view and search. Recipients may still answer their
 --     own handoffs (respond_handoff) and attach proof photos to them.
 --   * Adds documents.quantity, received_at / received_by (intake) and
---     delivered_at / delivered_to (set when a recipient accepts a handoff).
+--     delivered_at / delivered_to, which are set only when a final receiver
+--     (a profile with can_manage_documents = false) accepts a handoff;
+--     existing rows are recomputed in section 5b.
 --
--- BACK UP document_shipments, document_shipment_items and external_units
--- before applying if 0018 was previously run: the drops below are irreversible.
+-- The drops in sections 1-2 are irreversible: back up document_shipments,
+-- document_shipment_items and external_units first if they hold data.
 -- Run in the Supabase SQL Editor (or supabase db push).
--- Idempotent: safe to run more than once (whether only 0016, or any subset of
--- the old 0017–0019 migrations, was previously applied).
+-- Idempotent: safe to run more than once.
 -- =============================================================
 
 -- ---------- 1. Remap documents out of the removed statuses ----------
@@ -143,18 +139,6 @@ begin
     update public.documents
        set received_at = created_at,
            received_by = created_by;
-
-    update public.documents d
-       set delivered_at = h.responded_at,
-           delivered_to = h.to_user
-      from (
-        select distinct on (document_id) document_id, to_user, responded_at
-          from public.document_handoffs
-         where status = 'accepted'
-           and kind in ('assign', 'forward')
-         order by document_id, responded_at desc
-      ) h
-     where h.document_id = d.id;
   end if;
 end $$;
 
@@ -192,8 +176,9 @@ returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if new.status = 'accepted'
-     and old.status is distinct from 'accepted'
-     and new.kind in ('assign', 'forward') then
+     and (tg_op = 'INSERT' or old.status is distinct from 'accepted')
+     and new.kind in ('assign', 'forward')
+     and not coalesce((select can_manage_documents from public.profiles where id = new.to_user), false) then
     perform set_config('app.documents_rpc', 'on', true);
     update public.documents
        set delivered_at = coalesce(new.responded_at, now()),
@@ -209,9 +194,45 @@ create trigger trg_document_handoff_delivery
   after update on public.document_handoffs
   for each row execute function public.record_document_delivery();
 
--- ---------- 6. Handoff RPC & staff-only guard ----------
--- Includes the copy-holder check from old 0017 and the unavailable-status
--- guard ('in_transit', 'lost', 'delivered_external', 'archived') from old 0018.
+-- ---------- 5b. Recompute delivery for final receivers (safe to re-run) ----------
+do $$
+begin
+  perform set_config('app.documents_rpc', 'on', true);
+
+  with latest_final_handoff as (
+    select distinct on (h.document_id)
+      h.document_id,
+      coalesce(h.responded_at, h.created_at) as delivered_at,
+      h.to_user as delivered_to
+    from public.document_handoffs h
+    left join public.profiles p on p.id = h.to_user
+    where h.status = 'accepted'
+      and h.kind in ('assign', 'forward')
+      and not coalesce(p.can_manage_documents, false)
+    order by h.document_id, h.responded_at desc nulls last, h.created_at desc, h.id desc
+  )
+  update public.documents d
+     set delivered_at = lfh.delivered_at,
+         delivered_to = lfh.delivered_to
+    from (
+      select
+        doc.id as document_id,
+        lfh.delivered_at,
+        lfh.delivered_to
+      from public.documents doc
+      left join latest_final_handoff lfh on lfh.document_id = doc.id
+    ) lfh
+   where d.id = lfh.document_id
+     and (
+       d.delivered_at is distinct from lfh.delivered_at
+       or d.delivered_to is distinct from lfh.delivered_to
+     );
+end $$;
+
+-- ---------- 6. Handoff RPCs & staff-only guard ----------
+-- Handoffs may be created by intake staff (public.can_manage_documents()), the
+-- current holder, a copy holder, or a leader/admin. Documents in the statuses
+-- 'in_transit', 'lost', 'delivered_external' and 'archived' cannot be handed off.
 create or replace function public.create_handoff(
   p_document_id uuid,
   p_to_users    uuid[],
@@ -257,7 +278,8 @@ begin
       using detail = 'handoff_document_unavailable';
   end if;
 
-  if v_doc.current_holder_id is distinct from v_uid
+  if not public.can_manage_documents()
+     and v_doc.current_holder_id is distinct from v_uid
      and not exists (
        select 1
          from public.document_holders dh
@@ -265,7 +287,7 @@ begin
           and dh.user_id = v_uid
      )
      and not public.is_leader_or_admin() then
-    raise exception 'Only the current document holder, a copy holder, a leader, or an admin may create a handoff.';
+    raise exception 'Only document intake staff, the current holder, a copy holder, a leader, or an admin may create a handoff.';
   end if;
 
   if exists (
@@ -313,6 +335,106 @@ end;
 $$;
 
 grant execute on function public.create_handoff(uuid, uuid[], public.handoff_kind, text) to authenticated;
+
+-- Cancels a pending handoff. Allowed for document intake staff, the sender
+-- (from_user), or a leader/admin while status is 'pending'. Counts as
+-- "answered" for resolving a multi-recipient distribution when the last
+-- pending handoff is cancelled.
+create or replace function public.cancel_handoff(
+  p_handoff_id uuid,
+  p_note       text default null
+)
+returns public.document_handoffs
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid             uuid := auth.uid();
+  v_handoff         public.document_handoffs%rowtype;
+  v_doc             public.documents%rowtype;
+  v_prev_status     public.document_status;
+  v_dist_started_at timestamptz;
+  v_any_accepted    boolean;
+begin
+  if v_uid is null then
+    raise exception 'Authentication required to cancel a handoff.';
+  end if;
+
+  select *
+    into v_handoff
+    from public.document_handoffs
+   where id = p_handoff_id
+     for update;
+
+  if not found then
+    raise exception 'Handoff % not found.', p_handoff_id;
+  end if;
+
+  if not public.can_manage_documents()
+     and v_handoff.from_user is distinct from v_uid
+     and not public.is_leader_or_admin() then
+    raise exception 'Only document intake staff, the sender, a leader, or an admin may cancel this handoff.';
+  end if;
+
+  if v_handoff.status <> 'pending' then
+    raise exception 'Only a pending handoff may be cancelled (status: %).', v_handoff.status;
+  end if;
+
+  select *
+    into v_doc
+    from public.documents
+   where id = v_handoff.document_id
+     for update;
+
+  perform set_config('app.documents_rpc', 'on', true);
+
+  update public.document_handoffs
+     set status        = 'cancelled'::public.handoff_status,
+         response_note = p_note,
+         responded_at  = now()
+   where id = p_handoff_id
+  returning * into v_handoff;
+
+  if v_doc.status = 'distributing' then
+    if not exists (
+      select 1
+        from public.document_handoffs
+       where document_id = v_doc.id
+         and status = 'pending'
+    ) then
+      -- Derive the pre-distribution status and timestamp from the latest
+      -- document_logs entry where status transitioned into 'distributing'.
+      select (old_value #>> '{}')::public.document_status,
+             created_at
+        into v_prev_status,
+             v_dist_started_at
+        from public.document_logs
+       where document_id = v_doc.id
+         and action = 'status'
+         and new_value = to_jsonb('distributing'::text)
+       order by created_at desc, id desc
+       limit 1;
+
+      select exists (
+        select 1
+          from public.document_handoffs
+         where document_id = v_doc.id
+           and status = 'accepted'
+           and created_at >= coalesce(v_dist_started_at, v_handoff.created_at)
+      ) into v_any_accepted;
+
+      update public.documents
+         set status = case
+           when v_any_accepted then 'assigned'::public.document_status
+           else coalesce(v_prev_status, 'draft'::public.document_status)
+         end
+       where id = v_doc.id;
+    end if;
+  end if;
+
+  return v_handoff;
+end;
+$$;
+
+grant execute on function public.cancel_handoff(uuid, text) to authenticated;
 
 -- Only intake staff may start / cancel handoffs.
 -- create_handoff / cancel_handoff are security definer RPCs; auth.uid() still
