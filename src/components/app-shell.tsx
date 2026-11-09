@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   CalendarDays,
   ListChecks,
-  FileText,
   LogOut,
   Loader2,
   Search,
@@ -30,7 +29,6 @@ import { CommandPalette } from "@/components/command-palette";
 import { RealtimeSync } from "@/components/realtime-sync";
 import { ProfileDialog } from "@/modules/auth/profile-dialog";
 import { signOut } from "@/modules/auth/actions";
-import { useMyPendingHandoffs } from "@/modules/documents/handoff-hooks";
 import { FEATURES } from "@/lib/features";
 import type { UserRole } from "@/types/database";
 
@@ -47,9 +45,6 @@ const NAV: NavItem[] = [
     ? [{ href: "/meetings", label: "Họp giao ban", icon: CalendarDays }]
     : []),
   { href: "/tasks", label: "Công việc", icon: ListChecks },
-  ...(FEATURES.documents
-    ? [{ href: "/documents", label: "Hồ sơ – Công văn", icon: FileText }]
-    : []),
   { href: "/updates", label: "Báo cáo công việc", icon: ClipboardCheck },
 ];
 
@@ -61,7 +56,6 @@ const SHORT_LABEL: Record<string, string> = {
   "/": "Tổng quan",
   "/meetings": "Giao ban",
   "/tasks": "Công việc",
-  "/documents": "Hồ sơ",
   "/updates": "Báo cáo",
   "/accounts": "Tài khoản",
 };
@@ -98,10 +92,6 @@ export function AppShell({
   // Highlight tab được bấm ngay lập tức, không chờ điều hướng xong.
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const displayName = fullName ?? email;
-  const { data: pendingHandoffs = [] } = useMyPendingHandoffs();
-  const pendingDocumentsCount = FEATURES.documents
-    ? pendingHandoffs.length
-    : 0;
 
   // Khi điều hướng hoàn tất (pathname đổi), bỏ trạng thái pending.
   useEffect(() => {
@@ -148,8 +138,6 @@ export function AppShell({
           {navItems.map(({ href, label, icon: Icon, exact }) => {
             const active = isActive(href, exact);
             const pending = pendingHref === href;
-            const badgeCount =
-              href === "/documents" ? pendingDocumentsCount : 0;
             return (
               <Link
                 key={href}
@@ -168,18 +156,6 @@ export function AppShell({
                   <Icon className="h-4 w-4" />
                 )}
                 <span className="flex-1 truncate">{label}</span>
-                {badgeCount > 0 && (
-                  <span
-                    className={cn(
-                      "ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold",
-                      active
-                        ? "bg-primary-foreground text-primary"
-                        : "bg-amber-500 text-white",
-                    )}
-                  >
-                    {badgeCount}
-                  </span>
-                )}
               </Link>
             );
           })}
@@ -284,8 +260,6 @@ export function AppShell({
           {navItems.map(({ href, label, icon: Icon, exact }) => {
             const active = isActive(href, exact);
             const pending = pendingHref === href;
-            const badgeCount =
-              href === "/documents" ? pendingDocumentsCount : 0;
             return (
               <Link
                 key={href}
@@ -299,18 +273,11 @@ export function AppShell({
                     : "text-muted-foreground active:bg-accent",
                 )}
               >
-                <span className="relative">
-                  {pending ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
-                  )}
-                  {badgeCount > 0 && (
-                    <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
-                      {badgeCount}
-                    </span>
-                  )}
-                </span>
+                {pending ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
+                )}
                 <span
                   className={cn(
                     "w-full truncate text-center text-[10px] leading-none",

@@ -15,18 +15,6 @@ export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export type TaskStatus = "todo" | "in_progress" | "review" | "done" | "blocked";
 
-export type DocumentStatus =
-  | "draft"
-  | "at_office"
-  | "distributing"
-  | "assigned"
-  | "done"
-  | "archived";
-
-export type HandoffKind = "collect" | "assign" | "forward" | "return";
-
-export type HandoffStatus = "pending" | "accepted" | "rejected" | "cancelled";
-
 type Timestamps = {
   created_at: string;
 };
@@ -34,22 +22,12 @@ type Timestamps = {
 // LƯU Ý: các Row type phải là `type` (object literal), KHÔNG dùng `interface`.
 // Interface không có index signature ngầm nên không thỏa `Record<string, unknown>`
 // mà supabase-js yêu cầu → query sẽ resolve thành `never`.
-export type Office = Timestamps & {
-  id: string;
-  code: string;
-  name: string;
-  address: string | null;
-};
-
 export type Profile = Timestamps & {
   id: string;
   email: string;
   full_name: string | null;
   avatar_url: string | null;
   role: UserRole;
-  office_id: string | null;
-  department: string | null;
-  can_manage_documents: boolean;
 };
 
 export type Meeting = Timestamps & {
@@ -155,69 +133,6 @@ export type TaskLog = Timestamps & {
   created_by: string | null;
 };
 
-/** Document record (0016). Named DocumentRecord to avoid clashing with DOM Document. */
-export type DocumentRecord = Timestamps & {
-  id: string;
-  code: string;
-  title: string;
-  description: string | null;
-  category: string | null;
-  origin_office_id: string | null;
-  current_office_id: string | null;
-  current_holder_id: string | null;
-  /** Intended final recipient, informational only — no handoff. */
-  intended_recipient_id: string | null;
-  status: DocumentStatus;
-  priority: TaskPriority;
-  due_date: string | null;
-  quantity: number;
-  received_at: string;
-  received_by: string | null;
-  delivered_at: string | null;
-  delivered_to: string | null;
-  task_id: string | null;
-  created_by: string;
-  updated_at: string;
-};
-
-export type DocumentHandoff = Timestamps & {
-  id: string;
-  document_id: string;
-  from_user: string;
-  to_user: string;
-  kind: HandoffKind;
-  status: HandoffStatus;
-  note: string | null;
-  response_note: string | null;
-  responded_at: string | null;
-};
-
-export type DocumentAttachment = Timestamps & {
-  id: string;
-  document_id: string | null;
-  handoff_id: string | null;
-  file_name: string;
-  file_url: string;
-  uploaded_by: string;
-};
-
-export type DocumentLog = Timestamps & {
-  id: string;
-  document_id: string;
-  action: string;
-  old_value: unknown | null;
-  new_value: unknown | null;
-  created_by: string | null;
-};
-
-export type DocumentHolder = {
-  document_id: string;
-  user_id: string;
-  office_id: string | null;
-  accepted_at: string | null;
-  handoff_id: string;
-};
-
 type Row<T> = T;
 type Insert<T, Optional extends keyof T> = Omit<T, Optional> &
   Partial<Pick<T, Optional>>;
@@ -234,23 +149,11 @@ type Rel = {
 export interface Database {
   public: {
     Tables: {
-      offices: {
-        Row: Row<Office>;
-        Insert: Insert<Office, "id" | "created_at" | "address">;
-        Update: Update<Office>;
-        Relationships: Rel[];
-      };
       profiles: {
         Row: Row<Profile>;
         Insert: Insert<
           Profile,
-          | "created_at"
-          | "full_name"
-          | "avatar_url"
-          | "role"
-          | "office_id"
-          | "department"
-          | "can_manage_documents"
+          "created_at" | "full_name" | "avatar_url" | "role"
         >;
         Update: Update<Profile>;
         Relationships: Rel[];
@@ -340,112 +243,15 @@ export interface Database {
         Update: Update<TaskLog>;
         Relationships: Rel[];
       };
-      documents: {
-        Row: Row<DocumentRecord>;
-        Insert: Insert<
-          DocumentRecord,
-          | "id"
-          | "code"
-          | "description"
-          | "category"
-          | "origin_office_id"
-          | "current_office_id"
-          | "current_holder_id"
-          | "intended_recipient_id"
-          | "status"
-          | "priority"
-          | "due_date"
-          | "quantity"
-          | "received_at"
-          | "received_by"
-          | "delivered_at"
-          | "delivered_to"
-          | "task_id"
-          | "created_by"
-          | "created_at"
-          | "updated_at"
-        >;
-        Update: Update<DocumentRecord>;
-        Relationships: Rel[];
-      };
-      document_handoffs: {
-        Row: Row<DocumentHandoff>;
-        Insert: Insert<
-          DocumentHandoff,
-          | "id"
-          | "status"
-          | "note"
-          | "response_note"
-          | "created_at"
-          | "responded_at"
-        >;
-        Update: Update<DocumentHandoff>;
-        Relationships: Rel[];
-      };
-      document_attachments: {
-        Row: Row<DocumentAttachment>;
-        Insert: Insert<
-          DocumentAttachment,
-          | "id"
-          | "document_id"
-          | "handoff_id"
-          | "uploaded_by"
-          | "created_at"
-        >;
-        Update: Update<DocumentAttachment>;
-        Relationships: Rel[];
-      };
-      document_logs: {
-        Row: Row<DocumentLog>;
-        Insert: Insert<
-          DocumentLog,
-          "id" | "old_value" | "new_value" | "created_by" | "created_at"
-        >;
-        Update: Update<DocumentLog>;
-        Relationships: Rel[];
-      };
     };
-    Views: {
-      document_holders: {
-        Row: Row<DocumentHolder>;
-        Relationships: Rel[];
-      };
-    };
-    Functions: {
-      create_handoff: {
-        Args: {
-          p_document_id: string;
-          p_to_users: string[];
-          p_kind: HandoffKind;
-          p_note?: string | null;
-        };
-        Returns: DocumentHandoff[];
-      };
-      respond_handoff: {
-        Args: {
-          p_handoff_id: string;
-          p_accept: boolean;
-          p_note?: string | null;
-        };
-        Returns: DocumentHandoff;
-      };
-      cancel_handoff: {
-        Args: {
-          p_handoff_id: string;
-          p_note?: string | null;
-        };
-        Returns: DocumentHandoff;
-      };
-    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
     Enums: {
       user_role: UserRole;
       meeting_status: MeetingStatus;
       meeting_item_status: MeetingItemStatus;
       task_priority: TaskPriority;
       task_status: TaskStatus;
-      document_status: DocumentStatus;
-      handoff_kind: HandoffKind;
-      handoff_status: HandoffStatus;
     };
     CompositeTypes: Record<string, never>;
   };

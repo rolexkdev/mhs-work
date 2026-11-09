@@ -6,9 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/query-keys";
 
 type ChangeRow = {
-  id?: string;
   task_id?: string;
-  document_id?: string | null;
 } | null;
 
 /**
@@ -24,12 +22,6 @@ export function RealtimeSync() {
 
     const taskIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
       payload.new?.task_id ?? payload.old?.task_id ?? null;
-
-    const documentIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
-      payload.new?.document_id ?? payload.old?.document_id ?? null;
-
-    const rowIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
-      payload.new?.id ?? payload.old?.id ?? null;
 
     const channel = supabase
       .channel("realtime-app")
@@ -79,59 +71,6 @@ export function RealtimeSync() {
         (payload) => {
           const id = taskIdFrom(payload);
           if (id) qc.invalidateQueries({ queryKey: ["attachments", id] });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "documents" },
-        (payload) => {
-          const id = rowIdFrom(payload);
-          qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
-          qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
-          qc.invalidateQueries({
-            queryKey: queryKeys.documentsWithPendingHandoffs,
-          });
-          qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
-          if (id) {
-            qc.invalidateQueries({ queryKey: queryKeys.document(id) });
-            qc.invalidateQueries({ queryKey: queryKeys.documentHolders(id) });
-            qc.invalidateQueries({ queryKey: queryKeys.documentLogs(id) });
-          }
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "document_handoffs" },
-        (payload) => {
-          const docId = documentIdFrom(payload);
-          qc.invalidateQueries({ queryKey: queryKeys.myPendingHandoffs });
-          qc.invalidateQueries({
-            queryKey: queryKeys.documentsWithPendingHandoffs,
-          });
-          qc.invalidateQueries({ queryKey: queryKeys.documentsAll });
-          qc.invalidateQueries({ queryKey: queryKeys.documentHoldersAll });
-          if (docId) {
-            qc.invalidateQueries({
-              queryKey: queryKeys.documentHandoffs(docId),
-            });
-            qc.invalidateQueries({
-              queryKey: queryKeys.documentHolders(docId),
-            });
-            qc.invalidateQueries({ queryKey: queryKeys.document(docId) });
-            qc.invalidateQueries({ queryKey: queryKeys.documentLogs(docId) });
-          }
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "document_attachments" },
-        (payload) => {
-          const docId = documentIdFrom(payload);
-          if (docId) {
-            qc.invalidateQueries({
-              queryKey: queryKeys.documentAttachments(docId),
-            });
-          }
         },
       );
 

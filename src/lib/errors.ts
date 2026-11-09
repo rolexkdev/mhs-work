@@ -1,7 +1,5 @@
 const DETAIL_MESSAGES: Record<string, string> = {
   auth_required: "Vui lòng đăng nhập để thực hiện thao tác này.",
-  handoff_document_unavailable:
-    "Hồ sơ đang ở trạng thái không thể bàn giao (đã lưu trữ).",
 };
 
 /** Dịch lỗi Supabase/PostgREST sang thông báo tiếng Việt thân thiện. */
@@ -23,7 +21,7 @@ export function friendlyError(
   }
 
   if (code === "23503") {
-    return "Không thể xoá vì dữ liệu này đang được sử dụng (ví dụ hồ sơ đã có lượt bàn giao).";
+    return "Không thể xoá vì dữ liệu này đang được sử dụng.";
   }
 
   // UPDATE/DELETE khớp 0 dòng → thường do RLS chặn (không đủ quyền).

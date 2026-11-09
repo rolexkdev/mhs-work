@@ -83,7 +83,7 @@ export async function listAccounts(): Promise<{
   }
 
   const profileColumns =
-    "id, email, full_name, role, office_id, department, can_manage_documents, avatar_url, created_at" as const;
+    "id, email, full_name, role, avatar_url, created_at" as const;
 
   let { data: profiles, error } = await (admin ?? caller.supabase)
     .from("profiles")
@@ -133,9 +133,6 @@ export async function listAccounts(): Promise<{
       email: p.email,
       fullName: p.full_name,
       role: p.role,
-      officeId: p.office_id ?? null,
-      department: p.department ?? null,
-      canManageDocuments: p.can_manage_documents ?? false,
       avatarUrl: p.avatar_url,
       createdAt: p.created_at,
       lastSignInAt: authById.get(p.id)?.lastSignInAt ?? null,
@@ -156,17 +153,12 @@ async function createOne(
     fullName: string;
     email: string;
     role: UserRole;
-    officeId?: string | null;
-    department?: string | null;
-    canManageDocuments?: boolean;
     password?: string;
   },
 ): Promise<{ error?: string }> {
   const email = input.email.trim().toLowerCase();
   const fullName = input.fullName.trim();
   const password = input.password?.trim() || DEFAULT_PASSWORD;
-  const officeId = input.officeId?.trim() || null;
-  const department = input.department?.trim() || null;
 
   if (!email.includes("@")) return { error: "Email không hợp lệ." };
   if (!fullName) return { error: "Chưa nhập họ tên." };
@@ -189,7 +181,6 @@ async function createOne(
   }
 
   // Trigger handle_new_user đã tạo profile — ghi đè cho chắc tên và vai trò.
-  // Also persist office_id and department on profile creation.
   const { error: profileError } = await admin
     .from("profiles")
     .upsert(
@@ -198,9 +189,6 @@ async function createOne(
         email,
         full_name: fullName,
         role: input.role,
-        office_id: officeId,
-        department,
-        can_manage_documents: input.canManageDocuments ?? false,
       },
       { onConflict: "id" },
     );
@@ -213,9 +201,6 @@ export async function createAccount(input: {
   fullName: string;
   email: string;
   role: UserRole;
-  officeId?: string | null;
-  department?: string | null;
-  canManageDocuments?: boolean;
   password?: string;
 }): Promise<{ error?: string }> {
   const guard = await requireAdmin();
@@ -261,9 +246,6 @@ export async function updateAccount(input: {
   userId: string;
   fullName: string;
   role: UserRole;
-  officeId?: string | null;
-  department?: string | null;
-  canManageDocuments?: boolean;
 }): Promise<{ error?: string }> {
   const caller = await requireAdminCaller();
   if (!caller.ok) return { error: caller.error };
@@ -279,9 +261,6 @@ export async function updateAccount(input: {
     };
   }
 
-  const officeId = input.officeId?.trim() || null;
-  const department = input.department?.trim() || null;
-
   let admin: ReturnType<typeof createAdminClient> | null = null;
   try {
     admin = createAdminClient();
@@ -295,11 +274,6 @@ export async function updateAccount(input: {
     .update({
       full_name: fullName,
       role: input.role,
-      office_id: officeId,
-      department,
-      ...(input.canManageDocuments === undefined
-        ? {}
-        : { can_manage_documents: input.canManageDocuments }),
     })
     .eq("id", input.userId);
 

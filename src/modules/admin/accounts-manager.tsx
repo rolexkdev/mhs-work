@@ -36,7 +36,6 @@ import {
 import { AccountFormDialog } from "@/modules/admin/account-form-dialog";
 import { BulkCreateDialog } from "@/modules/admin/bulk-create-dialog";
 import { ResetPasswordDialog } from "@/modules/admin/reset-password-dialog";
-import { useOffices } from "@/modules/documents/office-hooks";
 
 const ROLE_BADGE: Record<AccountRow["role"], string> = {
   admin: "border-amber-200 bg-amber-50 text-amber-700",
@@ -51,7 +50,6 @@ function isLocked(account: AccountRow): boolean {
 
 export function AccountsManager({ currentUserId }: { currentUserId: string }) {
   const { data: accounts = [], isLoading, error, warning } = useAccounts();
-  const { data: offices = [] } = useOffices();
   const setLocked = useSetAccountLocked();
   const deleteAccount = useDeleteAccount();
 
@@ -62,25 +60,15 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
   const [resetting, setResetting] = useState<AccountRow | null>(null);
   const [deleting, setDeleting] = useState<AccountRow | null>(null);
 
-  const officeById = useMemo(
-    () => new Map(offices.map((o) => [o.id, o])),
-    [offices],
-  );
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return accounts;
-    return accounts.filter((a) => {
-      const office = a.officeId ? officeById.get(a.officeId) : undefined;
-      return (
+    return accounts.filter(
+      (a) =>
         a.email.toLowerCase().includes(q) ||
-        (a.fullName ?? "").toLowerCase().includes(q) ||
-        (a.department ?? "").toLowerCase().includes(q) ||
-        (office?.code ?? "").toLowerCase().includes(q) ||
-        (office?.name ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [accounts, search, officeById]);
+        (a.fullName ?? "").toLowerCase().includes(q),
+    );
+  }, [accounts, search]);
 
   const adminCount = accounts.filter((a) => a.role === "admin").length;
 
@@ -158,7 +146,7 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên, email, văn phòng, phòng ban..."
+            placeholder="Tìm theo tên hoặc email..."
             className="pl-9"
           />
         </div>
@@ -199,9 +187,6 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
             const locked = isLocked(account);
             const isSelf = account.id === currentUserId;
             const displayName = account.fullName ?? account.email;
-            const office = account.officeId
-              ? officeById.get(account.officeId)
-              : undefined;
             return (
               <div key={account.id} className="flex items-start gap-3 p-3">
                 <Avatar className="h-9 w-9 shrink-0">
@@ -242,16 +227,6 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
                     >
                       {ROLE_LABEL[account.role]}
                     </span>
-                    {office && (
-                      <Badge variant="secondary" className="text-xs font-normal" title={office.name}>
-                        {office.code}
-                      </Badge>
-                    )}
-                    {account.department && (
-                      <span className="text-xs text-muted-foreground">
-                        {account.department}
-                      </span>
-                    )}
                     <span className="text-xs text-muted-foreground">
                       {account.lastSignInAt
                         ? `Đăng nhập ${formatDateTime(account.lastSignInAt)}`
@@ -276,13 +251,11 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
 
         {/* ── Máy tính: bảng đầy đủ ── */}
         <div className="hidden overflow-x-auto rounded-lg border bg-background md:block">
-          <table className="w-full min-w-[840px] text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-4 py-2.5 text-left font-medium">Nhân viên</th>
                 <th className="px-4 py-2.5 text-left font-medium">Vai trò</th>
-                <th className="px-4 py-2.5 text-left font-medium">Văn phòng</th>
-                <th className="px-4 py-2.5 text-left font-medium">Phòng ban</th>
                 <th className="px-4 py-2.5 text-left font-medium">
                   Đăng nhập gần nhất
                 </th>
@@ -295,9 +268,6 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
                 const locked = isLocked(account);
                 const isSelf = account.id === currentUserId;
                 const displayName = account.fullName ?? account.email;
-                const office = account.officeId
-                  ? officeById.get(account.officeId)
-                  : undefined;
 
                 return (
                   <tr
@@ -352,25 +322,6 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
                       </span>
                     </td>
 
-                    <td className="px-4 py-2.5">
-                      {office ? (
-                        <div className="min-w-0">
-                          <span className="font-medium">{office.code}</span>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {office.name}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {account.department || (
-                        <span className="text-xs">—</span>
-                      )}
-                    </td>
-
                     <td className="px-4 py-2.5 text-muted-foreground">
                       {account.lastSignInAt ? (
                         formatDateTime(account.lastSignInAt)
@@ -395,7 +346,7 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
               {filtered.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={5}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
                     Không tìm thấy tài khoản nào khớp &ldquo;{search}&rdquo;.
