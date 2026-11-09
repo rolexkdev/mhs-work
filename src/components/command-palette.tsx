@@ -1,14 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
-import {
-  Search,
-  ListChecks,
-  CalendarDays,
-  FileText,
-} from "lucide-react";
+import { Search, ListChecks, CalendarDays } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,15 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { useTasks } from "@/modules/tasks/hooks";
 import { useMeetings } from "@/modules/meetings/hooks";
-import { useDocuments } from "@/modules/documents/hooks";
-import { useDocumentsWithPendingHandoffs } from "@/modules/documents/handoff-hooks";
-import { useProfiles } from "@/modules/auth/use-profiles";
 import { FEATURES } from "@/lib/features";
 import { TASK_STATUS_META } from "@/modules/tasks/constants";
-import {
-  DOCUMENT_FLOW_STATUS_META,
-  getDocumentFlowStatus,
-} from "@/modules/documents/constants";
 import { formatDateTime } from "@/lib/format";
 
 /** Hộp tìm nhanh toàn cục — mở bằng Ctrl/Cmd + K. */
@@ -33,19 +21,6 @@ export function CommandPalette() {
   const router = useRouter();
   const { data: tasks = [] } = useTasks();
   const { data: meetings = [] } = useMeetings();
-  const { data: documents = [] } = useDocuments();
-  const { data: pendingDocIds = [] } = useDocumentsWithPendingHandoffs();
-  const { data: profiles = [] } = useProfiles();
-
-  const pendingDocSet = useMemo(() => new Set(pendingDocIds), [pendingDocIds]);
-  const profileById = useMemo(
-    () => new Map(profiles.map((p) => [p.id, p])),
-    [profiles],
-  );
-  const isDocumentManager = useMemo(
-    () => (id: string) => profileById.get(id)?.can_manage_documents ?? true,
-    [profileById],
-  );
 
   // Phím tắt Ctrl/Cmd + K
   useEffect(() => {
@@ -81,7 +56,7 @@ export function CommandPalette() {
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <Command.Input
               autoFocus
-              placeholder="Tìm công việc, hồ sơ, chuyến vận chuyển, cuộc họp..."
+              placeholder="Tìm công việc, cuộc họp..."
               className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
@@ -90,38 +65,6 @@ export function CommandPalette() {
             <Command.Empty className="py-8 text-center text-sm text-muted-foreground">
               Không tìm thấy kết quả.
             </Command.Empty>
-
-            {FEATURES.documents && documents.length > 0 && (
-              <Command.Group
-                heading="Hồ sơ – Công văn"
-                className="px-1 text-xs font-medium text-muted-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5"
-              >
-                {documents.map((doc) => {
-                  const flowStatus = getDocumentFlowStatus(
-                    doc,
-                    pendingDocSet.has(doc.id),
-                    isDocumentManager,
-                  );
-                  return (
-                    <Command.Item
-                      key={doc.id}
-                      value={`document ${doc.code} ${doc.title} ${doc.id}`}
-                      onSelect={() => go(`/documents?doc=${doc.id}`)}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-2 text-sm text-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
-                    >
-                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="shrink-0 font-mono text-xs font-semibold text-primary">
-                        {doc.code}
-                      </span>
-                      <span className="flex-1 truncate">{doc.title}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {DOCUMENT_FLOW_STATUS_META[flowStatus].label}
-                      </span>
-                    </Command.Item>
-                  );
-                })}
-              </Command.Group>
-            )}
 
             {tasks.length > 0 && (
               <Command.Group

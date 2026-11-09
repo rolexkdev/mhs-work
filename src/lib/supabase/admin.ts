@@ -39,10 +39,6 @@ export function formatAdminError(error: unknown): string {
     return INVALID_SERVICE_ROLE_KEY_MESSAGE;
   }
 
-  if (lower.includes("can_manage_documents")) {
-    return "Cơ sở dữ liệu chưa có cột can_manage_documents — vui lòng chạy migration 0017_document_intake.sql trong Supabase SQL Editor.";
-  }
-
   return message;
 }
 
