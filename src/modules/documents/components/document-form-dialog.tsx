@@ -26,30 +26,40 @@ import { useProfiles } from "@/modules/auth/use-profiles";
 import {
   useCanManageDocuments,
   useCreateDocument,
+  useUpdateDocument,
 } from "@/modules/documents/hooks";
 import {
   DEPARTMENTS,
   TAG_COLOR_CLASS,
   colorOf,
 } from "@/modules/tasks/constants";
+import type { DocumentWithSteps } from "@/types/database";
 
 const NO_SENDER = "__none__";
 
 /**
- * Hộp thoại thêm hồ sơ: tên, người gửi, ghi chú và — chỉ với quản lý hồ sơ —
- * lộ trình ban đầu (thêm phòng ban, đổi thứ tự, xoá bước).
+ * Hộp thoại thêm / sửa thông tin hồ sơ.
+ *
+ * Tạo mới: tên, người gửi, ghi chú và — chỉ với quản lý hồ sơ — lộ trình ban
+ * đầu (thêm phòng ban, đổi thứ tự, xoá bước).
+ * Chỉnh sửa: chỉ tên, người gửi, ghi chú; lộ trình sửa ở bước sau.
  */
 export function DocumentFormDialog({
   open,
   onOpenChange,
+  document,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  /** Có giá trị là chế độ chỉnh sửa. */
+  document?: DocumentWithSteps | null;
 }) {
+  const isEdit = !!document;
   const { data: profiles = [] } = useProfiles();
   const currentUserId = useCurrentUserId();
   const canManage = useCanManageDocuments();
   const createDocument = useCreateDocument();
+  const updateDocument = useUpdateDocument();
 
   const [name, setName] = useState("");
   const [senderId, setSenderId] = useState("");
@@ -60,20 +70,20 @@ export function DocumentFormDialog({
   // Reset form mỗi khi mở.
   useEffect(() => {
     if (!open) return;
-    setName("");
-    setSenderId("");
-    setNote("");
+    setName(document?.name ?? "");
+    setSenderId(document?.sender_id ?? "");
+    setNote(document?.note ?? "");
     setDepartmentToAdd("");
     setRoute([]);
-  }, [open]);
+  }, [open, document]);
 
-  // Người gửi mặc định là người đang đăng nhập (chờ auth trả về id).
+  // Tạo mới: người gửi mặc định là người đang đăng nhập (chờ auth trả về id).
   useEffect(() => {
-    if (!open) return;
+    if (!open || isEdit) return;
     setSenderId((prev) => prev || currentUserId || "");
-  }, [open, currentUserId]);
+  }, [open, isEdit, currentUserId]);
 
-  const pending = createDocument.isPending;
+  const pending = createDocument.isPending || updateDocument.isPending;
 
   function handleAddDepartment(value: string) {
     setRoute((prev) => [...prev, value]);
@@ -106,10 +116,14 @@ export function DocumentFormDialog({
     };
 
     try {
-      await createDocument.mutateAsync({
-        ...info,
-        departments: canManage && route.length > 0 ? route : undefined,
-      });
+      if (isEdit && document) {
+        await updateDocument.mutateAsync({ id: document.id, ...info });
+      } else {
+        await createDocument.mutateAsync({
+          ...info,
+          departments: canManage && route.length > 0 ? route : undefined,
+        });
+      }
     } catch {
       // Toast do hook hiển thị; giữ hộp thoại mở để người dùng sửa lại.
       return;
@@ -121,9 +135,13 @@ export function DocumentFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="border-b px-6 py-4">
-          <DialogTitle className="text-lg">Thêm hồ sơ</DialogTitle>
+          <DialogTitle className="text-lg">
+            {isEdit ? "Chỉnh sửa hồ sơ" : "Thêm hồ sơ"}
+          </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Nhập thông tin hồ sơ giấy cần theo dõi.
+            {isEdit
+              ? "Cập nhật tên, người gửi và ghi chú của hồ sơ."
+              : "Nhập thông tin hồ sơ giấy cần theo dõi."}
           </p>
         </DialogHeader>
 
@@ -177,7 +195,7 @@ export function DocumentFormDialog({
               </div>
             </div>
 
-            {canManage && (
+            {!isEdit && canManage && (
               <Section title="Lộ trình xử lý">
                 <div className="space-y-3">
                   <Select
@@ -270,7 +288,11 @@ export function DocumentFormDialog({
               Huỷ
             </Button>
             <Button type="submit" disabled={pending || !name.trim()}>
-              {pending ? "Đang lưu..." : "Thêm hồ sơ"}
+              {pending
+                ? "Đang lưu..."
+                : isEdit
+                  ? "Lưu thay đổi"
+                  : "Thêm hồ sơ"}
             </Button>
           </DialogFooter>
         </form>

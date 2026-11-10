@@ -117,3 +117,54 @@ export function useCreateDocument() {
     onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }
+
+export interface UpdateDocumentInput {
+  id: string;
+  name: string;
+  sender_id: string | null;
+  note: string | null;
+}
+
+/**
+ * Sửa tên / người gửi / ghi chú. Route changes go through doc_set_route in a
+ * later step, so this only touches the documents row.
+ * `.select().single()` surfaces the RLS rejection: PostgREST returns success
+ * when an update matches zero rows.
+ */
+export function useUpdateDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: UpdateDocumentInput) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("documents")
+        .update(patch)
+        .eq("id", id)
+        .select("id")
+        .single();
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.documents });
+      toast.success("Đã cập nhật hồ sơ");
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
+
+/** Xoá hồ sơ (cascade steps and events). Permission is enforced by RLS. */
+export function useDeleteDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const supabase = createClient();
+      const { error } = await supabase.from("documents").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.documents });
+      toast.success("Đã xoá hồ sơ");
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
