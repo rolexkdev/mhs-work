@@ -71,7 +71,7 @@ create table if not exists public.documents (
   -- Defaults to the creator; kept null when the sender profile is deleted.
   sender_id   uuid default auth.uid() references public.profiles (id) on delete set null,
   note        text,
-  created_by  uuid references public.profiles (id) on delete set null,
+  created_by  uuid default auth.uid() references public.profiles (id) on delete set null,
   -- Set by the progress RPCs only; status is derived from it.
   finished_at timestamptz,
   created_at  timestamptz not null default now()
@@ -121,6 +121,9 @@ create table if not exists public.document_events (
   created_by   uuid references public.profiles (id) on delete set null,
   created_at   timestamptz not null default now()
 );
+
+-- Re-runs on a database created before the default existed.
+alter table public.documents alter column created_by set default auth.uid();
 
 create index if not exists idx_documents_created_at
   on public.documents (created_at desc);
