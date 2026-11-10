@@ -1,6 +1,8 @@
 import type { TaskFilters } from "@/store/ui-store";
 
 export const queryKeys = {
+  /** Id of the signed-in user (ownership checks). */
+  currentUser: ["auth", "current-user"] as const,
   profiles: ["profiles"] as const,
   /** Profile of the signed-in user (role + document manager flag). */
   currentProfile: ["profiles", "current"] as const,

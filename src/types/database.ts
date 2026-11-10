@@ -310,9 +310,15 @@ export interface Database {
       };
       documents: {
         Row: Row<DocumentRecord>;
+        // created_by and sender_id default to the caller in the database.
         Insert: Insert<
           DocumentRecord,
-          "id" | "created_at" | "sender_id" | "note" | "finished_at"
+          | "id"
+          | "created_at"
+          | "created_by"
+          | "sender_id"
+          | "note"
+          | "finished_at"
         >;
         Update: Update<DocumentRecord>;
         Relationships: Rel[];
