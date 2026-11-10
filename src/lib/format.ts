@@ -11,6 +11,12 @@ export function formatDateTime(value: string | null | undefined): string {
   return format(new Date(value), "HH:mm · dd/MM/yyyy", { locale: vi });
 }
 
+/** Tem mốc thời gian ngắn cho lộ trình hồ sơ: "dd/MM HH:mm". */
+export function formatShortDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  return format(new Date(value), "dd/MM HH:mm", { locale: vi });
+}
+
 /**
  * Nhãn deadline thân thiện: "Hôm nay", "Quá hạn 3 ngày", ...
  * Việc đã hoàn thành thì không còn quá hạn/sắp đến hạn: chỉ hiện ngày hạn chót

@@ -14,11 +14,12 @@ import {
   DOCUMENT_STATUS_BADGE,
   documentStatus,
 } from "@/modules/documents/status";
+import { DocumentStepper } from "@/modules/documents/components/document-stepper";
 import type { DocumentWithSteps } from "@/types/database";
 
 // Bố cục cột (inline style để Tailwind không phải sinh class động)
 const GRID_STYLE = {
-  gridTemplateColumns: "minmax(220px,1.4fr) 170px 150px 44px",
+  gridTemplateColumns: "minmax(220px,1.4fr) 170px minmax(260px,2fr) 130px 44px",
 };
 
 /**
@@ -41,7 +42,7 @@ export function DocumentListView({
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border bg-card">
-      <div className="min-w-[640px]">
+      <div className="min-w-[980px]">
         {/* Header */}
         <div
           className="grid items-center gap-x-4 border-b bg-muted/50 px-4 py-2.5 text-xs font-medium text-muted-foreground"
@@ -49,6 +50,7 @@ export function DocumentListView({
         >
           <span className="truncate">Hồ sơ</span>
           <span className="truncate">Đang giữ</span>
+          <span className="truncate">Hành trình</span>
           <span className="truncate">Trạng thái</span>
           <span />
         </div>
@@ -91,6 +93,14 @@ export function DocumentListView({
                 ) : (
                   <span className="text-xs text-muted-foreground/60">—</span>
                 )}
+              </div>
+
+              {/* Lộ trình */}
+              <div className="min-w-0">
+                <DocumentStepper
+                  steps={doc.steps}
+                  finishedAt={doc.finished_at}
+                />
               </div>
 
               {/* Trạng thái */}
