@@ -10,4 +10,7 @@ export const queryKeys = {
   tasks: (filters?: Partial<TaskFilters> & { meetingId?: string | null }) =>
     ["tasks", filters ?? {}] as const,
   task: (id: string) => ["tasks", "detail", id] as const,
+  documents: ["documents"] as const,
+  document: (id: string) => ["documents", "detail", id] as const,
+  documentEvents: (id: string) => ["documents", "events", id] as const,
 };
