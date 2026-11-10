@@ -31,3 +31,33 @@ export function useDocuments() {
     },
   });
 }
+
+/**
+ * True when the signed-in user may manage document progress: role 'admin'
+ * or profiles.is_doc_manager (mirrors can_manage_documents() from 0017).
+ * Invalidated together with the profiles list when an admin edits accounts.
+ */
+export function useCanManageDocuments(): boolean {
+  const { data } = useQuery({
+    queryKey: queryKeys.currentProfile,
+    queryFn: async (): Promise<boolean> => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("role, is_doc_manager")
+        .eq("id", user.id)
+        .single();
+      if (error) throw error;
+
+      return profile.role === "admin" || profile.is_doc_manager;
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  return data ?? false;
+}
