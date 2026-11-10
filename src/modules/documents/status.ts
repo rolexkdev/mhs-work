@@ -17,6 +17,17 @@ export const DOCUMENT_STATUS_ORDER: DocumentStatusKey[] = [
   "done",
 ];
 
+/**
+ * Pill classes per status, same Notion-style palette as task statuses
+ * (draft gray, in progress blue, returned orange, done emerald).
+ */
+export const DOCUMENT_STATUS_BADGE: Record<DocumentStatusKey, string> = {
+  pending: "bg-slate-100 text-slate-700 border-slate-200",
+  in_progress: "bg-blue-100 text-blue-700 border-blue-200",
+  returned: "bg-orange-100 text-orange-700 border-orange-200",
+  done: "bg-emerald-100 text-emerald-700 border-emerald-200",
+};
+
 export interface DocumentStatusInfo {
   status: DocumentStatusKey;
   label: string;
