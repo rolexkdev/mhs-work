@@ -26,8 +26,8 @@ function normalize(value: string): string {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/đ/g, "d");
 }
 
 /** Tên hồ sơ, người gửi (tên/email) và phòng ban đang giữ. */
