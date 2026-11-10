@@ -11,8 +11,18 @@
 --   finished_at   -> document flag before the action
 -- Route edits are logged but not undoable (edit the route again instead).
 --
+-- Stale calls: the client passes the id of the step it saw as current
+-- (or of the event it wants to undo); the call fails if that changed.
+--
 -- Idempotent. Run manually in the Supabase SQL Editor after 0017.
 -- =============================================================
+
+-- Earlier drafts of these functions had no expected-state argument.
+drop function if exists public.doc_forward(uuid, text, text);
+drop function if exists public.doc_return(uuid, text);
+drop function if exists public.doc_resend(uuid, text);
+drop function if exists public.doc_finish_early(uuid, text);
+drop function if exists public.doc_undo(uuid);
 
 -- ---------- Internal helpers ----------
 -- First step not done yet (current or next pending).
@@ -46,6 +56,21 @@ language sql stable security definer set search_path = public as $$
   )
   from public.document_steps s
   where s.id = any (p_step_ids);
+$$;
+
+-- Rejects a call made from an outdated view of the document.
+create or replace function public.doc_assert_current(
+  p_actual uuid,
+  p_expected uuid
+)
+returns void
+language plpgsql as $$
+begin
+  if p_expected is null or p_actual is distinct from p_expected then
+    raise exception 'Hồ sơ vừa được cập nhật, vui lòng tải lại rồi thử lại.'
+      using errcode = 'P0001';
+  end if;
+end;
 $$;
 
 -- Single insert point so every action writes exactly one event.
@@ -254,6 +279,7 @@ $$;
 -- ---------- Forward ----------
 create or replace function public.doc_forward(
   p_document_id uuid,
+  p_step_id uuid,
   p_handler_name text default null,
   p_note text default null
 )
@@ -290,6 +316,8 @@ begin
   if v_step.id is null or v_step.received_at is null then
     raise exception 'Hồ sơ chưa được gửi đi.' using errcode = 'P0001';
   end if;
+
+  perform public.doc_assert_current(v_step.id, p_step_id);
 
   if v_step.returned_at is not null then
     raise exception 'Hồ sơ đang chờ bổ sung, hãy gửi lại trước.'
@@ -348,6 +376,7 @@ $$;
 -- ---------- Return ----------
 create or replace function public.doc_return(
   p_document_id uuid,
+  p_step_id uuid,
   p_reason text
 )
 returns void
@@ -386,6 +415,8 @@ begin
     raise exception 'Hồ sơ chưa được gửi đi.' using errcode = 'P0001';
   end if;
 
+  perform public.doc_assert_current(v_step.id, p_step_id);
+
   if v_step.returned_at is not null then
     raise exception 'Hồ sơ đã được trả lại, đang chờ bổ sung.'
       using errcode = 'P0001';
@@ -419,6 +450,7 @@ $$;
 -- ---------- Resend ----------
 create or replace function public.doc_resend(
   p_document_id uuid,
+  p_step_id uuid,
   p_note text default null
 )
 returns void
@@ -456,6 +488,8 @@ begin
       using errcode = 'P0001';
   end if;
 
+  perform public.doc_assert_current(v_step.id, p_step_id);
+
   v_undo := jsonb_build_object(
     'finished_at', v_doc.finished_at,
     'steps', public.doc_step_snapshot(array[v_step.id]),
@@ -483,14 +517,19 @@ end;
 $$;
 
 -- ---------- Finish early ----------
+-- The step holding the document is marked done (it is the last department
+-- that handled it); only steps not reached yet are dropped.
 create or replace function public.doc_finish_early(
   p_document_id uuid,
+  p_step_id uuid,
+  p_handler_name text default null,
   p_note text default null
 )
 returns void
 language plpgsql security definer set search_path = public as $$
 declare
   v_doc public.documents;
+  v_step public.document_steps;
   v_now timestamptz := now();
   v_deleted jsonb;
   v_undo jsonb;
@@ -513,14 +552,13 @@ begin
     raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
   end if;
 
-  if not exists (
-    select 1
-    from public.document_steps s
-    where s.document_id = p_document_id
-      and s.received_at is not null
-  ) then
+  v_step := public.doc_current_step(p_document_id);
+
+  if v_step.id is null or v_step.received_at is null then
     raise exception 'Hồ sơ chưa được gửi đi.' using errcode = 'P0001';
   end if;
+
+  perform public.doc_assert_current(v_step.id, p_step_id);
 
   -- Snapshot every step that is about to be dropped so undo can restore it.
   select coalesce(
@@ -543,17 +581,24 @@ begin
     into v_deleted
   from public.document_steps s
   where s.document_id = p_document_id
-    and s.done_at is null;
+    and s.received_at is null;
 
   v_undo := jsonb_build_object(
     'finished_at', v_doc.finished_at,
-    'steps', '[]'::jsonb,
+    'steps', public.doc_step_snapshot(array[v_step.id]),
     'deleted_steps', v_deleted
   );
 
+  update public.document_steps
+  set done_at = v_now,
+      returned_at = null,
+      handler_name = p_handler_name,
+      note = p_note
+  where id = v_step.id;
+
   delete from public.document_steps
   where document_id = p_document_id
-    and done_at is null;
+    and received_at is null;
 
   update public.documents
   set finished_at = v_now
@@ -562,9 +607,9 @@ begin
   perform public.doc_log_event(
     p_document_id,
     'finish_early',
-    null,
-    null,
-    null,
+    v_step.step_order,
+    v_step.department,
+    p_handler_name,
     p_note,
     jsonb_build_object('dropped_steps', jsonb_array_length(v_deleted)),
     v_undo,
@@ -576,7 +621,12 @@ $$;
 -- ---------- Undo ----------
 -- Reverts the latest progress action that has not been undone yet.
 -- Route edits and info edits are not undoable.
-create or replace function public.doc_undo(p_document_id uuid)
+-- p_event_id is the event the client shows as latest, so a double click or
+-- a second manager cannot undo two actions at once.
+create or replace function public.doc_undo(
+  p_document_id uuid,
+  p_event_id uuid
+)
 returns void
 language plpgsql security definer set search_path = public as $$
 declare
@@ -616,6 +666,8 @@ begin
   if v_event.id is null then
     raise exception 'Không còn thao tác nào để hoàn tác.' using errcode = 'P0001';
   end if;
+
+  perform public.doc_assert_current(v_event.id, p_event_id);
 
   if v_event.undo_data is null then
     raise exception 'Thao tác này không thể hoàn tác.' using errcode = 'P0001';
@@ -689,30 +741,35 @@ end;
 $$;
 
 -- ---------- Grants ----------
+-- Supabase's default privileges grant execute on new functions in the
+-- public schema to anon and authenticated explicitly, so revoking from
+-- public alone is not enough: revoke from all three, then grant back.
 -- Progress actions: authenticated users only. The RPC itself rejects
 -- anyone without the manager flag, so members get a clear error.
-revoke all on function public.doc_set_route(uuid, text[]) from public;
+revoke all on function public.doc_set_route(uuid, text[]) from public, anon, authenticated;
 grant execute on function public.doc_set_route(uuid, text[]) to authenticated;
 
-revoke all on function public.doc_send(uuid, text) from public;
+revoke all on function public.doc_send(uuid, text) from public, anon, authenticated;
 grant execute on function public.doc_send(uuid, text) to authenticated;
 
-revoke all on function public.doc_forward(uuid, text, text) from public;
-grant execute on function public.doc_forward(uuid, text, text) to authenticated;
+revoke all on function public.doc_forward(uuid, uuid, text, text) from public, anon, authenticated;
+grant execute on function public.doc_forward(uuid, uuid, text, text) to authenticated;
 
-revoke all on function public.doc_return(uuid, text) from public;
-grant execute on function public.doc_return(uuid, text) to authenticated;
+revoke all on function public.doc_return(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.doc_return(uuid, uuid, text) to authenticated;
 
-revoke all on function public.doc_resend(uuid, text) from public;
-grant execute on function public.doc_resend(uuid, text) to authenticated;
+revoke all on function public.doc_resend(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.doc_resend(uuid, uuid, text) to authenticated;
 
-revoke all on function public.doc_finish_early(uuid, text) from public;
-grant execute on function public.doc_finish_early(uuid, text) to authenticated;
+revoke all on function public.doc_finish_early(uuid, uuid, text, text) from public, anon, authenticated;
+grant execute on function public.doc_finish_early(uuid, uuid, text, text) to authenticated;
 
-revoke all on function public.doc_undo(uuid) from public;
-grant execute on function public.doc_undo(uuid) to authenticated;
+revoke all on function public.doc_undo(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.doc_undo(uuid, uuid) to authenticated;
 
--- Internal helpers must not be callable from the API.
-revoke all on function public.doc_current_step(uuid) from public;
-revoke all on function public.doc_step_snapshot(uuid[]) from public;
-revoke all on function public.doc_log_event(uuid, text, int, text, text, text, jsonb, jsonb, uuid) from public;
+-- Internal helpers must not be callable from the API. doc_log_event is
+-- security definer: exposing it would let anyone forge undo_data.
+revoke all on function public.doc_current_step(uuid) from public, anon, authenticated;
+revoke all on function public.doc_step_snapshot(uuid[]) from public, anon, authenticated;
+revoke all on function public.doc_assert_current(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.doc_log_event(uuid, text, int, text, text, text, jsonb, jsonb, uuid) from public, anon, authenticated;

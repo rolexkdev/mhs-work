@@ -365,28 +365,36 @@ export interface Database {
         Args: { p_document_id: string; p_note?: string | null };
         Returns: undefined;
       };
+      // p_step_id / p_event_id: the current step or latest event the client
+      // saw; the RPC rejects the call if it changed meanwhile.
       doc_forward: {
         Args: {
           p_document_id: string;
+          p_step_id: string;
           p_handler_name?: string | null;
           p_note?: string | null;
         };
         Returns: undefined;
       };
       doc_return: {
-        Args: { p_document_id: string; p_reason: string };
+        Args: { p_document_id: string; p_step_id: string; p_reason: string };
         Returns: undefined;
       };
       doc_resend: {
-        Args: { p_document_id: string; p_note?: string | null };
+        Args: { p_document_id: string; p_step_id: string; p_note?: string | null };
         Returns: undefined;
       };
       doc_finish_early: {
-        Args: { p_document_id: string; p_note?: string | null };
+        Args: {
+          p_document_id: string;
+          p_step_id: string;
+          p_handler_name?: string | null;
+          p_note?: string | null;
+        };
         Returns: undefined;
       };
       doc_undo: {
-        Args: { p_document_id: string };
+        Args: { p_document_id: string; p_event_id: string };
         Returns: undefined;
       };
     };
