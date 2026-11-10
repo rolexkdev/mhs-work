@@ -117,7 +117,13 @@ export function DocumentDetailPanel({
     document?.id ?? null,
   );
   const canManage = useCanManageDocuments();
-  const [action, setAction] = useState<DocumentActionKey | null>(null);
+  // The step id is pinned when the dialog opens: if the list refetches while
+  // it is open (another manager acted, realtime), the RPC must still see the
+  // step the user looked at so it can reject the stale call.
+  const [action, setAction] = useState<{
+    key: DocumentActionKey;
+    stepId: string | null;
+  } | null>(null);
 
   const status = document ? documentStatus(document) : null;
   const senderName =
@@ -208,7 +214,9 @@ export function DocumentDetailPanel({
                             : "outline"
                         }
                         disabled={disabled}
-                        onClick={() => setAction(key)}
+                        onClick={() =>
+                          setAction({ key, stepId: currentStep?.id ?? null })
+                        }
                       >
                         <Icon className="h-4 w-4" />
                         {DOCUMENT_ACTION_LABEL[key]}
@@ -356,8 +364,8 @@ export function DocumentDetailPanel({
           open
           onOpenChange={(v) => !v && setAction(null)}
           documentId={document.id}
-          stepId={currentStep?.id ?? null}
-          action={action}
+          stepId={action.stepId}
+          action={action.key}
         />
       )}
     </Sheet>
