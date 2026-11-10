@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { friendlyError } from "@/lib/errors";
 import { queryKeys } from "@/lib/query-keys";
-import type { DocumentWithSteps } from "@/types/database";
+import type { DocumentEventWithActor, DocumentWithSteps } from "@/types/database";
 
 /**
  * Document list with its route and sender.
@@ -31,6 +31,30 @@ export function useDocuments() {
         steps: [...doc.steps].sort((a, b) => a.step_order - b.step_order),
       }));
     },
+  });
+}
+
+/**
+ * Lịch sử xử lý của một hồ sơ, cũ nhất trước, kèm tên người thao tác.
+ * Chỉ đọc: mọi thay đổi do RPC ghi.
+ */
+export function useDocumentEvents(documentId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.documentEvents(documentId ?? ""),
+    queryFn: async (): Promise<DocumentEventWithActor[]> => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("document_events")
+        .select(
+          "*, actor:profiles!document_events_created_by_fkey(id, full_name, email, avatar_url)",
+        )
+        .eq("document_id", documentId!)
+        .returns<DocumentEventWithActor[]>()
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!documentId,
   });
 }
 

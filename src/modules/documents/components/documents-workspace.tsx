@@ -15,6 +15,7 @@ import {
 } from "@/modules/documents/hooks";
 import { DocumentFormDialog } from "@/modules/documents/components/document-form-dialog";
 import { DocumentListView } from "@/modules/documents/components/document-list-view";
+import { DocumentDetailPanel } from "@/modules/documents/components/document-detail-panel";
 import { DocumentStats } from "@/modules/documents/components/document-stats";
 import { documentStatus } from "@/modules/documents/status";
 import { useUiStore } from "@/store/ui-store";
@@ -60,9 +61,23 @@ export function DocumentsWorkspace() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<DocumentWithSteps | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<DocumentWithSteps | null>(
     null,
   );
+
+  // Lấy lại từ danh sách mỗi lần render để tấm chi tiết luôn hiện dữ liệu mới
+  // sau khi query được invalidate.
+  const detailDocument = useMemo(
+    () => documents.find((doc) => doc.id === detailId) ?? null,
+    [documents, detailId],
+  );
+
+  function openDetail(doc: DocumentWithSteps) {
+    setDetailId(doc.id);
+    setDetailOpen(true);
+  }
 
   const filtered = useMemo(() => {
     const query = normalize(documentQuery.trim());
@@ -139,6 +154,7 @@ export function DocumentsWorkspace() {
           documents={filtered}
           currentUserId={currentUserId}
           canManage={canManage}
+          onOpen={openDetail}
           onEdit={setEditing}
           onDelete={setPendingDelete}
         />
@@ -149,6 +165,14 @@ export function DocumentsWorkspace() {
         open={!!editing}
         onOpenChange={(v) => !v && setEditing(null)}
         document={editing}
+      />
+      <DocumentDetailPanel
+        document={detailDocument}
+        open={detailOpen}
+        onOpenChange={(v) => {
+          setDetailOpen(v);
+          if (!v) setDetailId(null);
+        }}
       />
       <ConfirmDialog
         open={!!pendingDelete}

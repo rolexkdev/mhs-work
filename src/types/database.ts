@@ -198,6 +198,11 @@ export type DocumentWithSteps = DocumentRecord & {
   steps: DocumentStep[];
 };
 
+/** Event row with the profile of the user who performed it. */
+export type DocumentEventWithActor = DocumentEvent & {
+  actor: DocumentSender | null;
+};
+
 type Row<T> = T;
 type Insert<T, Optional extends keyof T> = Omit<T, Optional> &
   Partial<Pick<T, Optional>>;

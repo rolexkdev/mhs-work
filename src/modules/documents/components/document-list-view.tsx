@@ -31,12 +31,14 @@ export function DocumentListView({
   documents,
   currentUserId,
   canManage,
+  onOpen,
   onEdit,
   onDelete,
 }: {
   documents: DocumentWithSteps[];
   currentUserId: string | null;
   canManage: boolean;
+  onOpen: (doc: DocumentWithSteps) => void;
   onEdit: (doc: DocumentWithSteps) => void;
   onDelete: (doc: DocumentWithSteps) => void;
 }) {
@@ -68,7 +70,8 @@ export function DocumentListView({
           return (
             <div
               key={doc.id}
-              className="grid items-center gap-x-4 border-b px-4 py-2.5 last:border-0 hover:bg-muted/30"
+              onClick={() => onOpen(doc)}
+              className="grid cursor-pointer items-center gap-x-4 border-b px-4 py-2.5 last:border-0 hover:bg-muted/30"
               style={GRID_STYLE}
             >
               {/* Tên hồ sơ + người gửi */}
@@ -115,8 +118,11 @@ export function DocumentListView({
                 </span>
               </div>
 
-              {/* Thao tác */}
-              <div className="flex justify-end">
+              {/* Thao tác — bấm vào đây không mở chi tiết */}
+              <div
+                className="flex justify-end"
+                onClick={(e) => e.stopPropagation()}
+              >
                 {(canEdit || canDelete) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
