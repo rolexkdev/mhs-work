@@ -90,6 +90,7 @@ export function useUpdateAccount() {
       userId: string;
       fullName: string;
       role: UserRole;
+      isDocManager: boolean;
     }) => {
       const res = await updateAccount(input);
       if (res.error) throw new Error(res.error);

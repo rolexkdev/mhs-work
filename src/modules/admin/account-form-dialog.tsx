@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DEFAULT_PASSWORD,
   ROLE_OPTIONS,
@@ -44,6 +45,7 @@ export function AccountFormDialog({
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("member");
+  const [isDocManager, setIsDocManager] = useState(false);
   const [password, setPassword] = useState(DEFAULT_PASSWORD);
 
   useEffect(() => {
@@ -51,6 +53,7 @@ export function AccountFormDialog({
     setFullName(account?.fullName ?? "");
     setEmail(account?.email ?? "");
     setRole(account?.role ?? "member");
+    setIsDocManager(account?.isDocManager ?? false);
     setPassword(DEFAULT_PASSWORD);
   }, [open, account]);
 
@@ -65,6 +68,7 @@ export function AccountFormDialog({
         userId: account.id,
         fullName: fullName.trim(),
         role,
+        isDocManager,
       });
     } else {
       await createAccount.mutateAsync({
@@ -141,6 +145,29 @@ export function AccountFormDialog({
               {ROLE_OPTIONS.find((r) => r.value === role)?.hint}
             </p>
           </div>
+
+          {isEdit && (
+            <div className="flex items-start gap-2.5 rounded-md border p-3.5">
+              <Checkbox
+                id="a-doc-manager"
+                checked={isDocManager}
+                onCheckedChange={(v) => setIsDocManager(v === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-1">
+                <Label
+                  htmlFor="a-doc-manager"
+                  className="cursor-pointer text-sm"
+                >
+                  Quản lý hồ sơ
+                </Label>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Được gửi hồ sơ đi, chuyển tiếp, trả lại, kết thúc sớm và hoàn
+                  tác tiến độ. Quản trị viên luôn có quyền này.
+                </p>
+              </div>
+            </div>
+          )}
 
           {!isEdit && (
             <div className="space-y-1.5">
