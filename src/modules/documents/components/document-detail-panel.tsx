@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatShortDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   DOCUMENT_STATUS_BADGE,
@@ -25,6 +26,7 @@ import { DocumentStepper } from "@/modules/documents/components/document-stepper
 import {
   useCanManageDocuments,
   useDocumentEvents,
+  useUndoDocumentAction,
   type DocumentActionKey,
 } from "@/modules/documents/hooks";
 import {
@@ -100,6 +102,41 @@ function eventTitle(event: DocumentEvent): string {
   return ACTION_LABEL[event.action];
 }
 
+/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0018). */
+const UNDOABLE_ACTIONS: DocumentEventAction[] = [
+  "send",
+  "forward",
+  "return",
+  "resend",
+  "finish_early",
+];
+
+/**
+ * Event mới nhất còn hoàn tác được: đúng thứ tự doc_undo chọn (created_at
+ * giảm dần, rồi id) và bỏ qua event đã bị một event undo trỏ tới.
+ */
+function latestUndoableEvent(events: DocumentEvent[]): DocumentEvent | null {
+  const undoneIds = new Set(
+    events.map((event) => event.undo_of).filter((id): id is string => !!id),
+  );
+
+  let latest: DocumentEvent | null = null;
+  for (const event of events) {
+    if (!UNDOABLE_ACTIONS.includes(event.action) || undoneIds.has(event.id)) {
+      continue;
+    }
+    if (
+      !latest ||
+      event.created_at > latest.created_at ||
+      (event.created_at === latest.created_at && event.id > latest.id)
+    ) {
+      latest = event;
+    }
+  }
+
+  return latest;
+}
+
 /**
  * Tấm trượt bên phải: thông tin hồ sơ, lộ trình, nút thao tác tiến trình
  * (chỉ quản lý hồ sơ) và toàn bộ lịch sử xử lý.
@@ -117,12 +154,19 @@ export function DocumentDetailPanel({
     document?.id ?? null,
   );
   const canManage = useCanManageDocuments();
+  const undoAction = useUndoDocumentAction();
   // The step id is pinned when the dialog opens: if the list refetches while
   // it is open (another manager acted, realtime), the RPC must still see the
   // step the user looked at so it can reject the stale call.
   const [action, setAction] = useState<{
     key: DocumentActionKey;
     stepId: string | null;
+  } | null>(null);
+  // Same pinning for undo: the event the user confirmed, not whatever is
+  // latest after a refetch.
+  const [undoTarget, setUndoTarget] = useState<{
+    eventId: string;
+    label: string;
   } | null>(null);
 
   const status = document ? documentStatus(document) : null;
@@ -152,12 +196,16 @@ export function DocumentDetailPanel({
   const undoneIds = new Set(
     events.map((event) => event.undo_of).filter((id): id is string => !!id),
   );
+  const undoableEvent = latestUndoableEvent(events);
 
   return (
     <Sheet
       open={open}
       onOpenChange={(v) => {
-        if (!v) setAction(null);
+        if (!v) {
+          setAction(null);
+          setUndoTarget(null);
+        }
         onOpenChange(v);
       }}
     >
@@ -195,39 +243,61 @@ export function DocumentDetailPanel({
               </div>
             </div>
 
-            {showActions && (
+            {canManage && (showActions || !!undoableEvent) && (
               <div className="space-y-2 border-b px-4 py-3 sm:px-5">
-                <div className="flex flex-wrap gap-2">
-                  {actions.map((key) => {
-                    const Icon = ACTION_ICON[key];
-                    const disabled =
-                      key === "send"
-                        ? document.steps.length === 0
-                        : !currentStep;
-                    return (
-                      <Button
-                        key={key}
-                        size="sm"
-                        variant={
-                          key === "send" || key === "forward"
-                            ? "default"
-                            : "outline"
-                        }
-                        disabled={disabled}
-                        onClick={() =>
-                          setAction({ key, stepId: currentStep?.id ?? null })
-                        }
-                      >
-                        <Icon className="h-4 w-4" />
-                        {DOCUMENT_ACTION_LABEL[key]}
-                      </Button>
-                    );
-                  })}
-                </div>
-                {actions.includes("send") && document.steps.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Hãy thêm ít nhất một bước vào lộ trình trước khi gửi.
-                  </p>
+                {showActions && (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {actions.map((key) => {
+                        const Icon = ACTION_ICON[key];
+                        const disabled =
+                          key === "send"
+                            ? document.steps.length === 0
+                            : !currentStep;
+                        return (
+                          <Button
+                            key={key}
+                            size="sm"
+                            variant={
+                              key === "send" || key === "forward"
+                                ? "default"
+                                : "outline"
+                            }
+                            disabled={disabled}
+                            onClick={() =>
+                              setAction({ key, stepId: currentStep?.id ?? null })
+                            }
+                          >
+                            <Icon className="h-4 w-4" />
+                            {DOCUMENT_ACTION_LABEL[key]}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    {actions.includes("send") &&
+                      document.steps.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Hãy thêm ít nhất một bước vào lộ trình trước khi gửi.
+                        </p>
+                      )}
+                  </>
+                )}
+
+                {undoableEvent && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={undoAction.isPending}
+                    onClick={() =>
+                      setUndoTarget({
+                        eventId: undoableEvent.id,
+                        label: eventTitle(undoableEvent),
+                      })
+                    }
+                  >
+                    <Undo2 className="h-4 w-4" />
+                    Hoàn tác: {eventTitle(undoableEvent)}
+                  </Button>
                 )}
               </div>
             )}
@@ -368,6 +438,26 @@ export function DocumentDetailPanel({
           action={action.key}
         />
       )}
+
+      <ConfirmDialog
+        open={!!undoTarget}
+        onOpenChange={(v) => !v && setUndoTarget(null)}
+        title="Hoàn tác thao tác?"
+        description={
+          undoTarget
+            ? `Hồ sơ sẽ trở lại trạng thái trước thao tác "${undoTarget.label}".`
+            : undefined
+        }
+        confirmLabel="Hoàn tác"
+        onConfirm={() => {
+          if (undoTarget && document) {
+            undoAction.mutate({
+              documentId: document.id,
+              eventId: undoTarget.eventId,
+            });
+          }
+        }}
+      />
     </Sheet>
   );
 }

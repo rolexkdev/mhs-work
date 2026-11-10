@@ -143,6 +143,44 @@ export function useCreateDocument() {
   });
 }
 
+export interface SetDocumentRouteInput {
+  documentId: string;
+  /** Full ordered route: locked steps first, unchanged, then upcoming steps. */
+  departments: string[];
+}
+
+/**
+ * Sửa lộ trình qua RPC doc_set_route: các bước đã tới bị khoá, chỉ phần chưa
+ * tới được thay thế. Lỗi cũng invalidate vì lộ trình có thể đã đổi ở máy khác.
+ */
+export function useSetDocumentRoute() {
+  const qc = useQueryClient();
+
+  const invalidate = (documentId: string) => {
+    qc.invalidateQueries({ queryKey: queryKeys.documents });
+    qc.invalidateQueries({ queryKey: queryKeys.documentEvents(documentId) });
+  };
+
+  return useMutation({
+    mutationFn: async ({ documentId, departments }: SetDocumentRouteInput) => {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("doc_set_route", {
+        p_document_id: documentId,
+        p_departments: departments,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_data, input) => {
+      invalidate(input.documentId);
+      toast.success("Đã cập nhật lộ trình");
+    },
+    onError: (e: Error, input) => {
+      invalidate(input.documentId);
+      toast.error(friendlyError(e));
+    },
+  });
+}
+
 export interface UpdateDocumentInput {
   id: string;
   name: string;
@@ -326,6 +364,47 @@ export function useDocumentAction() {
     },
     onError: (e: Error, input) => {
       // Another manager may have moved the document meanwhile.
+      invalidate(input.documentId);
+      toast.error(friendlyError(e));
+    },
+  });
+}
+
+export interface UndoDocumentActionInput {
+  documentId: string;
+  /**
+   * Latest undoable event the user saw. Pinned when the confirm dialog opens
+   * so a refetch cannot change which action is undone.
+   */
+  eventId: string;
+}
+
+/**
+ * Hoàn tác thao tác tiến trình gần nhất. RPC tự chọn event mới nhất chưa bị
+ * hoàn tác và từ chối khi p_event_id đã cũ (hai quản lý bấm cùng lúc).
+ */
+export function useUndoDocumentAction() {
+  const qc = useQueryClient();
+
+  const invalidate = (documentId: string) => {
+    qc.invalidateQueries({ queryKey: queryKeys.documents });
+    qc.invalidateQueries({ queryKey: queryKeys.documentEvents(documentId) });
+  };
+
+  return useMutation({
+    mutationFn: async ({ documentId, eventId }: UndoDocumentActionInput) => {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("doc_undo", {
+        p_document_id: documentId,
+        p_event_id: eventId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_data, input) => {
+      invalidate(input.documentId);
+      toast.success("Đã hoàn tác");
+    },
+    onError: (e: Error, input) => {
       invalidate(input.documentId);
       toast.error(friendlyError(e));
     },
