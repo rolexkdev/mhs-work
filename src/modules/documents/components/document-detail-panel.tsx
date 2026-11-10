@@ -443,8 +443,10 @@ export function DocumentDetailPanel({
             </div>
           </div>
         )}
-      </SheetContent>
 
+      {/* Child dialogs live inside SheetContent so Radix treats them as
+          nested layers: rendered as siblings, closing one (e.g. the undo
+          confirm) also dismissed the Sheet. */}
       {action && document && (
         <DocumentActionDialog
           open
@@ -482,6 +484,7 @@ export function DocumentDetailPanel({
           }
         }}
       />
+      </SheetContent>
     </Sheet>
   );
 }
