@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { useCurrentUserId } from "@/modules/auth/use-current-user";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import {
@@ -28,11 +26,7 @@ import {
   useCreateDocument,
   useUpdateDocument,
 } from "@/modules/documents/hooks";
-import {
-  DEPARTMENTS,
-  TAG_COLOR_CLASS,
-  colorOf,
-} from "@/modules/tasks/constants";
+import { DocumentRouteList } from "@/modules/documents/components/document-route-list";
 import type { DocumentWithSteps } from "@/types/database";
 
 const NO_SENDER = "__none__";
@@ -64,7 +58,6 @@ export function DocumentFormDialog({
   const [name, setName] = useState("");
   const [senderId, setSenderId] = useState("");
   const [note, setNote] = useState("");
-  const [departmentToAdd, setDepartmentToAdd] = useState("");
   const [route, setRoute] = useState<string[]>([]);
 
   // Reset form mỗi khi mở.
@@ -73,7 +66,6 @@ export function DocumentFormDialog({
     setName(document?.name ?? "");
     setSenderId(document?.sender_id ?? "");
     setNote(document?.note ?? "");
-    setDepartmentToAdd("");
     setRoute([]);
   }, [open, document]);
 
@@ -87,7 +79,6 @@ export function DocumentFormDialog({
 
   function handleAddDepartment(value: string) {
     setRoute((prev) => [...prev, value]);
-    setDepartmentToAdd("");
   }
 
   function handleRemoveStep(index: number) {
@@ -200,84 +191,16 @@ export function DocumentFormDialog({
 
             {!isEdit && canManage && (
               <Section title="Lộ trình xử lý">
-                <div className="space-y-3">
-                  <Select
-                    value={departmentToAdd}
-                    onValueChange={handleAddDepartment}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Thêm phòng ban vào lộ trình" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DEPARTMENTS.map((d) => (
-                        <SelectItem key={d.value} value={d.value}>
-                          {d.value}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {route.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      Chưa có bước nào. Hồ sơ sẽ ở trạng thái Chờ gửi.
-                    </p>
-                  ) : (
-                    <ol className="space-y-2">
-                      {route.map((department, index) => (
-                        <li
-                          key={`${department}-${index}`}
-                          className="flex items-center gap-2 rounded-md border bg-card px-2.5 py-1.5"
-                        >
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
-                            {index + 1}
-                          </span>
-                          <span
-                            className={cn(
-                              "min-w-0 flex-1 truncate rounded-full border px-2 py-0.5 text-xs font-medium",
-                              TAG_COLOR_CLASS[
-                                colorOf(DEPARTMENTS, department)
-                              ],
-                            )}
-                          >
-                            {department}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            aria-label="Chuyển lên"
-                            disabled={index === 0}
-                            onClick={() => handleMoveStep(index, -1)}
-                          >
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            aria-label="Chuyển xuống"
-                            disabled={index === route.length - 1}
-                            onClick={() => handleMoveStep(index, 1)}
-                          >
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            aria-label="Xoá bước"
-                            onClick={() => handleRemoveStep(index)}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </div>
+                <DocumentRouteList
+                  rows={route.map((department, index) => ({
+                    key: `${department}-${index}`,
+                    department,
+                  }))}
+                  onAdd={handleAddDepartment}
+                  onMove={handleMoveStep}
+                  onRemove={handleRemoveStep}
+                  emptyText="Chưa có bước nào. Hồ sơ sẽ ở trạng thái Chờ gửi."
+                />
               </Section>
             )}
           </div>

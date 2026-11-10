@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Forward,
   Loader2,
+  Pencil,
   RotateCcw,
   Send,
   Undo2,
@@ -23,6 +24,7 @@ import {
   DOCUMENT_ACTION_LABEL,
 } from "@/modules/documents/components/document-action-dialog";
 import { DocumentStepper } from "@/modules/documents/components/document-stepper";
+import { DocumentRouteEditor } from "@/modules/documents/components/document-route-editor";
 import {
   useCanManageDocuments,
   useDocumentEvents,
@@ -168,6 +170,7 @@ export function DocumentDetailPanel({
     eventId: string;
     label: string;
   } | null>(null);
+  const [routeEditorOpen, setRouteEditorOpen] = useState(false);
 
   const status = document ? documentStatus(document) : null;
   const senderName =
@@ -205,6 +208,7 @@ export function DocumentDetailPanel({
         if (!v) {
           setAction(null);
           setUndoTarget(null);
+          setRouteEditorOpen(false);
         }
         onOpenChange(v);
       }}
@@ -323,7 +327,19 @@ export function DocumentDetailPanel({
 
               {/* Lộ trình */}
               <div className="space-y-2">
-                <h3 className="text-sm font-medium">Lộ trình</h3>
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-medium">Lộ trình</h3>
+                  {canManage && !document.finished_at && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setRouteEditorOpen(true)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Sửa lộ trình
+                    </Button>
+                  )}
+                </div>
                 <div className="rounded-lg border bg-muted/20 px-2 py-3">
                   <DocumentStepper
                     steps={document.steps}
@@ -436,6 +452,14 @@ export function DocumentDetailPanel({
           documentId={document.id}
           stepId={action.stepId}
           action={action.key}
+        />
+      )}
+
+      {routeEditorOpen && document && (
+        <DocumentRouteEditor
+          open
+          onOpenChange={(v) => !v && setRouteEditorOpen(false)}
+          document={document}
         />
       )}
 
