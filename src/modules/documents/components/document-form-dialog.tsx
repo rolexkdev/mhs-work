@@ -121,6 +121,9 @@ export function DocumentFormDialog({
       } else {
         await createDocument.mutateAsync({
           ...info,
+          // No sender picked yet (e.g. the user id was still loading): omit
+          // it so the database defaults it to the creator instead of null.
+          sender_id: senderId === "" ? undefined : info.sender_id,
           departments: canManage && route.length > 0 ? route : undefined,
         });
       }

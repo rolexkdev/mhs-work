@@ -66,7 +66,8 @@ export function useCanManageDocuments(): boolean {
 
 export interface CreateDocumentInput {
   name: string;
-  sender_id: string | null;
+  /** Omit to let the database default the sender to the creator. */
+  sender_id?: string | null;
   note: string | null;
   /** Ordered route; only sent by callers allowed to manage documents. */
   departments?: string[];
@@ -158,13 +159,28 @@ export function useDeleteDocument() {
   return useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient();
-      const { error } = await supabase.from("documents").delete().eq("id", id);
+      // RLS turns a forbidden delete into "0 rows deleted" without an error,
+      // so read back the deleted ids and fail when nothing was removed.
+      const { data, error } = await supabase
+        .from("documents")
+        .delete()
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(
+          "Không xoá được hồ sơ: hồ sơ đã được gửi đi hoặc bạn không có quyền xoá.",
+        );
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.documents });
       toast.success("Đã xoá hồ sơ");
     },
-    onError: (e: Error) => toast.error(friendlyError(e)),
+    onError: (e: Error) => {
+      // The list may be stale (e.g. the document was sent meanwhile).
+      qc.invalidateQueries({ queryKey: queryKeys.documents });
+      toast.error(friendlyError(e));
+    },
   });
 }
