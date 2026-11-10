@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { LayoutGrid, List, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { friendlyError } from "@/lib/errors";
 import { useCurrentUserId } from "@/modules/auth/use-current-user";
 import {
@@ -15,10 +16,11 @@ import {
 } from "@/modules/documents/hooks";
 import { DocumentFormDialog } from "@/modules/documents/components/document-form-dialog";
 import { DocumentListView } from "@/modules/documents/components/document-list-view";
+import { DocumentBoardView } from "@/modules/documents/components/document-board-view";
 import { DocumentDetailPanel } from "@/modules/documents/components/document-detail-panel";
 import { DocumentStats } from "@/modules/documents/components/document-stats";
 import { documentStatus } from "@/modules/documents/status";
-import { useUiStore } from "@/store/ui-store";
+import { useUiStore, type DocumentView } from "@/store/ui-store";
 import type { DocumentWithSteps } from "@/types/database";
 
 /** Bỏ dấu tiếng Việt để tìm kiếm không phân biệt hoa thường và dấu. */
@@ -58,6 +60,8 @@ export function DocumentsWorkspace() {
   const setDocumentStatus = useUiStore((s) => s.setDocumentStatus);
   const documentQuery = useUiStore((s) => s.documentQuery);
   const setDocumentQuery = useUiStore((s) => s.setDocumentQuery);
+  const documentView = useUiStore((s) => s.documentView);
+  const setDocumentView = useUiStore((s) => s.setDocumentView);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<DocumentWithSteps | null>(null);
@@ -117,6 +121,22 @@ export function DocumentsWorkspace() {
       )}
 
       <div className="flex flex-wrap items-center gap-2">
+        <Tabs
+          value={documentView}
+          onValueChange={(v) => setDocumentView(v as DocumentView)}
+        >
+          <TabsList className="h-9">
+            <TabsTrigger value="list" className="px-2.5 sm:px-3">
+              <List className="h-4 w-4" />
+              Danh sách
+            </TabsTrigger>
+            <TabsTrigger value="board" className="px-2.5 sm:px-3">
+              <LayoutGrid className="h-4 w-4" />
+              Theo phòng ban đang giữ
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         <div className="relative min-w-0 flex-1 basis-full sm:basis-auto">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -149,7 +169,7 @@ export function DocumentsWorkspace() {
             Không có hồ sơ phù hợp.
           </p>
         </div>
-      ) : (
+      ) : documentView === "list" ? (
         <DocumentListView
           documents={filtered}
           currentUserId={currentUserId}
@@ -158,6 +178,8 @@ export function DocumentsWorkspace() {
           onEdit={setEditing}
           onDelete={setPendingDelete}
         />
+      ) : (
+        <DocumentBoardView documents={filtered} onOpen={openDetail} />
       )}
 
       <DocumentFormDialog open={createOpen} onOpenChange={setCreateOpen} />
