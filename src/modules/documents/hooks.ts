@@ -208,3 +208,126 @@ export function useDeleteDocument() {
     },
   });
 }
+
+/** Progress actions exposed by the RPCs in 0018_document_actions.sql. */
+export type DocumentActionKey =
+  | "send"
+  | "forward"
+  | "return"
+  | "resend"
+  | "finish_early";
+
+export type DocumentActionInput =
+  | { action: "send"; documentId: string; note: string | null }
+  | {
+      action: "forward";
+      documentId: string;
+      stepId: string;
+      handlerName: string | null;
+      note: string | null;
+    }
+  | {
+      action: "return";
+      documentId: string;
+      stepId: string;
+      reason: string;
+    }
+  | {
+      action: "resend";
+      documentId: string;
+      stepId: string;
+      note: string | null;
+    }
+  | {
+      action: "finish_early";
+      documentId: string;
+      stepId: string;
+      handlerName: string | null;
+      note: string | null;
+    };
+
+const DOCUMENT_ACTION_SUCCESS: Record<DocumentActionKey, string> = {
+  send: "Đã gửi hồ sơ",
+  forward: "Đã chuyển tiếp hồ sơ",
+  return: "Đã trả lại hồ sơ",
+  resend: "Đã gửi lại hồ sơ",
+  finish_early: "Đã kết thúc hồ sơ",
+};
+
+/**
+ * Thao tác tiến trình qua RPC. p_step_id là bước hiện tại người dùng đang
+ * thấy; RPC từ chối khi bước đã đổi (hai người thao tác cùng lúc).
+ * Cả thành công lẫn lỗi đều invalidate để UI hiện trạng thái mới nhất.
+ */
+export function useDocumentAction() {
+  const qc = useQueryClient();
+
+  const invalidate = (documentId: string) => {
+    qc.invalidateQueries({ queryKey: queryKeys.documents });
+    qc.invalidateQueries({ queryKey: queryKeys.documentEvents(documentId) });
+  };
+
+  return useMutation({
+    mutationFn: async (input: DocumentActionInput): Promise<void> => {
+      const supabase = createClient();
+
+      switch (input.action) {
+        case "send": {
+          const { error } = await supabase.rpc("doc_send", {
+            p_document_id: input.documentId,
+            p_note: input.note,
+          });
+          if (error) throw error;
+          return;
+        }
+        case "forward": {
+          const { error } = await supabase.rpc("doc_forward", {
+            p_document_id: input.documentId,
+            p_step_id: input.stepId,
+            p_handler_name: input.handlerName,
+            p_note: input.note,
+          });
+          if (error) throw error;
+          return;
+        }
+        case "return": {
+          const { error } = await supabase.rpc("doc_return", {
+            p_document_id: input.documentId,
+            p_step_id: input.stepId,
+            p_reason: input.reason,
+          });
+          if (error) throw error;
+          return;
+        }
+        case "resend": {
+          const { error } = await supabase.rpc("doc_resend", {
+            p_document_id: input.documentId,
+            p_step_id: input.stepId,
+            p_note: input.note,
+          });
+          if (error) throw error;
+          return;
+        }
+        case "finish_early": {
+          const { error } = await supabase.rpc("doc_finish_early", {
+            p_document_id: input.documentId,
+            p_step_id: input.stepId,
+            p_handler_name: input.handlerName,
+            p_note: input.note,
+          });
+          if (error) throw error;
+          return;
+        }
+      }
+    },
+    onSuccess: (_data, input) => {
+      invalidate(input.documentId);
+      toast.success(DOCUMENT_ACTION_SUCCESS[input.action]);
+    },
+    onError: (e: Error, input) => {
+      // Another manager may have moved the document meanwhile.
+      invalidate(input.documentId);
+      toast.error(friendlyError(e));
+    },
+  });
+}

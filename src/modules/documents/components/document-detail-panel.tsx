@@ -1,15 +1,32 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import {
+  CheckCircle2,
+  Forward,
+  Loader2,
+  RotateCcw,
+  Send,
+  Undo2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatShortDateTime } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   DOCUMENT_STATUS_BADGE,
   documentStatus,
 } from "@/modules/documents/status";
+import {
+  DocumentActionDialog,
+  DOCUMENT_ACTION_LABEL,
+} from "@/modules/documents/components/document-action-dialog";
 import { DocumentStepper } from "@/modules/documents/components/document-stepper";
-import { useDocumentEvents } from "@/modules/documents/hooks";
+import {
+  useCanManageDocuments,
+  useDocumentEvents,
+  type DocumentActionKey,
+} from "@/modules/documents/hooks";
 import {
   DEPARTMENTS,
   TAG_COLOR_CLASS,
@@ -20,6 +37,15 @@ import type {
   DocumentEventAction,
   DocumentWithSteps,
 } from "@/types/database";
+
+/** Icon cho từng nút thao tác tiến trình. */
+const ACTION_ICON: Record<DocumentActionKey, React.ElementType> = {
+  send: Send,
+  forward: Forward,
+  return: Undo2,
+  resend: RotateCcw,
+  finish_early: CheckCircle2,
+};
 
 const ACTION_LABEL: Record<DocumentEventAction, string> = {
   created: "Tạo hồ sơ",
@@ -75,8 +101,8 @@ function eventTitle(event: DocumentEvent): string {
 }
 
 /**
- * Tấm trượt bên phải: thông tin hồ sơ, lộ trình và toàn bộ lịch sử xử lý.
- * Chỉ đọc — thao tác tiến trình nằm ở bước sau.
+ * Tấm trượt bên phải: thông tin hồ sơ, lộ trình, nút thao tác tiến trình
+ * (chỉ quản lý hồ sơ) và toàn bộ lịch sử xử lý.
  */
 export function DocumentDetailPanel({
   document,
@@ -90,10 +116,31 @@ export function DocumentDetailPanel({
   const { data: events = [], isLoading: eventsLoading } = useDocumentEvents(
     document?.id ?? null,
   );
+  const canManage = useCanManageDocuments();
+  const [action, setAction] = useState<DocumentActionKey | null>(null);
 
   const status = document ? documentStatus(document) : null;
   const senderName =
     document?.sender?.full_name ?? document?.sender?.email ?? "—";
+
+  const currentStep = document
+    ? [...document.steps]
+        .sort((a, b) => a.step_order - b.step_order)
+        .find((step) => !step.done_at) ?? null
+    : null;
+
+  // Chỉ hiện thao tác hợp lệ với trạng thái hiện tại; Hoàn thành không có nút.
+  const actions: DocumentActionKey[] = !status
+    ? []
+    : status.status === "pending"
+      ? ["send"]
+      : status.status === "in_progress"
+        ? ["forward", "return", "finish_early"]
+        : status.status === "returned"
+          ? ["resend", "finish_early"]
+          : [];
+
+  const showActions = canManage && actions.length > 0;
 
   // Event bị hoàn tác: một event khác có undo_of trỏ tới nó.
   const undoneIds = new Set(
@@ -101,7 +148,13 @@ export function DocumentDetailPanel({
   );
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) setAction(null);
+        onOpenChange(v);
+      }}
+    >
       <SheetContent className="overflow-y-auto p-0">
         {!document || !status ? (
           <div className="flex h-full items-center justify-center">
@@ -135,6 +188,41 @@ export function DocumentDetailPanel({
                 )}
               </div>
             </div>
+
+            {showActions && (
+              <div className="space-y-2 border-b px-4 py-3 sm:px-5">
+                <div className="flex flex-wrap gap-2">
+                  {actions.map((key) => {
+                    const Icon = ACTION_ICON[key];
+                    const disabled =
+                      key === "send"
+                        ? document.steps.length === 0
+                        : !currentStep;
+                    return (
+                      <Button
+                        key={key}
+                        size="sm"
+                        variant={
+                          key === "send" || key === "forward"
+                            ? "default"
+                            : "outline"
+                        }
+                        disabled={disabled}
+                        onClick={() => setAction(key)}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {DOCUMENT_ACTION_LABEL[key]}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {actions.includes("send") && document.steps.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Hãy thêm ít nhất một bước vào lộ trình trước khi gửi.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex-1 space-y-5 px-4 py-4 pb-safe sm:px-5">
               {/* Thông tin */}
@@ -262,6 +350,16 @@ export function DocumentDetailPanel({
           </div>
         )}
       </SheetContent>
+
+      {action && document && (
+        <DocumentActionDialog
+          open
+          onOpenChange={(v) => !v && setAction(null)}
+          documentId={document.id}
+          stepId={currentStep?.id ?? null}
+          action={action}
+        />
+      )}
     </Sheet>
   );
 }
