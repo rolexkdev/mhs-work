@@ -25,10 +25,10 @@ There is no test suite. After changing code, run `npm run typecheck` and `npm ru
 ## Project structure
 
 - `src/app/(app)/` — authenticated routes: dashboard (`page.tsx`), `meetings`, `tasks`,
-  `updates`, `accounts` (admin only). `src/app/login/` — login page.
+  `documents`, `updates`, `accounts` (admin only). `src/app/login/` — login page.
 - `src/middleware.ts` + `src/lib/supabase/middleware.ts` — session refresh / auth redirect.
 - `src/modules/<domain>/` — feature code per domain (`auth`, `admin`, `dashboard`,
-  `meetings`, `tasks`, `updates`): TanStack Query hooks (`hooks.ts`, `*-hooks.ts`) and components.
+  `meetings`, `tasks`, `documents`, `updates`): TanStack Query hooks (`hooks.ts`, `*-hooks.ts`) and components.
 - `src/lib/supabase/` — `client.ts` (browser), `server.ts` (server components / actions),
   `admin.ts` (service role, bypasses RLS).
 - `src/lib/query-keys.ts` — all React Query keys. `src/lib/errors.ts` — `friendlyError()`
@@ -101,5 +101,8 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - RLS: there is no team concept. Since migrations 0007 and 0009, every authenticated user
   can view and edit all tasks and task details; history is traced via `task_logs`.
   Admin-only features (e.g. `/accounts`) are enforced in the app and via the admin client.
+- Document progress changes go only through the security definer RPCs in
+  `0018_document_actions.sql` and require admin or `profiles.is_doc_manager` (toggled
+  in `/accounts`).
 - Zalo APIs reject non-Vietnamese IPs, so Edge Functions call Zalo through `zalo-bridge`.
   See `zalo-bridge/README.md` before changing anything in the Zalo flow.
