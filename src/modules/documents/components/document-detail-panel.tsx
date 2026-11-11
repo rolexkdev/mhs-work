@@ -26,6 +26,7 @@ import {
   DOCUMENT_ACTION_LABEL,
 } from "@/modules/documents/components/document-action-dialog";
 import { useCurrentUserId } from "@/modules/auth/use-current-user";
+import { useProfiles } from "@/modules/auth/use-profiles";
 import { DocumentStepper } from "@/modules/documents/components/document-stepper";
 import { DocumentRouteEditor } from "@/modules/documents/components/document-route-editor";
 import {
@@ -122,6 +123,36 @@ function eventTitle(event: DocumentEvent): string {
   return ACTION_LABEL[event.action];
 }
 
+const EDIT_FIELD_LABEL: Record<string, string> = {
+  name: "Tên",
+  sender_id: "Người gửi",
+  note: "Ghi chú",
+};
+
+/** Dòng "Tên: A → B" cho từng trường đổi trong event edit (payload của trigger). */
+function editLines(
+  event: DocumentEvent,
+  senderName: (id: string | null) => string,
+): string[] {
+  if (event.action !== "edit") return [];
+
+  return Object.entries(payloadOf(event)).flatMap(([field, change]) => {
+    const label = EDIT_FIELD_LABEL[field];
+    if (!label || !change || typeof change !== "object") return [];
+    const { old: from, new: to } = change as {
+      old: string | null;
+      new: string | null;
+    };
+    const show = (value: string | null) =>
+      value
+        ? field === "sender_id"
+          ? senderName(value)
+          : value
+        : "—";
+    return [`${label}: ${show(from)} → ${show(to)}`];
+  });
+}
+
 /** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0019). */
 const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "send",
@@ -177,6 +208,11 @@ export function DocumentDetailPanel({
     document?.id ?? null,
   );
   const canManage = useCanManageDocuments();
+  const { data: profiles = [] } = useProfiles();
+  const profileName = (id: string | null) => {
+    const profile = profiles.find((p) => p.id === id);
+    return profile?.full_name ?? profile?.email ?? "—";
+  };
   const currentUserId = useCurrentUserId();
   const undoAction = useUndoDocumentAction();
   // The step id is pinned when the dialog opens: if the list refetches while
@@ -463,6 +499,15 @@ export function DocumentDetailPanel({
                                   "—"}
                               </span>
                             </div>
+
+                            {editLines(event, profileName).map((line) => (
+                              <p
+                                key={line}
+                                className="whitespace-pre-wrap break-words text-xs text-muted-foreground"
+                              >
+                                {line}
+                              </p>
+                            ))}
 
                             {event.note && (
                               <p className="whitespace-pre-wrap text-xs text-muted-foreground">
