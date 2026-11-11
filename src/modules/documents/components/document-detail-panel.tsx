@@ -99,9 +99,15 @@ function eventTitle(event: DocumentEvent): string {
   const payload = payloadOf(event);
 
   if (event.action === "forward") {
-    return payload.finished === true
-      ? "Hoàn thành"
-      : ACTION_LABEL.forward;
+    // Before 0019 the last forward finished the document ("finished");
+    // since then it only ends the route ("route_done").
+    if (payload.finished === true) return "Hoàn thành";
+    if (payload.route_done === true) return "Đã xử lý, xong lộ trình";
+    return ACTION_LABEL.forward;
+  }
+
+  if (event.action === "sender_confirm" && payload.on_behalf === true) {
+    return `${ACTION_LABEL.sender_confirm} (quản lý xác nhận thay)`;
   }
 
   if (event.action === "undo") {
@@ -116,13 +122,16 @@ function eventTitle(event: DocumentEvent): string {
   return ACTION_LABEL[event.action];
 }
 
-/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0018). */
+/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0019). */
 const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "send",
   "forward",
   "return",
   "resend",
   "finish_early",
+  "receive_back",
+  "hand_over",
+  "sender_confirm",
 ];
 
 /**
