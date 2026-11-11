@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   CheckCircle2,
   Forward,
+  HandHelping,
+  Inbox,
   Loader2,
   Pencil,
   RotateCcw,
@@ -23,6 +25,8 @@ import {
   DocumentActionDialog,
   DOCUMENT_ACTION_LABEL,
 } from "@/modules/documents/components/document-action-dialog";
+import { useCurrentUserId } from "@/modules/auth/use-current-user";
+import { useProfiles } from "@/modules/auth/use-profiles";
 import { DocumentStepper } from "@/modules/documents/components/document-stepper";
 import { DocumentRouteEditor } from "@/modules/documents/components/document-route-editor";
 import {
@@ -49,6 +53,9 @@ const ACTION_ICON: Record<DocumentActionKey, React.ElementType> = {
   return: Undo2,
   resend: RotateCcw,
   finish_early: CheckCircle2,
+  receive_back: Inbox,
+  hand_over: HandHelping,
+  sender_confirm: CheckCircle2,
 };
 
 const ACTION_LABEL: Record<DocumentEventAction, string> = {
@@ -61,6 +68,9 @@ const ACTION_LABEL: Record<DocumentEventAction, string> = {
   resend: "Gửi lại",
   finish_early: "Kết thúc sớm",
   undo: "Hoàn tác",
+  receive_back: "Nhận lại hồ sơ",
+  hand_over: "Bàn giao người gửi",
+  sender_confirm: "Người gửi đã nhận",
 };
 
 /** Màu chấm mốc thời gian, cùng bảng màu trạng thái của /tasks. */
@@ -74,6 +84,9 @@ const ACTION_DOT: Record<DocumentEventAction, string> = {
   resend: "bg-blue-500",
   finish_early: "bg-emerald-500",
   undo: "bg-muted-foreground/40",
+  receive_back: "bg-violet-500",
+  hand_over: "bg-violet-500",
+  sender_confirm: "bg-emerald-500",
 };
 
 function payloadOf(event: DocumentEvent): Record<string, unknown> {
@@ -87,9 +100,15 @@ function eventTitle(event: DocumentEvent): string {
   const payload = payloadOf(event);
 
   if (event.action === "forward") {
-    return payload.finished === true
-      ? "Hoàn thành"
-      : ACTION_LABEL.forward;
+    // Before 0019 the last forward finished the document ("finished");
+    // since then it only ends the route ("route_done").
+    if (payload.finished === true) return "Hoàn thành";
+    if (payload.route_done === true) return "Đã xử lý, xong lộ trình";
+    return ACTION_LABEL.forward;
+  }
+
+  if (event.action === "sender_confirm" && payload.on_behalf === true) {
+    return `${ACTION_LABEL.sender_confirm} (quản lý xác nhận thay)`;
   }
 
   if (event.action === "undo") {
@@ -104,13 +123,46 @@ function eventTitle(event: DocumentEvent): string {
   return ACTION_LABEL[event.action];
 }
 
-/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0018). */
+const EDIT_FIELD_LABEL: Record<string, string> = {
+  name: "Tên",
+  sender_id: "Người gửi",
+  note: "Ghi chú",
+};
+
+/** Dòng "Tên: A → B" cho từng trường đổi trong event edit (payload của trigger). */
+function editLines(
+  event: DocumentEvent,
+  senderName: (id: string | null) => string,
+): string[] {
+  if (event.action !== "edit") return [];
+
+  return Object.entries(payloadOf(event)).flatMap(([field, change]) => {
+    const label = EDIT_FIELD_LABEL[field];
+    if (!label || !change || typeof change !== "object") return [];
+    const { old: from, new: to } = change as {
+      old: string | null;
+      new: string | null;
+    };
+    const show = (value: string | null) =>
+      value
+        ? field === "sender_id"
+          ? senderName(value)
+          : value
+        : "—";
+    return [`${label}: ${show(from)} → ${show(to)}`];
+  });
+}
+
+/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0019). */
 const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "send",
   "forward",
   "return",
   "resend",
   "finish_early",
+  "receive_back",
+  "hand_over",
+  "sender_confirm",
 ];
 
 /**
@@ -156,6 +208,12 @@ export function DocumentDetailPanel({
     document?.id ?? null,
   );
   const canManage = useCanManageDocuments();
+  const { data: profiles = [] } = useProfiles();
+  const profileName = (id: string | null) => {
+    const profile = profiles.find((p) => p.id === id);
+    return profile?.full_name ?? profile?.email ?? "—";
+  };
+  const currentUserId = useCurrentUserId();
   const undoAction = useUndoDocumentAction();
   // The step id is pinned when the dialog opens: if the list refetches while
   // it is open (another manager acted, realtime), the RPC must still see the
@@ -191,15 +249,26 @@ export function DocumentDetailPanel({
         ? ["forward", "return", "finish_early"]
         : status.status === "returned"
           ? ["resend", "finish_early"]
-          : [];
+          : status.handback === "awaiting_return"
+            ? ["receive_back"]
+            : status.handback === "received_back"
+              ? ["hand_over"]
+              : status.handback === "awaiting_sender"
+                ? ["sender_confirm"]
+                : [];
 
-  const showActions = canManage && actions.length > 0;
+  // The sender confirms receipt themself; every other action is manager-only.
+  const isSender =
+    !!currentUserId && document?.sender_id === currentUserId;
+  const canRunActions =
+    status?.handback === "awaiting_sender" ? canManage || isSender : canManage;
+  const showActions = canRunActions && actions.length > 0;
 
   // Event bị hoàn tác: một event khác có undo_of trỏ tới nó.
   const undoneIds = new Set(
     events.map((event) => event.undo_of).filter((id): id is string => !!id),
   );
-  const undoableEvent = latestUndoableEvent(events);
+  const undoableEvent = canManage ? latestUndoableEvent(events) : null;
 
   return (
     <Sheet
@@ -247,7 +316,7 @@ export function DocumentDetailPanel({
               </div>
             </div>
 
-            {canManage && (showActions || !!undoableEvent) && (
+            {(showActions || !!undoableEvent) && (
               <div className="space-y-2 border-b px-4 py-3 sm:px-5">
                 {showActions && (
                   <>
@@ -257,13 +326,17 @@ export function DocumentDetailPanel({
                         const disabled =
                           key === "send"
                             ? document.steps.length === 0
-                            : !currentStep;
+                            : status.status === "returning"
+                              ? false
+                              : !currentStep;
                         return (
                           <Button
                             key={key}
                             size="sm"
                             variant={
-                              key === "send" || key === "forward"
+                              key === "send" ||
+                              key === "forward" ||
+                              status.status === "returning"
                                 ? "default"
                                 : "outline"
                             }
@@ -329,7 +402,9 @@ export function DocumentDetailPanel({
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-medium">Lộ trình</h3>
-                  {canManage && !document.finished_at && (
+                  {/* The route is locked once done (doc_set_route, 0019). */}
+                  {canManage && !document.finished_at &&
+                    status.status !== "returning" && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -424,6 +499,15 @@ export function DocumentDetailPanel({
                                   "—"}
                               </span>
                             </div>
+
+                            {editLines(event, profileName).map((line) => (
+                              <p
+                                key={line}
+                                className="whitespace-pre-wrap break-words text-xs text-muted-foreground"
+                              >
+                                {line}
+                              </p>
+                            ))}
 
                             {event.note && (
                               <p className="whitespace-pre-wrap text-xs text-muted-foreground">

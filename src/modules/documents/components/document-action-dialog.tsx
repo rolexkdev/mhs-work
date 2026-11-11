@@ -23,6 +23,9 @@ export const DOCUMENT_ACTION_LABEL: Record<DocumentActionKey, string> = {
   return: "Trả lại",
   resend: "Gửi lại",
   finish_early: "Kết thúc sớm",
+  receive_back: "Nhận lại",
+  hand_over: "Bàn giao người gửi",
+  sender_confirm: "Đã nhận hồ sơ",
 };
 
 const ACTION_DESCRIPTION: Record<DocumentActionKey, string> = {
@@ -31,7 +34,11 @@ const ACTION_DESCRIPTION: Record<DocumentActionKey, string> = {
     "Bước hiện tại được đánh dấu đã xử lý và hồ sơ chuyển sang bước kế tiếp.",
   return: "Hồ sơ quay về KCN và chuyển sang trạng thái Cần bổ sung.",
   resend: "Gửi lại hồ sơ cho phòng ban đang giữ sau khi đã bổ sung.",
-  finish_early: "Kết thúc hồ sơ ngay; các bước chưa tới sẽ bị bỏ.",
+  finish_early:
+    "Dừng lộ trình ngay; các bước chưa tới sẽ bị bỏ và hồ sơ chuyển sang trả về người gửi.",
+  receive_back: "Xác nhận hồ sơ đã được nhận lại về KCN.",
+  hand_over: "Bàn giao hồ sơ cho người gửi; người gửi sẽ xác nhận đã nhận.",
+  sender_confirm: "Xác nhận người gửi đã nhận lại hồ sơ. Hồ sơ sẽ Hoàn thành.",
 };
 
 const NOTE_PLACEHOLDER: Record<DocumentActionKey, string> = {
@@ -40,6 +47,9 @@ const NOTE_PLACEHOLDER: Record<DocumentActionKey, string> = {
   return: "Lý do trả lại...",
   resend: "Ghi chú khi gửi lại (không bắt buộc)",
   finish_early: "Ghi chú khi kết thúc (không bắt buộc)",
+  receive_back: "Ghi chú khi nhận lại (không bắt buộc)",
+  hand_over: "Ghi chú khi bàn giao (không bắt buộc)",
+  sender_confirm: "Ghi chú khi nhận (không bắt buộc)",
 };
 
 /**
@@ -56,7 +66,7 @@ export function DocumentActionDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   documentId: string;
-  /** Bước hiện tại; send không cần. */
+  /** Bước hiện tại; send và các thao tác trả về không cần. */
   stepId: string | null;
   action: DocumentActionKey;
 }) {
@@ -74,7 +84,11 @@ export function DocumentActionDialog({
   const needsHandler = action === "forward" || action === "finish_early";
   const reasonRequired = action === "return";
   const trimmedNote = note.trim();
-  const needsStep = action !== "send";
+  const isHandback =
+    action === "receive_back" ||
+    action === "hand_over" ||
+    action === "sender_confirm";
+  const needsStep = action !== "send" && !isHandback;
   const canSubmit =
     !mutation.isPending &&
     (!needsStep || !!stepId) &&
@@ -128,6 +142,15 @@ export function DocumentActionDialog({
             documentId,
             stepId,
             handlerName: handlerName.trim() || null,
+            note: trimmedNote || null,
+          });
+          break;
+        case "receive_back":
+        case "hand_over":
+        case "sender_confirm":
+          await mutation.mutateAsync({
+            action,
+            documentId,
             note: trimmedNote || null,
           });
           break;
