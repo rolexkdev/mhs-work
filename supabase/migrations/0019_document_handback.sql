@@ -410,3 +410,194 @@ begin
   );
 end;
 $$;
+
+-- ---------- Hand-back ----------
+-- Undo snapshot of the document-level progress columns.
+create or replace function public.doc_handback_snapshot(p_doc public.documents)
+returns jsonb
+language sql immutable as $$
+  select jsonb_build_object(
+    'finished_at', p_doc.finished_at,
+    'received_back_at', p_doc.received_back_at,
+    'handed_over_at', p_doc.handed_over_at,
+    'sender_confirmed_at', p_doc.sender_confirmed_at,
+    'sender_confirmed_by', p_doc.sender_confirmed_by,
+    'steps', '[]'::jsonb,
+    'deleted_steps', '[]'::jsonb
+  );
+$$;
+
+revoke all on function public.doc_handback_snapshot(public.documents) from public, anon, authenticated;
+
+-- Manager confirms the document is back at KCN.
+create or replace function public.doc_receive_back(
+  p_document_id uuid,
+  p_note text default null
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_undo jsonb;
+begin
+  if not public.can_manage_documents() then
+    raise exception 'Chỉ quản lý hồ sơ mới được thực hiện thao tác này.'
+      using errcode = '42501';
+  end if;
+
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  if v_doc.finished_at is not null then
+    raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
+  end if;
+
+  if not public.doc_route_done(p_document_id) then
+    raise exception 'Hồ sơ chưa đi hết lộ trình.' using errcode = 'P0001';
+  end if;
+
+  if v_doc.received_back_at is not null then
+    raise exception 'Hồ sơ vừa được cập nhật, vui lòng tải lại rồi thử lại.'
+      using errcode = 'P0001';
+  end if;
+
+  v_undo := public.doc_handback_snapshot(v_doc);
+
+  perform set_config('app.doc_rpc', 'on', true);
+
+  update public.documents
+  set received_back_at = now()
+  where id = p_document_id;
+
+  perform public.doc_log_event(
+    p_document_id, 'receive_back', null, null, null, p_note, null, v_undo, null
+  );
+end;
+$$;
+
+-- Manager hands the document over to the sender.
+create or replace function public.doc_hand_over(
+  p_document_id uuid,
+  p_note text default null
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_undo jsonb;
+begin
+  if not public.can_manage_documents() then
+    raise exception 'Chỉ quản lý hồ sơ mới được thực hiện thao tác này.'
+      using errcode = '42501';
+  end if;
+
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  if v_doc.finished_at is not null then
+    raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
+  end if;
+
+  if v_doc.received_back_at is null or v_doc.handed_over_at is not null then
+    raise exception 'Hồ sơ vừa được cập nhật, vui lòng tải lại rồi thử lại.'
+      using errcode = 'P0001';
+  end if;
+
+  v_undo := public.doc_handback_snapshot(v_doc);
+
+  perform set_config('app.doc_rpc', 'on', true);
+
+  update public.documents
+  set handed_over_at = now()
+  where id = p_document_id;
+
+  perform public.doc_log_event(
+    p_document_id, 'hand_over', null, null, null, p_note, null, v_undo, null
+  );
+end;
+$$;
+
+-- The sender (or a manager on their behalf) confirms receipt; this is
+-- what marks the document Hoàn thành.
+create or replace function public.doc_sender_confirm(
+  p_document_id uuid,
+  p_note text default null
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_undo jsonb;
+  v_now timestamptz := now();
+begin
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  if auth.uid() is null
+     or (
+       v_doc.sender_id is distinct from auth.uid()
+       and not public.can_manage_documents()
+     ) then
+    raise exception 'Chỉ người gửi hoặc quản lý hồ sơ mới được xác nhận đã nhận.'
+      using errcode = '42501';
+  end if;
+
+  if v_doc.finished_at is not null then
+    raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
+  end if;
+
+  if v_doc.handed_over_at is null then
+    raise exception 'Hồ sơ vừa được cập nhật, vui lòng tải lại rồi thử lại.'
+      using errcode = 'P0001';
+  end if;
+
+  v_undo := public.doc_handback_snapshot(v_doc);
+
+  perform set_config('app.doc_rpc', 'on', true);
+
+  update public.documents
+  set sender_confirmed_at = v_now,
+      sender_confirmed_by = auth.uid(),
+      finished_at = v_now
+  where id = p_document_id;
+
+  perform public.doc_log_event(
+    p_document_id,
+    'sender_confirm',
+    null,
+    null,
+    null,
+    p_note,
+    jsonb_build_object('on_behalf', v_doc.sender_id is distinct from auth.uid()),
+    v_undo,
+    null
+  );
+end;
+$$;
+
+revoke all on function public.doc_receive_back(uuid, text) from public, anon, authenticated;
+grant execute on function public.doc_receive_back(uuid, text) to authenticated;
+
+revoke all on function public.doc_hand_over(uuid, text) from public, anon, authenticated;
+grant execute on function public.doc_hand_over(uuid, text) to authenticated;
+
+revoke all on function public.doc_sender_confirm(uuid, text) from public, anon, authenticated;
+grant execute on function public.doc_sender_confirm(uuid, text) to authenticated;
