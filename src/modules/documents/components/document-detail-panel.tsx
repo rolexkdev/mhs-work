@@ -61,6 +61,9 @@ const ACTION_LABEL: Record<DocumentEventAction, string> = {
   resend: "Gửi lại",
   finish_early: "Kết thúc sớm",
   undo: "Hoàn tác",
+  receive_back: "Nhận lại hồ sơ",
+  hand_over: "Bàn giao người gửi",
+  sender_confirm: "Người gửi đã nhận",
 };
 
 /** Màu chấm mốc thời gian, cùng bảng màu trạng thái của /tasks. */
@@ -74,6 +77,9 @@ const ACTION_DOT: Record<DocumentEventAction, string> = {
   resend: "bg-blue-500",
   finish_early: "bg-emerald-500",
   undo: "bg-muted-foreground/40",
+  receive_back: "bg-violet-500",
+  hand_over: "bg-violet-500",
+  sender_confirm: "bg-emerald-500",
 };
 
 function payloadOf(event: DocumentEvent): Record<string, unknown> {

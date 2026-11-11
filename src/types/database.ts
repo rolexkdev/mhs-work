@@ -144,7 +144,10 @@ export type DocumentEventAction =
   | "return"
   | "resend"
   | "finish_early"
-  | "undo";
+  | "undo"
+  | "receive_back"
+  | "hand_over"
+  | "sender_confirm";
 
 /** A paper document tracked through departments (0017). */
 export type DocumentRecord = Timestamps & {
@@ -155,6 +158,11 @@ export type DocumentRecord = Timestamps & {
   created_by: string | null;
   /** Completion marker written only by the progress RPCs. Status derives from it. */
   finished_at: string | null;
+  /** Hand-back phase (0019): back at KCN, handed to sender, sender confirmed. */
+  received_back_at: string | null;
+  handed_over_at: string | null;
+  sender_confirmed_at: string | null;
+  sender_confirmed_by: string | null;
 };
 
 /** One step of a document route (0017). */
@@ -324,6 +332,10 @@ export interface Database {
           | "sender_id"
           | "note"
           | "finished_at"
+          | "received_back_at"
+          | "handed_over_at"
+          | "sender_confirmed_at"
+          | "sender_confirmed_by"
         >;
         Update: Update<DocumentRecord>;
         Relationships: Rel[];
@@ -406,6 +418,19 @@ export interface Database {
       };
       doc_undo: {
         Args: { p_document_id: string; p_event_id: string };
+        Returns: undefined;
+      };
+      // Hand-back phase (0019): the RPCs check the current state themselves.
+      doc_receive_back: {
+        Args: { p_document_id: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      doc_hand_over: {
+        Args: { p_document_id: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      doc_sender_confirm: {
+        Args: { p_document_id: string; p_note?: string | null };
         Returns: undefined;
       };
     };
