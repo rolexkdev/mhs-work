@@ -48,8 +48,9 @@ export function DocumentStepper({
   const currentIndex = sorted.findIndex(
     (step) => !step.done_at && !!step.received_at,
   );
-  const allDone = sorted.every((step) => !!step.done_at);
-  const finished = !!finishedAt || allDone;
+  // Since 0019 a done route is not the end: the document still goes back to
+  // the sender, so only finished_at marks the final node done.
+  const finished = !!finishedAt;
 
   return (
     <div className="max-w-full overflow-x-auto">

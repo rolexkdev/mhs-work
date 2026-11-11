@@ -13,7 +13,7 @@ import {
 import type { DocumentWithSteps } from "@/types/database";
 
 /**
- * Thẻ thống kê: Tất cả + 4 trạng thái, bấm để lọc danh sách.
+ * Thẻ thống kê: Tất cả + 5 trạng thái, bấm để lọc danh sách.
  * Số đếm luôn tính trên toàn bộ hồ sơ, không phụ thuộc ô tìm kiếm.
  */
 export function DocumentStats({
@@ -31,6 +31,7 @@ export function DocumentStats({
       pending: 0,
       in_progress: 0,
       returned: 0,
+      returning: 0,
       done: 0,
     };
     documents.forEach((doc) => {
@@ -55,7 +56,7 @@ export function DocumentStats({
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5 [&>*]:min-w-0">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6 [&>*]:min-w-0">
       {cards.map((card) => {
         const active = status === card.key;
         return (
