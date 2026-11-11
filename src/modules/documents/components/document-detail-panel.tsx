@@ -10,6 +10,7 @@ import {
   Pencil,
   RotateCcw,
   Send,
+  TriangleAlert,
   Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -56,6 +57,7 @@ const ACTION_ICON: Record<DocumentActionKey, React.ElementType> = {
   receive_back: Inbox,
   hand_over: HandHelping,
   sender_confirm: CheckCircle2,
+  report_missing: TriangleAlert,
 };
 
 const ACTION_LABEL: Record<DocumentEventAction, string> = {
@@ -71,6 +73,7 @@ const ACTION_LABEL: Record<DocumentEventAction, string> = {
   receive_back: "Nhận lại hồ sơ",
   hand_over: "Bàn giao người gửi",
   sender_confirm: "Người gửi đã nhận",
+  report_missing: "Báo thiếu hồ sơ",
 };
 
 /** Màu chấm mốc thời gian, cùng bảng màu trạng thái của /tasks. */
@@ -87,6 +90,7 @@ const ACTION_DOT: Record<DocumentEventAction, string> = {
   receive_back: "bg-violet-500",
   hand_over: "bg-violet-500",
   sender_confirm: "bg-emerald-500",
+  report_missing: "bg-orange-500",
 };
 
 function payloadOf(event: DocumentEvent): Record<string, unknown> {
@@ -153,7 +157,7 @@ function editLines(
   });
 }
 
-/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0019). */
+/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0020). */
 const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "send",
   "forward",
@@ -163,6 +167,7 @@ const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "receive_back",
   "hand_over",
   "sender_confirm",
+  "report_missing",
 ];
 
 /**
@@ -250,9 +255,9 @@ export function DocumentDetailPanel({
         : status.status === "returned"
           ? ["resend", "finish_early"]
           : status.handback === "awaiting_return"
-            ? ["receive_back"]
+            ? ["receive_back", "report_missing"]
             : status.handback === "received_back"
-              ? ["hand_over"]
+              ? ["hand_over", "report_missing"]
               : status.handback === "awaiting_sender"
                 ? ["sender_confirm"]
                 : [];
@@ -336,7 +341,8 @@ export function DocumentDetailPanel({
                             variant={
                               key === "send" ||
                               key === "forward" ||
-                              status.status === "returning"
+                              (status.status === "returning" &&
+                                key !== "report_missing")
                                 ? "default"
                                 : "outline"
                             }
@@ -446,7 +452,9 @@ export function DocumentDetailPanel({
                   <ol className="space-y-4">
                     {events.map((event) => {
                       const undone = undoneIds.has(event.id);
-                      const isReturn = event.action === "return";
+                      const isReturn =
+                        event.action === "return" ||
+                        event.action === "report_missing";
                       return (
                         <li key={event.id} className="flex gap-3">
                           <span
