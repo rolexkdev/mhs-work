@@ -132,7 +132,9 @@ export function DocumentsWorkspace() {
             </TabsTrigger>
             <TabsTrigger value="board" className="px-2.5 sm:px-3">
               <LayoutGrid className="h-4 w-4" />
-              Theo phòng ban đang giữ
+              {/* The full label is too wide for a 360px screen. */}
+              <span className="sm:hidden">Theo phòng ban</span>
+              <span className="hidden sm:inline">Theo phòng ban đang giữ</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
