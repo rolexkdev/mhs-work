@@ -25,6 +25,7 @@ import {
   DocumentActionDialog,
   DOCUMENT_ACTION_LABEL,
 } from "@/modules/documents/components/document-action-dialog";
+import { useCurrentUserId } from "@/modules/auth/use-current-user";
 import { DocumentStepper } from "@/modules/documents/components/document-stepper";
 import { DocumentRouteEditor } from "@/modules/documents/components/document-route-editor";
 import {
@@ -167,6 +168,7 @@ export function DocumentDetailPanel({
     document?.id ?? null,
   );
   const canManage = useCanManageDocuments();
+  const currentUserId = useCurrentUserId();
   const undoAction = useUndoDocumentAction();
   // The step id is pinned when the dialog opens: if the list refetches while
   // it is open (another manager acted, realtime), the RPC must still see the
@@ -202,15 +204,26 @@ export function DocumentDetailPanel({
         ? ["forward", "return", "finish_early"]
         : status.status === "returned"
           ? ["resend", "finish_early"]
-          : [];
+          : status.handback === "awaiting_return"
+            ? ["receive_back"]
+            : status.handback === "received_back"
+              ? ["hand_over"]
+              : status.handback === "awaiting_sender"
+                ? ["sender_confirm"]
+                : [];
 
-  const showActions = canManage && actions.length > 0;
+  // The sender confirms receipt themself; every other action is manager-only.
+  const isSender =
+    !!currentUserId && document?.sender_id === currentUserId;
+  const canRunActions =
+    status?.handback === "awaiting_sender" ? canManage || isSender : canManage;
+  const showActions = canRunActions && actions.length > 0;
 
   // Event bị hoàn tác: một event khác có undo_of trỏ tới nó.
   const undoneIds = new Set(
     events.map((event) => event.undo_of).filter((id): id is string => !!id),
   );
-  const undoableEvent = latestUndoableEvent(events);
+  const undoableEvent = canManage ? latestUndoableEvent(events) : null;
 
   return (
     <Sheet
@@ -258,7 +271,7 @@ export function DocumentDetailPanel({
               </div>
             </div>
 
-            {canManage && (showActions || !!undoableEvent) && (
+            {(showActions || !!undoableEvent) && (
               <div className="space-y-2 border-b px-4 py-3 sm:px-5">
                 {showActions && (
                   <>
@@ -268,13 +281,17 @@ export function DocumentDetailPanel({
                         const disabled =
                           key === "send"
                             ? document.steps.length === 0
-                            : !currentStep;
+                            : status.status === "returning"
+                              ? false
+                              : !currentStep;
                         return (
                           <Button
                             key={key}
                             size="sm"
                             variant={
-                              key === "send" || key === "forward"
+                              key === "send" ||
+                              key === "forward" ||
+                              status.status === "returning"
                                 ? "default"
                                 : "outline"
                             }
@@ -340,7 +357,9 @@ export function DocumentDetailPanel({
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-medium">Lộ trình</h3>
-                  {canManage && !document.finished_at && (
+                  {/* The route is locked once done (doc_set_route, 0019). */}
+                  {canManage && !document.finished_at &&
+                    status.status !== "returning" && (
                     <Button
                       size="sm"
                       variant="outline"
