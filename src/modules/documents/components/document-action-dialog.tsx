@@ -26,6 +26,7 @@ export const DOCUMENT_ACTION_LABEL: Record<DocumentActionKey, string> = {
   receive_back: "Nhận lại",
   hand_over: "Bàn giao người gửi",
   sender_confirm: "Đã nhận hồ sơ",
+  report_missing: "Báo thiếu",
 };
 
 const ACTION_DESCRIPTION: Record<DocumentActionKey, string> = {
@@ -39,6 +40,8 @@ const ACTION_DESCRIPTION: Record<DocumentActionKey, string> = {
   receive_back: "Xác nhận hồ sơ đã được nhận lại về KCN.",
   hand_over: "Bàn giao hồ sơ cho người gửi; người gửi sẽ xác nhận đã nhận.",
   sender_confirm: "Xác nhận người gửi đã nhận lại hồ sơ. Hồ sơ sẽ Hoàn thành.",
+  report_missing:
+    "Hồ sơ còn thiếu: bước cuối mở lại ở trạng thái Cần bổ sung để gửi lại cho phòng ban đó bổ sung.",
 };
 
 const NOTE_PLACEHOLDER: Record<DocumentActionKey, string> = {
@@ -50,6 +53,7 @@ const NOTE_PLACEHOLDER: Record<DocumentActionKey, string> = {
   receive_back: "Ghi chú khi nhận lại (không bắt buộc)",
   hand_over: "Ghi chú khi bàn giao (không bắt buộc)",
   sender_confirm: "Ghi chú khi nhận (không bắt buộc)",
+  report_missing: "Hồ sơ còn thiếu gì, cần bổ sung gì...",
 };
 
 /**
@@ -82,13 +86,14 @@ export function DocumentActionDialog({
   }, [open, action]);
 
   const needsHandler = action === "forward" || action === "finish_early";
-  const reasonRequired = action === "return";
+  const reasonRequired = action === "return" || action === "report_missing";
   const trimmedNote = note.trim();
   const isHandback =
     action === "receive_back" ||
     action === "hand_over" ||
     action === "sender_confirm";
-  const needsStep = action !== "send" && !isHandback;
+  const needsStep =
+    action !== "send" && action !== "report_missing" && !isHandback;
   const canSubmit =
     !mutation.isPending &&
     (!needsStep || !!stepId) &&
@@ -154,6 +159,14 @@ export function DocumentActionDialog({
             note: trimmedNote || null,
           });
           break;
+        case "report_missing":
+          if (!trimmedNote) return;
+          await mutation.mutateAsync({
+            action: "report_missing",
+            documentId,
+            reason: trimmedNote,
+          });
+          break;
       }
     } catch {
       // Toast do hook hiển thị; giữ hộp thoại mở để người dùng thử lại.
@@ -189,7 +202,11 @@ export function DocumentActionDialog({
 
           <div className="space-y-1.5">
             <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {reasonRequired ? "Lý do trả lại *" : "Ghi chú"}
+              {action === "report_missing"
+                ? "Nội dung còn thiếu *"
+                : reasonRequired
+                  ? "Lý do trả lại *"
+                  : "Ghi chú"}
             </Label>
             <Textarea
               value={note}
