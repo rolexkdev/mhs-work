@@ -28,6 +28,8 @@ export type Profile = Timestamps & {
   full_name: string | null;
   avatar_url: string | null;
   role: UserRole;
+  /** Admin can toggle this in /accounts; grants document progress actions (0017). */
+  is_doc_manager: boolean;
 };
 
 export type Meeting = Timestamps & {
@@ -133,6 +135,74 @@ export type TaskLog = Timestamps & {
   created_by: string | null;
 };
 
+export type DocumentEventAction =
+  | "created"
+  | "edit"
+  | "route"
+  | "send"
+  | "forward"
+  | "return"
+  | "resend"
+  | "finish_early"
+  | "undo";
+
+/** A paper document tracked through departments (0017). */
+export type DocumentRecord = Timestamps & {
+  id: string;
+  name: string;
+  sender_id: string | null;
+  note: string | null;
+  created_by: string | null;
+  /** Completion marker written only by the progress RPCs. Status derives from it. */
+  finished_at: string | null;
+};
+
+/** One step of a document route (0017). */
+export type DocumentStep = Timestamps & {
+  id: string;
+  document_id: string;
+  step_order: number;
+  department: string;
+  received_at: string | null;
+  done_at: string | null;
+  /** Set when the step returns the document; cleared on resend. */
+  returned_at: string | null;
+  handler_name: string | null;
+  note: string | null;
+};
+
+/** Append-only action log, written only by RPCs and triggers (0017). */
+export type DocumentEvent = Timestamps & {
+  id: string;
+  document_id: string;
+  action: DocumentEventAction;
+  step_order: number | null;
+  department: string | null;
+  handler_name: string | null;
+  note: string | null;
+  payload: unknown | null;
+  undo_data: unknown | null;
+  undo_of: string | null;
+  created_by: string | null;
+};
+
+/** Sender fields embedded with a document. */
+export type DocumentSender = Pick<
+  Profile,
+  "id" | "full_name" | "email" | "avatar_url"
+>;
+
+/** Document row with its route and sender, as loaded by useDocuments(). */
+export type DocumentWithSteps = DocumentRecord & {
+  sender: DocumentSender | null;
+  steps: DocumentStep[];
+};
+
+/** Event row with the profile of the user who performed it. */
+export type DocumentEventWithActor = DocumentEvent & {
+  actor: DocumentSender | null;
+};
+
 type Row<T> = T;
 type Insert<T, Optional extends keyof T> = Omit<T, Optional> &
   Partial<Pick<T, Optional>>;
@@ -153,7 +223,7 @@ export interface Database {
         Row: Row<Profile>;
         Insert: Insert<
           Profile,
-          "created_at" | "full_name" | "avatar_url" | "role"
+          "created_at" | "full_name" | "avatar_url" | "role" | "is_doc_manager"
         >;
         Update: Update<Profile>;
         Relationships: Rel[];
@@ -243,9 +313,102 @@ export interface Database {
         Update: Update<TaskLog>;
         Relationships: Rel[];
       };
+      documents: {
+        Row: Row<DocumentRecord>;
+        // created_by and sender_id default to the caller in the database.
+        Insert: Insert<
+          DocumentRecord,
+          | "id"
+          | "created_at"
+          | "created_by"
+          | "sender_id"
+          | "note"
+          | "finished_at"
+        >;
+        Update: Update<DocumentRecord>;
+        Relationships: Rel[];
+      };
+      document_steps: {
+        Row: Row<DocumentStep>;
+        Insert: Insert<
+          DocumentStep,
+          | "id"
+          | "created_at"
+          | "received_at"
+          | "done_at"
+          | "returned_at"
+          | "handler_name"
+          | "note"
+        >;
+        Update: Update<DocumentStep>;
+        Relationships: Rel[];
+      };
+      document_events: {
+        Row: Row<DocumentEvent>;
+        Insert: Insert<
+          DocumentEvent,
+          | "id"
+          | "created_at"
+          | "step_order"
+          | "department"
+          | "handler_name"
+          | "note"
+          | "payload"
+          | "undo_data"
+          | "undo_of"
+          | "created_by"
+        >;
+        Update: Update<DocumentEvent>;
+        Relationships: Rel[];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      can_manage_documents: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      doc_set_route: {
+        Args: { p_document_id: string; p_departments: string[] };
+        Returns: undefined;
+      };
+      doc_send: {
+        Args: { p_document_id: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      // p_step_id / p_event_id: the current step or latest event the client
+      // saw; the RPC rejects the call if it changed meanwhile.
+      doc_forward: {
+        Args: {
+          p_document_id: string;
+          p_step_id: string;
+          p_handler_name?: string | null;
+          p_note?: string | null;
+        };
+        Returns: undefined;
+      };
+      doc_return: {
+        Args: { p_document_id: string; p_step_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      doc_resend: {
+        Args: { p_document_id: string; p_step_id: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      doc_finish_early: {
+        Args: {
+          p_document_id: string;
+          p_step_id: string;
+          p_handler_name?: string | null;
+          p_note?: string | null;
+        };
+        Returns: undefined;
+      };
+      doc_undo: {
+        Args: { p_document_id: string; p_event_id: string };
+        Returns: undefined;
+      };
+    };
     Enums: {
       user_role: UserRole;
       meeting_status: MeetingStatus;

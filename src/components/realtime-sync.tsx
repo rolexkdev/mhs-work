@@ -9,6 +9,10 @@ type ChangeRow = {
   task_id?: string;
 } | null;
 
+type DocumentChangeRow = {
+  document_id?: string;
+} | null;
+
 /**
  * Đồng bộ realtime: lắng nghe thay đổi từ Supabase và làm mới cache react-query
  * → khi 1 người cập nhật, mọi máy khác tự cập nhật theo.
@@ -22,6 +26,13 @@ export function RealtimeSync() {
 
     const taskIdFrom = (payload: { new: ChangeRow; old: ChangeRow }) =>
       payload.new?.task_id ?? payload.old?.task_id ?? null;
+
+    // Both tables use replica identity full, so old rows keep document_id
+    // even on deletes.
+    const documentIdFrom = (payload: {
+      new: DocumentChangeRow;
+      old: DocumentChangeRow;
+    }) => payload.new?.document_id ?? payload.old?.document_id ?? null;
 
     const channel = supabase
       .channel("realtime-app")
@@ -71,6 +82,37 @@ export function RealtimeSync() {
         (payload) => {
           const id = taskIdFrom(payload);
           if (id) qc.invalidateQueries({ queryKey: ["attachments", id] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "documents" },
+        () => {
+          // The "documents" key prefix also covers document detail and
+          // document event queries.
+          qc.invalidateQueries({ queryKey: queryKeys.documents });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "document_steps" },
+        (payload) => {
+          qc.invalidateQueries({ queryKey: queryKeys.documents });
+          const id = documentIdFrom(payload);
+          if (id) {
+            qc.invalidateQueries({ queryKey: queryKeys.documentEvents(id) });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "document_events" },
+        (payload) => {
+          qc.invalidateQueries({ queryKey: queryKeys.documents });
+          const id = documentIdFrom(payload);
+          if (id) {
+            qc.invalidateQueries({ queryKey: queryKeys.documentEvents(id) });
+          }
         },
       );
 

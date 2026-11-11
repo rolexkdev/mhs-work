@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  FileCheck,
   KeyRound,
   Lock,
   MoreHorizontal,
@@ -42,6 +43,19 @@ const ROLE_BADGE: Record<AccountRow["role"], string> = {
   leader: "border-blue-200 bg-blue-50 text-blue-700",
   member: "border-slate-200 bg-slate-50 text-slate-600",
 };
+
+/** Cờ quản lý hồ sơ (0017) — hiện cạnh vai trò. */
+function DocManagerBadge() {
+  return (
+    <Badge
+      variant="outline"
+      className="gap-1 border-violet-200 bg-violet-50 text-violet-700"
+    >
+      <FileCheck className="h-3 w-3" />
+      Quản lý hồ sơ
+    </Badge>
+  );
+}
 
 function isLocked(account: AccountRow): boolean {
   if (!account.bannedUntil) return false;
@@ -227,6 +241,7 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
                     >
                       {ROLE_LABEL[account.role]}
                     </span>
+                    {account.isDocManager && <DocManagerBadge />}
                     <span className="text-xs text-muted-foreground">
                       {account.lastSignInAt
                         ? `Đăng nhập ${formatDateTime(account.lastSignInAt)}`
@@ -312,14 +327,17 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
                     </td>
 
                     <td className="px-4 py-2.5">
-                      <span
-                        className={cn(
-                          "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
-                          ROLE_BADGE[account.role],
-                        )}
-                      >
-                        {ROLE_LABEL[account.role]}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={cn(
+                            "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
+                            ROLE_BADGE[account.role],
+                          )}
+                        >
+                          {ROLE_LABEL[account.role]}
+                        </span>
+                        {account.isDocManager && <DocManagerBadge />}
+                      </div>
                     </td>
 
                     <td className="px-4 py-2.5 text-muted-foreground">

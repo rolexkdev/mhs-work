@@ -83,7 +83,7 @@ export async function listAccounts(): Promise<{
   }
 
   const profileColumns =
-    "id, email, full_name, role, avatar_url, created_at" as const;
+    "id, email, full_name, role, avatar_url, created_at, is_doc_manager" as const;
 
   let { data: profiles, error } = await (admin ?? caller.supabase)
     .from("profiles")
@@ -133,6 +133,7 @@ export async function listAccounts(): Promise<{
       email: p.email,
       fullName: p.full_name,
       role: p.role,
+      isDocManager: p.is_doc_manager,
       avatarUrl: p.avatar_url,
       createdAt: p.created_at,
       lastSignInAt: authById.get(p.id)?.lastSignInAt ?? null,
@@ -246,6 +247,7 @@ export async function updateAccount(input: {
   userId: string;
   fullName: string;
   role: UserRole;
+  isDocManager: boolean;
 }): Promise<{ error?: string }> {
   const caller = await requireAdminCaller();
   if (!caller.ok) return { error: caller.error };
@@ -269,11 +271,14 @@ export async function updateAccount(input: {
     // profiles_admin_all and guard_profile_protected_columns allow admins.
   }
 
+  // Column guarded by guard_profile_protected_columns (0017): the trigger
+  // also rejects the flag change for anyone but admins at the DB level.
   const { error } = await (admin ?? caller.supabase)
     .from("profiles")
     .update({
       full_name: fullName,
       role: input.role,
+      is_doc_manager: input.isDocManager,
     })
     .eq("id", input.userId);
 

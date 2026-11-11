@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Files,
   LayoutDashboard,
   CalendarDays,
   ListChecks,
@@ -45,6 +46,7 @@ const NAV: NavItem[] = [
     ? [{ href: "/meetings", label: "Họp giao ban", icon: CalendarDays }]
     : []),
   { href: "/tasks", label: "Công việc", icon: ListChecks },
+  { href: "/documents", label: "Hồ sơ", icon: Files },
   { href: "/updates", label: "Báo cáo công việc", icon: ClipboardCheck },
 ];
 

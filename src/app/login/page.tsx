@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { signIn } from "@/modules/auth/actions";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,14 @@ function SubmitButton() {
 
 export default function LoginPage() {
   const [state, formAction] = useActionState(signIn, null);
+  const queryClient = useQueryClient();
+
+  // The QueryClient lives in the root layout and survives the soft
+  // navigation after sign-out, so drop the previous user's cached data
+  // (e.g. their document manager permission) before the next sign-in.
+  useEffect(() => {
+    queryClient.clear();
+  }, [queryClient]);
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-muted/40 p-4">

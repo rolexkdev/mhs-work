@@ -36,6 +36,8 @@ export type AccountRow = {
   email: string;
   fullName: string | null;
   role: UserRole;
+  /** Document manager flag (0017): may run document progress actions. */
+  isDocManager: boolean;
   avatarUrl: string | null;
   createdAt: string;
   /** null = chưa đăng nhập lần nào. */
