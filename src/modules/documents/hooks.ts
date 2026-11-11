@@ -247,13 +247,28 @@ export function useDeleteDocument() {
   });
 }
 
-/** Progress actions exposed by the RPCs in 0018_document_actions.sql. */
+/** Progress actions exposed by the RPCs in 0018 and 0019. */
 export type DocumentActionKey =
   | "send"
   | "forward"
   | "return"
   | "resend"
-  | "finish_early";
+  | "finish_early"
+  | "receive_back"
+  | "hand_over"
+  | "sender_confirm";
+
+/** Hand-back actions (0019): no step id, the RPC checks the state itself. */
+export type DocumentHandbackActionKey =
+  | "receive_back"
+  | "hand_over"
+  | "sender_confirm";
+
+const HANDBACK_RPC = {
+  receive_back: "doc_receive_back",
+  hand_over: "doc_hand_over",
+  sender_confirm: "doc_sender_confirm",
+} as const satisfies Record<DocumentHandbackActionKey, string>;
 
 export type DocumentActionInput =
   | { action: "send"; documentId: string; note: string | null }
@@ -282,6 +297,11 @@ export type DocumentActionInput =
       stepId: string;
       handlerName: string | null;
       note: string | null;
+    }
+  | {
+      action: DocumentHandbackActionKey;
+      documentId: string;
+      note: string | null;
     };
 
 const DOCUMENT_ACTION_SUCCESS: Record<DocumentActionKey, string> = {
@@ -290,6 +310,9 @@ const DOCUMENT_ACTION_SUCCESS: Record<DocumentActionKey, string> = {
   return: "Đã trả lại hồ sơ",
   resend: "Đã gửi lại hồ sơ",
   finish_early: "Đã kết thúc hồ sơ",
+  receive_back: "Đã nhận lại hồ sơ",
+  hand_over: "Đã bàn giao cho người gửi",
+  sender_confirm: "Đã xác nhận nhận hồ sơ",
 };
 
 /**
@@ -351,6 +374,16 @@ export function useDocumentAction() {
             p_document_id: input.documentId,
             p_step_id: input.stepId,
             p_handler_name: input.handlerName,
+            p_note: input.note,
+          });
+          if (error) throw error;
+          return;
+        }
+        case "receive_back":
+        case "hand_over":
+        case "sender_confirm": {
+          const { error } = await supabase.rpc(HANDBACK_RPC[input.action], {
+            p_document_id: input.documentId,
             p_note: input.note,
           });
           if (error) throw error;

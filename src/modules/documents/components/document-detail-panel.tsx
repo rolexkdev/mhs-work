@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   CheckCircle2,
   Forward,
+  HandHelping,
+  Inbox,
   Loader2,
   Pencil,
   RotateCcw,
@@ -49,6 +51,9 @@ const ACTION_ICON: Record<DocumentActionKey, React.ElementType> = {
   return: Undo2,
   resend: RotateCcw,
   finish_early: CheckCircle2,
+  receive_back: Inbox,
+  hand_over: HandHelping,
+  sender_confirm: CheckCircle2,
 };
 
 const ACTION_LABEL: Record<DocumentEventAction, string> = {
