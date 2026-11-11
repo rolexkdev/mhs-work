@@ -126,7 +126,8 @@ revoke all on function public.doc_route_done(uuid) from public, anon, authentica
 revoke all on function public.doc_in_rpc() from public, anon, authenticated;
 
 -- ---------- End of route ----------
--- Same as 0018, but the route can no longer change once it is done.
+-- doc_set_route, doc_forward, doc_finish_early and doc_return reject calls
+-- once the route is done. Same as 0018, but the route can no longer change once it is done.
 create or replace function public.doc_set_route(
   p_document_id uuid,
   p_departments text[]
@@ -405,6 +406,87 @@ begin
     p_handler_name,
     p_note,
     jsonb_build_object('dropped_steps', jsonb_array_length(v_deleted)),
+    v_undo,
+    null
+  );
+end;
+$$;
+
+-- Same as 0018, plus an explicit route-done check: once the route is done
+-- doc_current_step returns null, which used to surface as the misleading
+-- "Hồ sơ chưa được gửi đi". Grants from 0018 are kept by create or replace.
+create or replace function public.doc_return(
+  p_document_id uuid,
+  p_step_id uuid,
+  p_reason text
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_step public.document_steps;
+  v_now timestamptz := now();
+  v_undo jsonb;
+begin
+  if not public.can_manage_documents() then
+    raise exception 'Chỉ quản lý hồ sơ mới được thực hiện thao tác này.'
+      using errcode = '42501';
+  end if;
+
+  if p_reason is null or length(btrim(p_reason)) = 0 then
+    raise exception 'Vui lòng nhập lý do trả lại.' using errcode = 'P0001';
+  end if;
+
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  if v_doc.finished_at is not null then
+    raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
+  end if;
+
+  if public.doc_route_done(p_document_id) then
+    raise exception 'Lộ trình đã xong, hồ sơ đang trả về người gửi.'
+      using errcode = 'P0001';
+  end if;
+
+  v_step := public.doc_current_step(p_document_id);
+
+  if v_step.id is null or v_step.received_at is null then
+    raise exception 'Hồ sơ chưa được gửi đi.' using errcode = 'P0001';
+  end if;
+
+  perform public.doc_assert_current(v_step.id, p_step_id);
+
+  if v_step.returned_at is not null then
+    raise exception 'Hồ sơ đã được trả lại, đang chờ bổ sung.'
+      using errcode = 'P0001';
+  end if;
+
+  v_undo := jsonb_build_object(
+    'finished_at', v_doc.finished_at,
+    'steps', public.doc_step_snapshot(array[v_step.id]),
+    'deleted_steps', '[]'::jsonb
+  );
+
+  update public.document_steps
+  set returned_at = v_now,
+      note = btrim(p_reason)
+  where id = v_step.id;
+
+  perform public.doc_log_event(
+    p_document_id,
+    'return',
+    v_step.step_order,
+    v_step.department,
+    null,
+    btrim(p_reason),
+    null,
     v_undo,
     null
   );
