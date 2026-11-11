@@ -51,7 +51,7 @@ There is no test suite. After changing code, run `npm run typecheck` and `npm ru
 - Use the `@/` path alias. Combine class names with `cn()` from `@/lib/utils`. Add new UI
   primitives via shadcn (`components.json`) rather than writing them from scratch.
 - User-facing text is in **Vietnamese**; code identifiers are in English.
-- Database changes: add a new migration with the next number (e.g. `0018_<name>.sql`),
+- Database changes: add a new migration with the next number (e.g. `0020_<name>.sql`),
   keep it idempotent (`drop ... if exists` / `create or replace`), and update
   `src/types/database.ts` to match. Migrations are applied manually in the Supabase SQL
   Editor — do not assume they have been run.
@@ -102,7 +102,10 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
   can view and edit all tasks and task details; history is traced via `task_logs`.
   Admin-only features (e.g. `/accounts`) are enforced in the app and via the admin client.
 - Document progress changes go only through the security definer RPCs in
-  `0018_document_actions.sql` and require admin or `profiles.is_doc_manager` (toggled
-  in `/accounts`).
+  `0018_document_actions.sql` and `0019_document_handback.sql`, and require admin or
+  `profiles.is_doc_manager` (toggled in `/accounts`). The one exception is
+  `doc_sender_confirm`, which the document's sender may also call. These RPCs set the
+  transaction-local flag `app.doc_rpc` so the guard trigger lets them write progress
+  columns.
 - Zalo APIs reject non-Vietnamese IPs, so Edge Functions call Zalo through `zalo-bridge`.
   See `zalo-bridge/README.md` before changing anything in the Zalo flow.
