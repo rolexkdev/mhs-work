@@ -92,6 +92,8 @@ export const DEPARTMENTS: { value: string; color: TagColor }[] = [
   { value: "NM Cấp nước", color: "purple" },
   { value: "Hành chính", color: "gray" },
   { value: "Tổng giám đốc", color: "pink" },
+  { value: "Kế toán", color: "sky" },
+  { value: "Pháp chế", color: "yellow" },
 ];
 
 // ----- Hạng mục -----
