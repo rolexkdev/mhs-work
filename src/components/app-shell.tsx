@@ -28,6 +28,7 @@ import {
 import { Brand } from "@/components/brand";
 import { CommandPalette } from "@/components/command-palette";
 import { RealtimeSync } from "@/components/realtime-sync";
+import { ActivityTracker } from "@/components/activity-tracker";
 import { ProfileDialog } from "@/modules/auth/profile-dialog";
 import { signOut } from "@/modules/auth/actions";
 import { FEATURES } from "@/lib/features";
@@ -296,6 +297,7 @@ export function AppShell({
 
       <CommandPalette />
       <RealtimeSync />
+      <ActivityTracker />
 
       <ProfileDialog
         open={profileOpen}

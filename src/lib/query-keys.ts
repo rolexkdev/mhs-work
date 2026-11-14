@@ -7,6 +7,8 @@ export const queryKeys = {
   /** Profile of the signed-in user (role + document manager flag). */
   currentProfile: ["profiles", "current"] as const,
   accounts: ["accounts"] as const,
+  accountActivity: (userId: string, days: number) =>
+    ["accounts", "activity", userId, days] as const,
   meetings: ["meetings"] as const,
   meeting: (id: string) => ["meetings", id] as const,
   meetingItems: (meetingId: string) => ["meeting-items", meetingId] as const,
