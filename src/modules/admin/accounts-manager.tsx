@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   FileCheck,
+  History,
   KeyRound,
   Lock,
   MoreHorizontal,
@@ -37,6 +38,7 @@ import {
 import { AccountFormDialog } from "@/modules/admin/account-form-dialog";
 import { BulkCreateDialog } from "@/modules/admin/bulk-create-dialog";
 import { ResetPasswordDialog } from "@/modules/admin/reset-password-dialog";
+import { AccountActivitySheet } from "@/modules/admin/account-activity-sheet";
 
 const ROLE_BADGE: Record<AccountRow["role"], string> = {
   admin: "border-amber-200 bg-amber-50 text-amber-700",
@@ -73,6 +75,7 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
   const [editing, setEditing] = useState<AccountRow | null>(null);
   const [resetting, setResetting] = useState<AccountRow | null>(null);
   const [deleting, setDeleting] = useState<AccountRow | null>(null);
+  const [viewing, setViewing] = useState<AccountRow | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -100,50 +103,57 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
     isSelf: boolean,
     locked: boolean,
   ) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={() => {
-            setEditing(account);
-            setFormOpen(true);
-          }}
-        >
-          <Pencil className="h-4 w-4" /> Sửa thông tin
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setResetting(account)}>
-          <KeyRound className="h-4 w-4" /> Đặt lại mật khẩu
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          disabled={isSelf || setLocked.isPending}
-          onClick={() =>
-            setLocked.mutate({ userId: account.id, locked: !locked })
-          }
-        >
-          {locked ? (
-            <>
-              <Unlock className="h-4 w-4" /> Mở khoá đăng nhập
-            </>
-          ) : (
-            <>
-              <Lock className="h-4 w-4" /> Khoá đăng nhập
-            </>
-          )}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          disabled={isSelf}
-          className="text-destructive focus:text-destructive"
-          onClick={() => setDeleting(account)}
-        >
-          <Trash2 className="h-4 w-4" /> Xoá tài khoản
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    // Rows open the activity history on click; keep menu clicks (including
+    // the portaled menu items, which bubble through React) out of that.
+    <div onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setViewing(account)}>
+            <History className="h-4 w-4" /> Xem lịch sử hoạt động
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => {
+              setEditing(account);
+              setFormOpen(true);
+            }}
+          >
+            <Pencil className="h-4 w-4" /> Sửa thông tin
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setResetting(account)}>
+            <KeyRound className="h-4 w-4" /> Đặt lại mật khẩu
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={isSelf || setLocked.isPending}
+            onClick={() =>
+              setLocked.mutate({ userId: account.id, locked: !locked })
+            }
+          >
+            {locked ? (
+              <>
+                <Unlock className="h-4 w-4" /> Mở khoá đăng nhập
+              </>
+            ) : (
+              <>
+                <Lock className="h-4 w-4" /> Khoá đăng nhập
+              </>
+            )}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={isSelf}
+            className="text-destructive focus:text-destructive"
+            onClick={() => setDeleting(account)}
+          >
+            <Trash2 className="h-4 w-4" /> Xoá tài khoản
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 
   return (
@@ -195,185 +205,195 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
         </div>
       ) : (
         <>
-        {/* ── Điện thoại: mỗi tài khoản là một thẻ ── */}
-        <div className="divide-y rounded-lg border bg-background md:hidden">
-          {filtered.map((account) => {
-            const locked = isLocked(account);
-            const isSelf = account.id === currentUserId;
-            const displayName = account.fullName ?? account.email;
-            return (
-              <div key={account.id} className="flex items-start gap-3 p-3">
-                <Avatar className="h-9 w-9 shrink-0">
-                  {account.avatarUrl && (
-                    <AvatarImage src={account.avatarUrl} alt={displayName} />
-                  )}
-                  <AvatarFallback className="text-xs">
-                    {initials(displayName)}
-                  </AvatarFallback>
-                </Avatar>
+          {/* ── Điện thoại: mỗi tài khoản là một thẻ ── */}
+          <div className="divide-y rounded-lg border bg-background md:hidden">
+            {filtered.map((account) => {
+              const locked = isLocked(account);
+              const isSelf = account.id === currentUserId;
+              const displayName = account.fullName ?? account.email;
+              return (
+                <div
+                  key={account.id}
+                  onClick={() => setViewing(account)}
+                  className="flex cursor-pointer items-start gap-3 p-3 hover:bg-muted/30"
+                >
+                  <Avatar className="h-9 w-9 shrink-0">
+                    {account.avatarUrl && (
+                      <AvatarImage src={account.avatarUrl} alt={displayName} />
+                    )}
+                    <AvatarFallback className="text-xs">
+                      {initials(displayName)}
+                    </AvatarFallback>
+                  </Avatar>
 
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium leading-tight">
-                    <span className="truncate">{displayName}</span>
-                    {isSelf && (
-                      <span className="text-xs font-normal text-muted-foreground">
-                        (bạn)
-                      </span>
-                    )}
-                    {locked && (
-                      <Badge
-                        variant="outline"
-                        className="border-destructive/40 text-destructive"
-                      >
-                        Đã khoá
-                      </Badge>
-                    )}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {account.email}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                    <span
-                      className={cn(
-                        "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
-                        ROLE_BADGE[account.role],
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium leading-tight">
+                      <span className="truncate">{displayName}</span>
+                      {isSelf && (
+                        <span className="text-xs font-normal text-muted-foreground">
+                          (bạn)
+                        </span>
                       )}
-                    >
-                      {ROLE_LABEL[account.role]}
-                    </span>
-                    {account.isDocManager && <DocManagerBadge />}
-                    <span className="text-xs text-muted-foreground">
-                      {account.lastSignInAt
-                        ? `Đăng nhập ${formatDateTime(account.lastSignInAt)}`
-                        : "Chưa đăng nhập lần nào"}
-                    </span>
+                      {locked && (
+                        <Badge
+                          variant="outline"
+                          className="border-destructive/40 text-destructive"
+                        >
+                          Đã khoá
+                        </Badge>
+                      )}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {account.email}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      <span
+                        className={cn(
+                          "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
+                          ROLE_BADGE[account.role],
+                        )}
+                      >
+                        {ROLE_LABEL[account.role]}
+                      </span>
+                      {account.isDocManager && <DocManagerBadge />}
+                      <span className="text-xs text-muted-foreground">
+                        {account.lastSignInAt
+                          ? `Đăng nhập ${formatDateTime(account.lastSignInAt)}`
+                          : "Chưa đăng nhập lần nào"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0">
+                    {accountActions(account, isSelf, locked)}
                   </div>
                 </div>
+              );
+            })}
 
-                <div className="shrink-0">
-                  {accountActions(account, isSelf, locked)}
-                </div>
-              </div>
-            );
-          })}
+            {filtered.length === 0 && (
+              <p className="px-4 py-12 text-center text-sm text-muted-foreground">
+                Không tìm thấy tài khoản nào khớp &ldquo;{search}&rdquo;.
+              </p>
+            )}
+          </div>
 
-          {filtered.length === 0 && (
-            <p className="px-4 py-12 text-center text-sm text-muted-foreground">
-              Không tìm thấy tài khoản nào khớp &ldquo;{search}&rdquo;.
-            </p>
-          )}
-        </div>
+          {/* ── Máy tính: bảng đầy đủ ── */}
+          <div className="hidden overflow-x-auto rounded-lg border bg-background md:block">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2.5 text-left font-medium">
+                    Nhân viên
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium">Vai trò</th>
+                  <th className="px-4 py-2.5 text-left font-medium">
+                    Đăng nhập gần nhất
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium">
+                    Ngày tạo
+                  </th>
+                  <th className="w-12 px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((account) => {
+                  const locked = isLocked(account);
+                  const isSelf = account.id === currentUserId;
+                  const displayName = account.fullName ?? account.email;
 
-        {/* ── Máy tính: bảng đầy đủ ── */}
-        <div className="hidden overflow-x-auto rounded-lg border bg-background md:block">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2.5 text-left font-medium">Nhân viên</th>
-                <th className="px-4 py-2.5 text-left font-medium">Vai trò</th>
-                <th className="px-4 py-2.5 text-left font-medium">
-                  Đăng nhập gần nhất
-                </th>
-                <th className="px-4 py-2.5 text-left font-medium">Ngày tạo</th>
-                <th className="w-12 px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((account) => {
-                const locked = isLocked(account);
-                const isSelf = account.id === currentUserId;
-                const displayName = account.fullName ?? account.email;
-
-                return (
-                  <tr
-                    key={account.id}
-                    className="border-b last:border-0 hover:bg-muted/30"
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          {account.avatarUrl && (
-                            <AvatarImage
-                              src={account.avatarUrl}
-                              alt={displayName}
-                            />
-                          )}
-                          <AvatarFallback className="text-xs">
-                            {initials(displayName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="flex items-center gap-2 truncate font-medium">
-                            {displayName}
-                            {isSelf && (
-                              <span className="text-xs font-normal text-muted-foreground">
-                                (bạn)
-                              </span>
+                  return (
+                    <tr
+                      key={account.id}
+                      onClick={() => setViewing(account)}
+                      title="Bấm để xem lịch sử hoạt động"
+                      className="cursor-pointer border-b last:border-0 hover:bg-muted/30"
+                    >
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            {account.avatarUrl && (
+                              <AvatarImage
+                                src={account.avatarUrl}
+                                alt={displayName}
+                              />
                             )}
-                            {locked && (
-                              <Badge
-                                variant="outline"
-                                className="border-destructive/40 text-destructive"
-                              >
-                                Đã khoá
-                              </Badge>
-                            )}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {account.email}
-                          </p>
+                            <AvatarFallback className="text-xs">
+                              {initials(displayName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-2 truncate font-medium">
+                              {displayName}
+                              {isSelf && (
+                                <span className="text-xs font-normal text-muted-foreground">
+                                  (bạn)
+                                </span>
+                              )}
+                              {locked && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-destructive/40 text-destructive"
+                                >
+                                  Đã khoá
+                                </Badge>
+                              )}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {account.email}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="px-4 py-2.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span
-                          className={cn(
-                            "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
-                            ROLE_BADGE[account.role],
-                          )}
-                        >
-                          {ROLE_LABEL[account.role]}
-                        </span>
-                        {account.isDocManager && <DocManagerBadge />}
-                      </div>
-                    </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "inline-flex rounded-md border px-2 py-0.5 text-xs font-medium",
+                              ROLE_BADGE[account.role],
+                            )}
+                          >
+                            {ROLE_LABEL[account.role]}
+                          </span>
+                          {account.isDocManager && <DocManagerBadge />}
+                        </div>
+                      </td>
 
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {account.lastSignInAt ? (
-                        formatDateTime(account.lastSignInAt)
-                      ) : (
-                        <span className="text-xs italic">
-                          Chưa đăng nhập lần nào
-                        </span>
-                      )}
-                    </td>
+                      <td className="px-4 py-2.5 text-muted-foreground">
+                        {account.lastSignInAt ? (
+                          formatDateTime(account.lastSignInAt)
+                        ) : (
+                          <span className="text-xs italic">
+                            Chưa đăng nhập lần nào
+                          </span>
+                        )}
+                      </td>
 
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {formatDate(account.createdAt)}
-                    </td>
+                      <td className="px-4 py-2.5 text-muted-foreground">
+                        {formatDate(account.createdAt)}
+                      </td>
 
-                    <td className="px-4 py-2.5">
-                      {accountActions(account, isSelf, locked)}
+                      <td className="px-4 py-2.5">
+                        {accountActions(account, isSelf, locked)}
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {filtered.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-4 py-12 text-center text-sm text-muted-foreground"
+                    >
+                      Không tìm thấy tài khoản nào khớp &ldquo;{search}&rdquo;.
                     </td>
                   </tr>
-                );
-              })}
-
-              {filtered.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-12 text-center text-sm text-muted-foreground"
-                  >
-                    Không tìm thấy tài khoản nào khớp &ldquo;{search}&rdquo;.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 
@@ -387,6 +407,10 @@ export function AccountsManager({ currentUserId }: { currentUserId: string }) {
         open={!!resetting}
         onOpenChange={(v) => !v && setResetting(null)}
         account={resetting}
+      />
+      <AccountActivitySheet
+        account={viewing}
+        onOpenChange={(v) => !v && setViewing(null)}
       />
       <ConfirmDialog
         open={!!deleting}

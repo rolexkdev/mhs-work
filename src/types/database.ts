@@ -135,6 +135,16 @@ export type TaskLog = Timestamps & {
   created_by: string | null;
 };
 
+/** Sign-in / page view record (0021). Readable by admins only. */
+export type UserActivityKind = "login" | "page_view";
+
+export type UserActivity = Timestamps & {
+  id: number;
+  user_id: string;
+  kind: UserActivityKind;
+  path: string | null;
+};
+
 export type DocumentEventAction =
   | "created"
   | "edit"
@@ -320,6 +330,13 @@ export interface Database {
         Row: Row<TaskLog>;
         Insert: Insert<TaskLog, "id" | "created_at">;
         Update: Update<TaskLog>;
+        Relationships: Rel[];
+      };
+      user_activity: {
+        Row: Row<UserActivity>;
+        // user_id defaults to auth.uid() in the database.
+        Insert: Insert<UserActivity, "id" | "created_at" | "user_id" | "path">;
+        Update: Update<UserActivity>;
         Relationships: Rel[];
       };
       documents: {

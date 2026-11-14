@@ -744,7 +744,7 @@ const B = ({ children }: { children: React.ReactNode }) => (
 );
 
 /** Mô tả 1 dòng log thành câu tiếng Việt dễ đọc. */
-function describeLog(
+export function describeLog(
   log: TaskLog,
   nameOf: (id: string | null) => string | null,
 ): React.ReactNode {
