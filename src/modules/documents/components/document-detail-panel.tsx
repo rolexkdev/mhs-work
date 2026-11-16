@@ -99,7 +99,7 @@ function payloadOf(event: DocumentEvent): Record<string, unknown> {
     : {};
 }
 
-/** Nhãn tiếng Việt của một mốc, xử lý riêng forward và undo. */
+/** Nhãn tiếng Việt của một mốc, xử lý riêng forward và sender_confirm. */
 function eventTitle(event: DocumentEvent): string {
   const payload = payloadOf(event);
 
@@ -113,15 +113,6 @@ function eventTitle(event: DocumentEvent): string {
 
   if (event.action === "sender_confirm" && payload.on_behalf === true) {
     return `${ACTION_LABEL.sender_confirm} (quản lý xác nhận thay)`;
-  }
-
-  if (event.action === "undo") {
-    const undone = payload.action;
-    return `Hoàn tác: ${
-      typeof undone === "string" && undone in ACTION_LABEL
-        ? ACTION_LABEL[undone as DocumentEventAction]
-        : "thao tác"
-    }`;
   }
 
   return ACTION_LABEL[event.action];
@@ -269,9 +260,14 @@ export function DocumentDetailPanel({
     status?.handback === "awaiting_sender" ? canManage || isSender : canManage;
   const showActions = canRunActions && actions.length > 0;
 
-  // Event bị hoàn tác: một event khác có undo_of trỏ tới nó.
+  // Undo history is not shown: hide the undo events and the events they
+  // reverted (an undo event's undo_of points at the reverted one), so the
+  // timeline reads as if those actions never happened.
   const undoneIds = new Set(
     events.map((event) => event.undo_of).filter((id): id is string => !!id),
+  );
+  const visibleEvents = events.filter(
+    (event) => event.action !== "undo" && !undoneIds.has(event.id),
   );
   const undoableEvent = canManage ? latestUndoableEvent(events) : null;
 
@@ -433,9 +429,9 @@ export function DocumentDetailPanel({
               <div className="space-y-3">
                 <h3 className="flex items-center gap-2 text-sm font-medium">
                   Lịch sử xử lý
-                  {events.length > 0 && (
+                  {visibleEvents.length > 0 && (
                     <span className="text-xs font-normal text-muted-foreground">
-                      {events.length} mốc
+                      {visibleEvents.length} mốc
                     </span>
                   )}
                 </h3>
@@ -444,14 +440,13 @@ export function DocumentDetailPanel({
                   <div className="flex justify-center py-6">
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   </div>
-                ) : events.length === 0 ? (
+                ) : visibleEvents.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
                     Chưa có hoạt động nào.
                   </p>
                 ) : (
                   <ol className="space-y-4">
-                    {events.map((event) => {
-                      const undone = undoneIds.has(event.id);
+                    {visibleEvents.map((event) => {
                       const isReturn =
                         event.action === "return" ||
                         event.action === "report_missing";
@@ -460,24 +455,12 @@ export function DocumentDetailPanel({
                           <span
                             className={cn(
                               "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                              undone
-                                ? "bg-muted-foreground/30"
-                                : ACTION_DOT[event.action],
+                              ACTION_DOT[event.action],
                             )}
                           />
-                          <div
-                            className={cn(
-                              "min-w-0 flex-1 space-y-1",
-                              undone && "text-muted-foreground/60",
-                            )}
-                          >
+                          <div className="min-w-0 flex-1 space-y-1">
                             <div className="flex flex-wrap items-baseline gap-x-2">
-                              <p
-                                className={cn(
-                                  "text-sm font-medium",
-                                  undone && "line-through",
-                                )}
-                              >
+                              <p className="text-sm font-medium">
                                 {eventTitle(event)}
                               </p>
                               <span className="whitespace-nowrap text-xs text-muted-foreground">
