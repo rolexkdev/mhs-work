@@ -110,5 +110,9 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
   columns.
 - Undo keeps no history: `doc_undo` (`0022_document_undo_no_history.sql`) restores the
   document and deletes the reverted event; no `undo` event is ever written.
+- The route is set by the document creator: it is required when creating a document,
+  and `doc_set_route` (`0023_document_creator_route.sql`) lets the creator edit it only
+  while the document is a draft (Chờ gửi). Managers can edit it any time the route is
+  still open.
 - Zalo APIs reject non-Vietnamese IPs, so Edge Functions call Zalo through `zalo-bridge`.
   See `zalo-bridge/README.md` before changing anything in the Zalo flow.

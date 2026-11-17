@@ -253,6 +253,10 @@ export function DocumentDetailPanel({
   const canRunActions =
     status?.handback === "awaiting_sender" ? canManage || isSender : canManage;
   const showActions = canRunActions && actions.length > 0;
+  const isCreator =
+    !!currentUserId && document?.created_by === currentUserId;
+  const canEditRoute =
+    canManage || (isCreator && status?.status === "pending");
 
   const undoableEvent = canManage ? latestUndoableEvent(events) : null;
 
@@ -389,8 +393,10 @@ export function DocumentDetailPanel({
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-medium">Lộ trình</h3>
-                  {/* The route is locked once done (doc_set_route, 0019). */}
-                  {canManage && !document.finished_at &&
+                  {/* The route is locked once done (doc_set_route, 0019). The
+                      creator may edit it only while the document is a draft
+                      (0023). */}
+                  {canEditRoute && !document.finished_at &&
                     status.status !== "returning" && (
                     <Button
                       size="sm"

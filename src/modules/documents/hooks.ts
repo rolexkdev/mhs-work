@@ -93,8 +93,8 @@ export interface CreateDocumentInput {
   /** Omit to let the database default the sender to the creator. */
   sender_id?: string | null;
   note: string | null;
-  /** Ordered route; only sent by callers allowed to manage documents. */
-  departments?: string[];
+  /** Ordered route, required: the creator sets it (doc_set_route, 0023). */
+  departments: string[];
 }
 
 /**
@@ -119,18 +119,16 @@ export function useCreateDocument() {
         .single();
       if (error) throw error;
 
-      if (departments && departments.length > 0) {
-        const { error: routeError } = await supabase.rpc("doc_set_route", {
-          p_document_id: data.id,
-          p_departments: departments,
-        });
-        if (routeError) {
-          // Do not leave a route-less draft behind when the RPC was rejected
-          // (e.g. the manager flag was just removed): the user would retry and
-          // create a duplicate. Best effort only; the original error is shown.
-          await supabase.from("documents").delete().eq("id", data.id);
-          throw routeError;
-        }
+      const { error: routeError } = await supabase.rpc("doc_set_route", {
+        p_document_id: data.id,
+        p_departments: departments,
+      });
+      if (routeError) {
+        // Do not leave a route-less draft behind when the RPC was rejected:
+        // the user would retry and create a duplicate. Best effort only (the
+        // creator may delete their own draft); the original error is shown.
+        await supabase.from("documents").delete().eq("id", data.id);
+        throw routeError;
       }
 
       return data.id;
