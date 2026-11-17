@@ -38,7 +38,7 @@ There is no test suite. After changing code, run `npm run typecheck` and `npm ru
 - `src/components/ui/` — shadcn/ui components; `src/components/` — app shell, command
   palette, `realtime-sync.tsx` (Supabase Realtime → query invalidation).
 - `supabase/migrations/00NN_*.sql` — schema history. `supabase/functions/` — Edge Functions
-  `zalo-auth`, `zalo-daily-reminder`, shared helpers in `_shared/zalo.ts`.
+  `zalo-auth`, `zalo-daily-reminder`, `email-notify`, shared helpers in `_shared/zalo.ts`.
 - `zalo-bridge/server.mjs` — Node proxy giving Zalo API calls a Vietnamese IP.
 
 ## Conventions
@@ -110,3 +110,8 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
   columns.
 - Zalo APIs reject non-Vietnamese IPs, so Edge Functions call Zalo through `zalo-bridge`.
   See `zalo-bridge/README.md` before changing anything in the Zalo flow.
+- Email notifications (migration `0022`): triggers on `tasks` (newly added assignees) and
+  `task_comments` (new comment → assignees + creator) queue a `pg_net` call to the
+  `email-notify` Edge Function, which sends via the Resend HTTP API. The function URL and
+  secret live in Supabase Vault (`supabase/email-notify-setup.sql`); without them the
+  triggers do nothing. Sends are logged in `email_notification_log`.
