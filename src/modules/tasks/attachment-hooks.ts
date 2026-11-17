@@ -7,10 +7,33 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyError } from "@/lib/errors";
 import type { TaskAttachment } from "@/types/database";
 
 const BUCKET = "task-attachments";
 const key = (taskId: string) => ["attachments", taskId] as const;
+
+/**
+ * Storage keys only accept safe ASCII, so "Báo cáo #2.docx" fails with
+ * "Invalid key". Strip diacritics and replace anything else with "-".
+ * The original name is kept in task_attachments.file_name for display.
+ */
+export function storageSafeName(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const [base, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot + 1)] : [name, ""];
+  const clean = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .replace(/[^A-Za-z0-9_-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+  const safeBase = clean(base).slice(0, 80) || "file";
+  const safeExt = clean(ext).slice(0, 10);
+  return safeExt ? `${safeBase}.${safeExt}` : safeBase;
+}
 
 export function useAttachments(taskId: string | null) {
   return useQuery({
@@ -39,7 +62,7 @@ export function useUploadAttachment(taskId: string) {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Chưa đăng nhập");
 
-      const path = `${taskId}/${Date.now()}-${file.name}`;
+      const path = `${taskId}/${Date.now()}-${storageSafeName(file.name)}`;
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
         .upload(path, file);
@@ -57,7 +80,7 @@ export function useUploadAttachment(taskId: string) {
       qc.invalidateQueries({ queryKey: key(taskId) });
       toast.success("Đã tải lên tệp");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }
 
@@ -77,7 +100,7 @@ export function useDeleteAttachment(taskId: string) {
       qc.invalidateQueries({ queryKey: key(taskId) });
       toast.success("Đã xoá tệp");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }
 
