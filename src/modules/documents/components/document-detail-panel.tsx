@@ -69,7 +69,6 @@ const ACTION_LABEL: Record<DocumentEventAction, string> = {
   return: "Trả lại",
   resend: "Gửi lại",
   finish_early: "Kết thúc sớm",
-  undo: "Hoàn tác",
   receive_back: "Nhận lại hồ sơ",
   hand_over: "Bàn giao người gửi",
   sender_confirm: "Người gửi đã nhận",
@@ -86,7 +85,6 @@ const ACTION_DOT: Record<DocumentEventAction, string> = {
   return: "bg-orange-500",
   resend: "bg-blue-500",
   finish_early: "bg-emerald-500",
-  undo: "bg-muted-foreground/40",
   receive_back: "bg-violet-500",
   hand_over: "bg-violet-500",
   sender_confirm: "bg-emerald-500",
@@ -148,7 +146,7 @@ function editLines(
   });
 }
 
-/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0020). */
+/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0023). */
 const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "send",
   "forward",
@@ -163,16 +161,12 @@ const UNDOABLE_ACTIONS: DocumentEventAction[] = [
 
 /**
  * Event mới nhất còn hoàn tác được: đúng thứ tự doc_undo chọn (created_at
- * giảm dần, rồi id) và bỏ qua event đã bị một event undo trỏ tới.
+ * giảm dần, rồi id). Event đã hoàn tác bị xoá khỏi DB nên không cần lọc.
  */
 function latestUndoableEvent(events: DocumentEvent[]): DocumentEvent | null {
-  const undoneIds = new Set(
-    events.map((event) => event.undo_of).filter((id): id is string => !!id),
-  );
-
   let latest: DocumentEvent | null = null;
   for (const event of events) {
-    if (!UNDOABLE_ACTIONS.includes(event.action) || undoneIds.has(event.id)) {
+    if (!UNDOABLE_ACTIONS.includes(event.action)) {
       continue;
     }
     if (
@@ -260,15 +254,6 @@ export function DocumentDetailPanel({
     status?.handback === "awaiting_sender" ? canManage || isSender : canManage;
   const showActions = canRunActions && actions.length > 0;
 
-  // Undo history is not shown: hide the undo events and the events they
-  // reverted (an undo event's undo_of points at the reverted one), so the
-  // timeline reads as if those actions never happened.
-  const undoneIds = new Set(
-    events.map((event) => event.undo_of).filter((id): id is string => !!id),
-  );
-  const visibleEvents = events.filter(
-    (event) => event.action !== "undo" && !undoneIds.has(event.id),
-  );
   const undoableEvent = canManage ? latestUndoableEvent(events) : null;
 
   return (
@@ -429,9 +414,9 @@ export function DocumentDetailPanel({
               <div className="space-y-3">
                 <h3 className="flex items-center gap-2 text-sm font-medium">
                   Lịch sử xử lý
-                  {visibleEvents.length > 0 && (
+                  {events.length > 0 && (
                     <span className="text-xs font-normal text-muted-foreground">
-                      {visibleEvents.length} mốc
+                      {events.length} mốc
                     </span>
                   )}
                 </h3>
@@ -440,13 +425,13 @@ export function DocumentDetailPanel({
                   <div className="flex justify-center py-6">
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   </div>
-                ) : visibleEvents.length === 0 ? (
+                ) : events.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
                     Chưa có hoạt động nào.
                   </p>
                 ) : (
                   <ol className="space-y-4">
-                    {visibleEvents.map((event) => {
+                    {events.map((event) => {
                       const isReturn =
                         event.action === "return" ||
                         event.action === "report_missing";

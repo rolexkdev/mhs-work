@@ -108,5 +108,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
   `doc_sender_confirm`, which the document's sender may also call. These RPCs set the
   transaction-local flag `app.doc_rpc` so the guard trigger lets them write progress
   columns.
+- Undo keeps no history: `doc_undo` (`0023_document_undo_no_history.sql`) restores the
+  document and deletes the reverted event; no `undo` event is ever written.
 - Zalo APIs reject non-Vietnamese IPs, so Edge Functions call Zalo through `zalo-bridge`.
   See `zalo-bridge/README.md` before changing anything in the Zalo flow.
