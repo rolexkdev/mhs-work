@@ -265,17 +265,28 @@ export function useUpdateMeetingItem() {
   });
 }
 
-/** Xoá đầu mục cùng công việc đi kèm. */
+/**
+ * Xoá đầu mục. Đầu mục đã có công việc thì chỉ chuyển công việc vào thùng rác
+ * (đầu mục tự ẩn, admin khôi phục là hiện lại); chưa có công việc thì xoá hẳn.
+ */
 export function useDeleteMeetingItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient();
-      const { error: taskError } = await supabase
+      const { data: linked, error: taskError } = await supabase
         .from("tasks")
-        .delete()
+        .select("id, deleted_at")
         .eq("meeting_item_id", id);
       if (taskError) throw taskError;
+      if (linked?.length) {
+        const alive = linked.filter((t) => !t.deleted_at).map((t) => t.id);
+        if (alive.length) {
+          const { error } = await supabase.rpc("task_trash", { p_ids: alive });
+          if (error) throw error;
+        }
+        return;
+      }
       const { error } = await supabase
         .from("meeting_items")
         .delete()

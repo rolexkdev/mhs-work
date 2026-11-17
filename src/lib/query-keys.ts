@@ -13,8 +13,14 @@ export const queryKeys = {
   meeting: (id: string) => ["meetings", id] as const,
   meetingItems: (meetingId: string) => ["meeting-items", meetingId] as const,
   meetingItemStats: ["meeting-items", "stats"] as const,
-  tasks: (filters?: Partial<TaskFilters> & { meetingId?: string | null }) =>
-    ["tasks", filters ?? {}] as const,
+  tasks: (
+    filters?: Partial<TaskFilters> & {
+      meetingId?: string | null;
+      withDeleted?: boolean;
+    },
+  ) => ["tasks", filters ?? {}] as const,
+  /** Trashed tasks (admin trash page). */
+  taskTrash: ["tasks", "trash"] as const,
   task: (id: string) => ["tasks", "detail", id] as const,
   documents: ["documents"] as const,
   document: (id: string) => ["documents", "detail", id] as const,

@@ -99,6 +99,9 @@ export type Task = Timestamps & {
   completed_at: string | null;
   /** Các tuần (yyyy-mm-dd của Thứ 2) admin ẩn task thủ công. */
   hidden_weeks: string[];
+  /** Set when the task is moved to the trash (0024); null = active. */
+  deleted_at: string | null;
+  deleted_by: string | null;
   updated_at: string;
 };
 
@@ -304,6 +307,8 @@ export interface Database {
           | "recurrence"
           | "completed_at"
           | "hidden_weeks"
+          | "deleted_at"
+          | "deleted_by"
         >;
         Update: Update<Task>;
         Relationships: Rel[];
@@ -394,6 +399,16 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      // Moves tasks to the trash; returns how many were moved (0024).
+      task_trash: {
+        Args: { p_ids: string[] };
+        Returns: number;
+      };
+      // Brings a trashed task back; admin only (0024).
+      task_restore: {
+        Args: { p_id: string };
+        Returns: undefined;
+      };
       can_manage_documents: {
         Args: Record<string, never>;
         Returns: boolean;

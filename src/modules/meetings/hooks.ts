@@ -58,7 +58,8 @@ export function useMeetingTaskCounts() {
       const { data, error } = await supabase
         .from("tasks")
         .select("meeting_id, status")
-        .not("meeting_id", "is", null);
+        .not("meeting_id", "is", null)
+        .is("deleted_at", null);
       if (error) throw error;
       const counts: Record<string, MeetingTaskCount> = {};
       for (const row of data ?? []) {

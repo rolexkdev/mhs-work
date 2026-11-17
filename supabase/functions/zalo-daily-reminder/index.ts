@@ -110,7 +110,8 @@ Deno.serve(async (req) => {
       .from("tasks")
       .select("id, title, status, due_date, assignee_ids, manual_progress")
       .overlaps("assignee_ids", ids)
-      .neq("status", "done");
+      .neq("status", "done")
+      .is("deleted_at", null);
     if (taskErr) throw taskErr;
 
     const { data: sentToday } = await db

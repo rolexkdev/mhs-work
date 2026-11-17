@@ -57,8 +57,13 @@ function matches(filter: StatusFilter, status: TaskStatus | undefined) {
  * Tiến độ và trạng thái lấy thẳng từ công việc, bấm vào để mở chi tiết công việc.
  */
 export function MeetingItems({ meeting }: { meeting: Meeting }) {
-  const { data: items = [], isLoading } = useMeetingItems(meeting.id);
-  const { data: tasks = [] } = useTasks({ meetingId: meeting.id });
+  const { data: allItems = [], isLoading } = useMeetingItems(meeting.id);
+  // Trashed tasks are fetched too: an item whose tasks are all in the trash is
+  // hidden here and comes back when an admin restores them.
+  const { data: allTasks = [] } = useTasks({
+    meetingId: meeting.id,
+    withDeleted: true,
+  });
   const { data: profiles = [] } = useProfiles();
   const { data: meetings = [] } = useMeetings();
   const { data: me } = useMe();
@@ -81,6 +86,8 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
     return (id: string) => m.get(id) ?? "—";
   }, [profiles]);
 
+  const tasks = useMemo(() => allTasks.filter((t) => !t.deleted_at), [allTasks]);
+
   const tasksByItem = useMemo(() => {
     const m = new Map<string, Task[]>();
     for (const t of [...tasks].reverse()) {
@@ -89,6 +96,15 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
     }
     return m;
   }, [tasks]);
+
+  const items = useMemo(() => {
+    const trashed = new Set(
+      allTasks.flatMap((t) =>
+        t.deleted_at && t.meeting_item_id ? [t.meeting_item_id] : [],
+      ),
+    );
+    return allItems.filter((it) => tasksByItem.has(it.id) || !trashed.has(it.id));
+  }, [allItems, allTasks, tasksByItem]);
 
   const linkedTasks = tasks.filter((t) => t.meeting_item_id);
   const doneCount = linkedTasks.filter((t) => t.status === "done").length;
@@ -402,7 +418,7 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
         open={!!deleting}
         onOpenChange={(v) => !v && setDeleting(null)}
         title="Xoá đầu mục?"
-        description="Công việc đi kèm cũng bị xoá cùng tiến độ, bình luận và tệp đính kèm."
+        description="Công việc đi kèm được chuyển vào thùng rác. Quản trị viên có thể khôi phục lại."
         confirmLabel="Xoá"
         destructive
         onConfirm={() => deleting && del.mutate(deleting.id)}

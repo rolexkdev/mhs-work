@@ -236,6 +236,14 @@ export function TaskDetailPanel({
               </Button>
             </div>
 
+            {task.deleted_at && (
+              <div className="border-b border-orange-200 bg-orange-50 px-4 py-2 text-xs text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300 sm:px-5">
+                Công việc đang trong thùng rác
+                {nameOf(task.deleted_by) && <> · {nameOf(task.deleted_by)} xoá</>}{" "}
+                lúc {formatDateTime(task.deleted_at)}.
+              </div>
+            )}
+
             <Tabs
               defaultValue="detail"
               className="flex min-h-0 flex-1 flex-col"
@@ -823,6 +831,10 @@ export function describeLog(
       return <>cập nhật tình hình mới nhất</>;
     case "description":
       return <>sửa mô tả</>;
+    case "deleted":
+      return <>chuyển công việc vào thùng rác</>;
+    case "restored":
+      return <>khôi phục công việc từ thùng rác</>;
     default:
       return <>cập nhật công việc</>;
   }

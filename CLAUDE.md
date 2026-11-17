@@ -101,6 +101,10 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - RLS: there is no team concept. Since migrations 0007 and 0009, every authenticated user
   can view and edit all tasks and task details; history is traced via `task_logs`.
   Admin-only features (e.g. `/accounts`) are enforced in the app and via the admin client.
+- Tasks are soft-deleted (0024): deleting calls the `task_trash` RPC, which sets
+  `deleted_at` / `deleted_by`. Every task query must filter `deleted_at is null`
+  (`useTasks` does unless `withDeleted`). Only admins can restore (`task_restore`) from
+  `/tasks/trash` or hard-delete (RLS allows DELETE for admins on trashed tasks only).
 - Document progress changes go only through the security definer RPCs in
   `0018_document_actions.sql`, `0019_document_handback.sql` and
   `0020_document_report_missing.sql`, and require admin or
