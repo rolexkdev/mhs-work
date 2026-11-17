@@ -148,6 +148,25 @@ export type UserActivity = Timestamps & {
   path: string | null;
 };
 
+/** In-app notification for the bell (0025). Written by DB triggers only. */
+export type NotificationKind = "assigned" | "comment" | "due_date";
+
+export type AppNotification = Timestamps & {
+  id: string;
+  user_id: string;
+  actor_id: string | null;
+  task_id: string | null;
+  kind: NotificationKind;
+  /** Snapshot taken when the notification was written. */
+  data: {
+    title?: string;
+    due_date?: string | null;
+    old_due_date?: string | null;
+    comment?: string;
+  };
+  read_at: string | null;
+};
+
 export type DocumentEventAction =
   | "created"
   | "edit"
@@ -342,6 +361,13 @@ export interface Database {
         // user_id defaults to auth.uid() in the database.
         Insert: Insert<UserActivity, "id" | "created_at" | "user_id" | "path">;
         Update: Update<UserActivity>;
+        Relationships: Rel[];
+      };
+      notifications: {
+        Row: Row<AppNotification>;
+        // Rows are inserted by triggers only (0025).
+        Insert: Insert<AppNotification, "id" | "created_at" | "actor_id" | "task_id" | "data" | "read_at">;
+        Update: Update<AppNotification>;
         Relationships: Rel[];
       };
       documents: {

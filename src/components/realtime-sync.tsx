@@ -86,6 +86,12 @@ export function RealtimeSync() {
       )
       .on(
         "postgres_changes",
+        // RLS limits these events to the signed-in user's own notifications.
+        { event: "*", schema: "public", table: "notifications" },
+        () => qc.invalidateQueries({ queryKey: queryKeys.notifications }),
+      )
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "documents" },
         () => {
           // The "documents" key prefix also covers document detail and

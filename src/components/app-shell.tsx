@@ -30,6 +30,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { RealtimeSync } from "@/components/realtime-sync";
 import { ActivityTracker } from "@/components/activity-tracker";
 import { ProfileDialog } from "@/modules/auth/profile-dialog";
+import { NotificationBell } from "@/modules/notifications/notification-bell";
 import { signOut } from "@/modules/auth/actions";
 import { FEATURES } from "@/lib/features";
 import type { UserRole } from "@/types/database";
@@ -118,8 +119,9 @@ export function AppShell({
     <div className="flex min-h-screen bg-muted/30">
       {/* Sidebar — đứng yên khi nội dung bên phải cuộn dài */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-background md:flex">
-        <div className="flex h-14 items-center border-b px-5">
+        <div className="flex h-14 items-center justify-between gap-2 border-b pl-5 pr-2">
           <Brand />
+          <NotificationBell align="start" />
         </div>
 
         <div className="px-3 pt-3">
@@ -202,6 +204,8 @@ export function AppShell({
           <span className="min-w-0 flex-1 truncate text-base font-semibold">
             {currentLabel}
           </span>
+
+          <NotificationBell />
 
           <button
             onClick={() =>
