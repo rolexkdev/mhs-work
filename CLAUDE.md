@@ -28,7 +28,7 @@ There is no test suite. After changing code, run `npm run typecheck` and `npm ru
   `documents`, `updates`, `accounts` (admin only). `src/app/login/` — login page.
 - `src/middleware.ts` + `src/lib/supabase/middleware.ts` — session refresh / auth redirect.
 - `src/modules/<domain>/` — feature code per domain (`auth`, `admin`, `dashboard`,
-  `meetings`, `tasks`, `documents`, `updates`): TanStack Query hooks (`hooks.ts`, `*-hooks.ts`) and components.
+  `meetings`, `tasks`, `documents`, `updates`, `notifications`): TanStack Query hooks (`hooks.ts`, `*-hooks.ts`) and components.
 - `src/lib/supabase/` — `client.ts` (browser), `server.ts` (server components / actions),
   `admin.ts` (service role, bypasses RLS).
 - `src/lib/query-keys.ts` — all React Query keys. `src/lib/errors.ts` — `friendlyError()`
@@ -105,6 +105,9 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
   `deleted_at` / `deleted_by`. Every task query must filter `deleted_at is null`
   (`useTasks` does unless `withDeleted`). Only admins can restore (`task_restore`) from
   `/tasks/trash` or hard-delete (RLS allows DELETE for admins on trashed tasks only).
+- Bell notifications (0025) are written only by DB triggers on `tasks` (assigned,
+  due date changed) and `task_comments` (comment), for users in `assignee_ids` other
+  than the actor. Add a new kind by extending those triggers and the `kind` check.
 - Document progress changes go only through the security definer RPCs in
   `0018_document_actions.sql`, `0019_document_handback.sql` and
   `0020_document_report_missing.sql`, and require admin or

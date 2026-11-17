@@ -22,6 +22,8 @@ export const queryKeys = {
   /** Trashed tasks (admin trash page). */
   taskTrash: ["tasks", "trash"] as const,
   task: (id: string) => ["tasks", "detail", id] as const,
+  /** Bell notifications of the signed-in user. */
+  notifications: ["notifications"] as const,
   documents: ["documents"] as const,
   document: (id: string) => ["documents", "detail", id] as const,
   documentEvents: (id: string) => ["documents", "events", id] as const,
