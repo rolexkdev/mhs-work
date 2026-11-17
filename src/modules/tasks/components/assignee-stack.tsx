@@ -93,8 +93,11 @@ export function AssigneePicker({
   onChange: (ids: string[]) => void;
   children: React.ReactNode;
 }) {
+  // Non-modal: when the picker sits in a dialog, a modal menu disables
+  // pointer events on the page, so the click that closes the menu lands
+  // "outside" the dialog and closes the dialog too.
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
         <DropdownMenuItem onClick={() => onChange([])}>
