@@ -1,11 +1,11 @@
 -- =============================================================
--- 0022 — The creator sets the document route
+-- 0023 — The creator sets the document route
 -- doc_set_route used to be manager-only. The creator of a document may
 -- now set and edit its route while the document is still a draft
 -- (Chờ gửi: nothing received yet). Managers keep editing it any time
 -- the route is still open. Everything else is the same as 0019.
 --
--- Idempotent. Run manually in the Supabase SQL Editor after 0021.
+-- Idempotent. Run manually in the Supabase SQL Editor after 0022.
 -- =============================================================
 
 create or replace function public.doc_set_route(

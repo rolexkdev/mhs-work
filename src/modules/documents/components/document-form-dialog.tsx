@@ -22,7 +22,6 @@ import {
 import { useCurrentUserId } from "@/modules/auth/use-current-user";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import {
-  useCanManageDocuments,
   useCreateDocument,
   useUpdateDocument,
 } from "@/modules/documents/hooks";
@@ -34,8 +33,8 @@ const NO_SENDER = "__none__";
 /**
  * Hộp thoại thêm / sửa thông tin hồ sơ.
  *
- * Tạo mới: tên, người gửi, ghi chú và — chỉ với quản lý hồ sơ — lộ trình ban
- * đầu (thêm phòng ban, đổi thứ tự, xoá bước).
+ * Tạo mới: tên, người gửi, ghi chú và lộ trình ban đầu bắt buộc (thêm phòng
+ * ban, đổi thứ tự, xoá bước).
  * Chỉnh sửa: chỉ tên, người gửi, ghi chú; lộ trình sửa ở bước sau.
  */
 export function DocumentFormDialog({
@@ -51,7 +50,6 @@ export function DocumentFormDialog({
   const isEdit = !!document;
   const { data: profiles = [] } = useProfiles();
   const currentUserId = useCurrentUserId();
-  const canManage = useCanManageDocuments();
   const createDocument = useCreateDocument();
   const updateDocument = useUpdateDocument();
 
@@ -115,7 +113,7 @@ export function DocumentFormDialog({
           // No sender picked yet (e.g. the user id was still loading): omit
           // it so the database defaults it to the creator instead of null.
           sender_id: senderId === "" ? undefined : info.sender_id,
-          departments: canManage && route.length > 0 ? route : undefined,
+          departments: route,
         });
       }
     } catch {
@@ -189,8 +187,8 @@ export function DocumentFormDialog({
               </div>
             </div>
 
-            {!isEdit && canManage && (
-              <Section title="Lộ trình xử lý">
+            {!isEdit && (
+              <Section title="Lộ trình xử lý *">
                 <DocumentRouteList
                   rows={route.map((department, index) => ({
                     key: `${department}-${index}`,
@@ -199,7 +197,7 @@ export function DocumentFormDialog({
                   onAdd={handleAddDepartment}
                   onMove={handleMoveStep}
                   onRemove={handleRemoveStep}
-                  emptyText="Chưa có bước nào. Hồ sơ sẽ ở trạng thái Chờ gửi."
+                  emptyText="Chưa có bước nào. Cần ít nhất một phòng ban để tạo hồ sơ."
                 />
               </Section>
             )}
@@ -213,7 +211,12 @@ export function DocumentFormDialog({
             >
               Huỷ
             </Button>
-            <Button type="submit" disabled={pending || !name.trim()}>
+            <Button
+              type="submit"
+              disabled={
+                pending || !name.trim() || (!isEdit && route.length === 0)
+              }
+            >
               {pending
                 ? "Đang lưu..."
                 : isEdit
