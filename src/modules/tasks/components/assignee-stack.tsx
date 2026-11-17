@@ -81,7 +81,13 @@ export function AssigneeStack({
   );
 }
 
-/** Chọn nhiều người phụ trách; menu giữ mở để tích liên tiếp. */
+/**
+ * Chọn nhiều người phụ trách; menu giữ mở để tích liên tiếp.
+ *
+ * modal={false}: menu modal tắt pointer-events của phần còn lại, nên khi nó
+ * còn mở, một click ra ngoài rơi xuống lớp phủ của Dialog và đóng luôn cả hộp
+ * thoại chứa nó (form tạo/sửa công việc).
+ */
 export function AssigneePicker({
   value,
   options,
@@ -94,7 +100,7 @@ export function AssigneePicker({
   children: React.ReactNode;
 }) {
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
         <DropdownMenuItem onClick={() => onChange([])}>
