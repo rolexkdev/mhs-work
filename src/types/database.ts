@@ -154,7 +154,6 @@ export type DocumentEventAction =
   | "return"
   | "resend"
   | "finish_early"
-  | "undo"
   | "receive_back"
   | "hand_over"
   | "sender_confirm"
@@ -201,6 +200,7 @@ export type DocumentEvent = Timestamps & {
   note: string | null;
   payload: unknown | null;
   undo_data: unknown | null;
+  /** Always null since 0022: undo deletes the reverted event instead. */
   undo_of: string | null;
   created_by: string | null;
 };
