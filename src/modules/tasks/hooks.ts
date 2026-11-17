@@ -19,6 +19,8 @@ export interface TaskQueryFilters {
   assigneeId?: string | null;
   status?: Task["status"] | null;
   priority?: Task["priority"] | null;
+  /** Also return trashed tasks (the meeting page needs them to hide items). */
+  withDeleted?: boolean;
 }
 
 export function useTasks(filters: TaskQueryFilters = {}) {
@@ -27,6 +29,7 @@ export function useTasks(filters: TaskQueryFilters = {}) {
     queryFn: async (): Promise<Task[]> => {
       const supabase = createClient();
       let q = supabase.from("tasks").select("*");
+      if (!filters.withDeleted) q = q.is("deleted_at", null);
       if (filters.meetingId) q = q.eq("meeting_id", filters.meetingId);
       if (filters.assigneeId) q = q.contains("assignee_ids", [filters.assigneeId]);
       if (filters.status) q = q.eq("status", filters.status);
@@ -160,18 +163,76 @@ export function useUpdateTask() {
   });
 }
 
+/** Moves a task to the trash; an admin can restore it from /tasks/trash. */
 export function useDeleteTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient();
-      const { error } = await supabase.from("tasks").delete().eq("id", id);
+      const { error } = await supabase.rpc("task_trash", { p_ids: [id] });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
-      toast.success("Đã xoá công việc");
+      toast.success("Đã chuyển công việc vào thùng rác");
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
+
+/** Trashed tasks, most recently deleted first. */
+export function useTrashedTasks() {
+  return useQuery({
+    queryKey: queryKeys.taskTrash,
+    queryFn: async (): Promise<Task[]> => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("*")
+        .not("deleted_at", "is", null)
+        .order("deleted_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+export function useRestoreTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const supabase = createClient();
+      const { error } = await supabase.rpc("task_restore", { p_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
+      toast.success("Đã khôi phục công việc");
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
+
+/** Deletes a trashed task for good (admin only, enforced by RLS). */
+export function usePurgeTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("tasks")
+        .delete()
+        .eq("id", id)
+        .not("deleted_at", "is", null)
+        .select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Không có quyền xoá vĩnh viễn công việc này");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Đã xoá vĩnh viễn công việc");
     },
     onError: (e: Error) => toast.error(friendlyError(e)),
   });

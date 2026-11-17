@@ -493,7 +493,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         title="Xoá công việc?"
         description={
           pendingDelete
-            ? `"${pendingDelete.title}" sẽ bị xoá vĩnh viễn cùng việc con, bình luận và tệp đính kèm.`
+            ? `"${pendingDelete.title}" sẽ được chuyển vào thùng rác. Quản trị viên có thể khôi phục lại.`
             : undefined
         }
         confirmLabel="Xoá"
