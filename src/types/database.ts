@@ -200,7 +200,7 @@ export type DocumentEvent = Timestamps & {
   note: string | null;
   payload: unknown | null;
   undo_data: unknown | null;
-  /** Always null since 0023: undo deletes the reverted event instead. */
+  /** Always null since 0022: undo deletes the reverted event instead. */
   undo_of: string | null;
   created_by: string | null;
 };

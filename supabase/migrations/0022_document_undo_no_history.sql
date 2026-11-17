@@ -1,5 +1,5 @@
 -- =============================================================
--- 0023 — Undo no longer keeps history
+-- 0022 — Undo no longer keeps history
 -- doc_undo used to log an 'undo' event and keep the reverted event
 -- (marked through undo_of). Now it restores the document and deletes
 -- the reverted event, so an undone action leaves no trace and the
@@ -9,7 +9,7 @@
 -- 'undo' is removed from the allowed actions. The undo_of column stays
 -- (doc_log_event still has the parameter) but is always null.
 --
--- Idempotent. Run manually in the Supabase SQL Editor after 0022.
+-- Idempotent. Run manually in the Supabase SQL Editor after 0021.
 -- Back up document_events first: the cleanup is a hard delete.
 -- =============================================================
 

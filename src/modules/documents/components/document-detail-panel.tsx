@@ -146,7 +146,7 @@ function editLines(
   });
 }
 
-/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0023). */
+/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0022). */
 const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "send",
   "forward",
