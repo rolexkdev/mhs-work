@@ -73,6 +73,7 @@ const ACTION_LABEL: Record<DocumentEventAction, string> = {
   hand_over: "Bàn giao người gửi",
   sender_confirm: "Người gửi đã nhận",
   report_missing: "Báo thiếu hồ sơ",
+  complete: "Hoàn thành trực tiếp",
 };
 
 /** Màu chấm mốc thời gian, cùng bảng màu trạng thái của /tasks. */
@@ -89,6 +90,7 @@ const ACTION_DOT: Record<DocumentEventAction, string> = {
   hand_over: "bg-violet-500",
   sender_confirm: "bg-emerald-500",
   report_missing: "bg-orange-500",
+  complete: "bg-emerald-500",
 };
 
 function payloadOf(event: DocumentEvent): Record<string, unknown> {

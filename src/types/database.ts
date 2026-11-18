@@ -179,7 +179,8 @@ export type DocumentEventAction =
   | "receive_back"
   | "hand_over"
   | "sender_confirm"
-  | "report_missing";
+  | "report_missing"
+  | "complete";
 
 /** A paper document tracked through departments (0017). */
 export type DocumentRecord = Timestamps & {
@@ -495,6 +496,10 @@ export interface Database {
       // Reopens the last step as returned during hand-back (0020).
       doc_report_missing: {
         Args: { p_document_id: string; p_reason: string };
+        Returns: undefined;
+      };
+      doc_complete: {
+        Args: { p_document_id: string; p_note?: string | null };
         Returns: undefined;
       };
     };
