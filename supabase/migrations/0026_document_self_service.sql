@@ -958,32 +958,57 @@ $$;
 --     'verification');                            -- expect ok
 -- rollback;
 --
--- Step 2 scenario (new transaction; use a finished-route document created by
--- a non-admin :creator who is not the sender, with every step done, status
--- Chờ nhận lại; :doc2 is its id, :other is unrelated):
+-- Step 2 scenario. Events written in one transaction share created_at, so
+-- doc_undo's "latest event" is only well defined when each action is its
+-- own transaction. Use a document created by a non-admin :creator who is
+-- not the sender, with every step done (status Chờ nhận lại); :doc2 is its
+-- id, :other is an unrelated member.
 --
+-- Transaction A. COMMITS: this writes dev data, run on dev only.
 -- begin;
 --   set local role authenticated;
 --   select set_config('request.jwt.claims', json_build_object('sub', ':creator')::text, true);
 --   select public.doc_receive_back(':doc2', null);      -- ok
+-- commit;
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claims', json_build_object('sub', ':creator')::text, true);
 --   select public.doc_hand_over(':doc2', null);         -- ok
---   select public.doc_sender_confirm(':doc2', null);    -- ok, event payload on_behalf = true
+-- commit;
+--
+-- Transaction B. Rolled back.
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claims', json_build_object('sub', ':creator')::text, true);
+--   select public.doc_sender_confirm(':doc2', null);    -- ok
 --   select finished_at is not null from public.documents where id = ':doc2';  -- expect true
+--   select payload ->> 'on_behalf' from public.document_events
+--     where document_id = ':doc2' and action = 'sender_confirm';              -- expect 'true'
 --   select public.doc_undo(':doc2', (select id from public.document_events
---     where document_id = ':doc2' order by created_at desc, id desc limit 1)); -- ok, back to Chờ người gửi nhận
+--     where document_id = ':doc2' and action = 'sender_confirm'));            -- ok
 --   select finished_at is null and handed_over_at is not null
---     from public.documents where id = ':doc2';         -- expect true
+--     from public.documents where id = ':doc2';         -- expect true (back at awaiting sender)
 --
 --   select set_config('request.jwt.claims', json_build_object('sub', ':other')::text, true);
---   do $$ begin
---     perform public.doc_receive_back(':doc2', null);
---     raise exception 'expected 42501';
---   exception when insufficient_privilege then null;
---   end $$;
 --   do $$ begin
 --     perform public.doc_sender_confirm(':doc2', null);
 --     raise exception 'expected 42501';
 --   exception when insufficient_privilege then null;
 --   end $$;
+--   do $$ begin
+--     perform public.doc_undo(':doc2', (select id from public.document_events
+--       where document_id = ':doc2' order by created_at desc, id desc limit 1));
+--     raise exception 'expected 42501';
+--   exception when insufficient_privilege then null;
+--   end $$;
+-- rollback;
+--
+-- Transaction C (optional). Rolled back: the real sender confirms.
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claims', json_build_object('sub', ':sender')::text, true);
+--   select public.doc_sender_confirm(':doc2', null);    -- ok
+--   select payload ->> 'on_behalf' from public.document_events
+--     where document_id = ':doc2' and action = 'sender_confirm';              -- expect 'false'
 -- rollback;
 -- =============================================================
