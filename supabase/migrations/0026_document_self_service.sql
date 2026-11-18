@@ -6,13 +6,19 @@
 --   * can_manage_documents() is redefined as admin only. RLS policies
 --     (0017) and the guard trigger (0019) keep calling it unchanged, so
 --     creators still edit/delete their own rows via created_by = auth.uid().
---   * doc_send, doc_set_route, doc_forward, doc_return, doc_resend and
---     doc_finish_early check can_update_document(). Bodies are copied from
---     0018/0019/0023; only the permission check changed (and doc_set_route
---     no longer requires a draft for the creator).
+--   * These 11 RPCs check can_update_document() instead of the manager
+--     flag: doc_send, doc_set_route, doc_forward, doc_return, doc_resend,
+--     doc_finish_early, doc_receive_back, doc_hand_over, doc_report_missing,
+--     doc_sender_confirm (admin, creator or sender) and doc_undo. Bodies are
+--     copied from 0018/0019/0020/0022/0023; only the permission check
+--     changed (doc_set_route no longer requires a draft for the creator).
+--   * New doc_complete RPC and 'complete' event action: finishes a document
+--     in Chờ nhận lại directly. document_events_action_check is replaced
+--     (existing list plus 'complete'); doc_undo also selects 'complete'.
 -- profiles.is_doc_manager stays in place but is no longer used.
 --
--- Idempotent. Run manually in the Supabase SQL Editor after 0025.
+-- Idempotent. Run manually in the Supabase SQL Editor after 0022 (and 0025):
+-- the new action check has no 'undo', which 0022 removes.
 -- =============================================================
 
 -- ---------- Permission helpers ----------
