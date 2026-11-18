@@ -556,8 +556,87 @@ begin
 end;
 $$;
 
+-- ---------- Direct completion ----------
+-- New event action: the existing list (0022) plus 'complete'.
+alter table public.document_events
+  drop constraint if exists document_events_action_check;
+alter table public.document_events
+  add constraint document_events_action_check check (
+    action in (
+      'created',
+      'edit',
+      'route',
+      'send',
+      'forward',
+      'return',
+      'resend',
+      'finish_early',
+      'receive_back',
+      'hand_over',
+      'sender_confirm',
+      'report_missing',
+      'complete'
+    )
+  );
+
+-- Finishes a document whose route is done (Chờ nhận lại) without the
+-- hand-back. Undo restores finished_at from the snapshot, so doc_undo
+-- needs no separate branch: it only has to select 'complete' events.
+create or replace function public.doc_complete(
+  p_document_id uuid,
+  p_note text default null
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_undo jsonb;
+begin
+  if not public.can_update_document(p_document_id) then
+    raise exception 'Chỉ người tạo, người gửi hoặc quản trị viên mới được thực hiện thao tác này.'
+      using errcode = '42501';
+  end if;
+
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  if v_doc.finished_at is not null then
+    raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
+  end if;
+
+  -- Only in Chờ nhận lại: route done, not received back yet.
+  if not public.doc_route_done(p_document_id)
+     or v_doc.received_back_at is not null then
+    raise exception 'Hồ sơ vừa được cập nhật, vui lòng tải lại rồi thử lại.'
+      using errcode = 'P0001';
+  end if;
+
+  v_undo := public.doc_handback_snapshot(v_doc);
+
+  perform set_config('app.doc_rpc', 'on', true);
+
+  update public.documents
+  set finished_at = now()
+  where id = p_document_id;
+
+  perform public.doc_log_event(
+    p_document_id, 'complete', null, null, null, p_note, null, v_undo, null
+  );
+end;
+$$;
+
+revoke all on function public.doc_complete(uuid, text) from public, anon, authenticated;
+grant execute on function public.doc_complete(uuid, text) to authenticated;
+
 -- ---------- Hand-back and undo ----------
--- Same bodies as 0019/0020/0022; only the permission check changed.
+-- Same bodies as 0019/0020/0022; only the permission check changed (and
+-- doc_undo also selects 'complete' events).
 
 create or replace function public.doc_receive_back(
   p_document_id uuid,
@@ -771,7 +850,8 @@ begin
       'receive_back',
       'hand_over',
       'sender_confirm',
-      'report_missing'
+      'report_missing',
+      'complete'
     )
   order by e.created_at desc, e.id desc
   limit 1;
@@ -1010,5 +1090,52 @@ $$;
 --   select public.doc_sender_confirm(':doc2', null);    -- ok
 --   select payload ->> 'on_behalf' from public.document_events
 --     where document_id = ':doc2' and action = 'sender_confirm';              -- expect 'false'
+-- rollback;
+--
+-- Step 3 scenario (direct completion). Same rules as step 2: one event per
+-- transaction. Use a non-admin :creator's document :doc3 with every step done
+-- (status Chờ nhận lại), :other an unrelated member.
+--
+-- Transaction A. Rolled back: rejected for an unrelated member.
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claims', json_build_object('sub', ':other')::text, true);
+--   do $$ begin
+--     perform public.doc_complete(':doc3', null);
+--     raise exception 'expected 42501';
+--   exception when insufficient_privilege then null;
+--   end $$;
+-- rollback;
+--
+-- Transaction B. Rolled back: complete, then undo.
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claims', json_build_object('sub', ':creator')::text, true);
+--   select public.doc_complete(':doc3', 'done');         -- ok
+--   select finished_at is not null from public.documents where id = ':doc3';  -- expect true
+--   select count(*) from public.document_events
+--     where document_id = ':doc3' and action = 'complete';                    -- expect 1
+--   select public.doc_undo(':doc3', (select id from public.document_events
+--     where document_id = ':doc3' and action = 'complete'));                  -- ok
+--   select finished_at is null and received_back_at is null
+--     from public.documents where id = ':doc3';          -- expect true (Chờ nhận lại)
+-- rollback;
+--
+-- Transaction C. COMMITS (dev only): move :doc3 to Đã nhận lại.
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claims', json_build_object('sub', ':creator')::text, true);
+--   select public.doc_receive_back(':doc3', null);       -- ok
+-- commit;
+--
+-- Transaction D. Rolled back: rejected once received back.
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claims', json_build_object('sub', ':creator')::text, true);
+--   do $$ begin
+--     perform public.doc_complete(':doc3', null);
+--     raise exception 'expected P0001';
+--   exception when raise_exception then null;
+--   end $$;
 -- rollback;
 -- =============================================================
