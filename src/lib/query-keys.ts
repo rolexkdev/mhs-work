@@ -4,7 +4,7 @@ export const queryKeys = {
   /** Id of the signed-in user (ownership checks). */
   currentUser: ["auth", "current-user"] as const,
   profiles: ["profiles"] as const,
-  /** Profile of the signed-in user (role + document manager flag). */
+  /** Profile of the signed-in user (role). */
   currentProfile: ["profiles", "current"] as const,
   accounts: ["accounts"] as const,
   accountActivity: (userId: string, days: number) =>

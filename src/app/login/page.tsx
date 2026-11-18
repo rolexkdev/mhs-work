@@ -26,7 +26,7 @@ export default function LoginPage() {
 
   // The QueryClient lives in the root layout and survives the soft
   // navigation after sign-out, so drop the previous user's cached data
-  // (e.g. their document manager permission) before the next sign-in.
+  // (e.g. their role) before the next sign-in.
   useEffect(() => {
     queryClient.clear();
   }, [queryClient]);

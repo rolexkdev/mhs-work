@@ -188,7 +188,7 @@ function latestUndoableEvent(events: DocumentEvent[]): DocumentEvent | null {
 
 /**
  * Tấm trượt bên phải: thông tin hồ sơ, lộ trình, nút thao tác tiến trình
- * (chỉ quản lý hồ sơ) và toàn bộ lịch sử xử lý.
+ * (người tạo, người gửi, quản trị viên) và toàn bộ lịch sử xử lý.
  */
 export function DocumentDetailPanel({
   document,
