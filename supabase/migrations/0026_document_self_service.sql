@@ -560,10 +560,11 @@ $$;
 
 -- =============================================================
 -- Verification (run on dev in the SQL Editor; everything is rolled back).
--- Replace the four uuids with: a plain member who created a draft document
--- with at least one route step (:creator), the document's sender
--- (:sender, a different member), an unrelated member (:other) and an admin
--- (:admin); :doc is the document id.
+-- Replace the placeholders ':creator', ':sender', ':other', ':admin' and
+-- ':doc' (including the leading colon, keep the quotes) with real uuids:
+-- a plain member who created a draft document with at least two route
+-- steps (:creator), the document's sender (:sender, a different member),
+-- an unrelated member (:other), an admin (:admin) and the document id (:doc).
 --
 -- begin;
 --   set local role authenticated;
@@ -576,16 +577,31 @@ $$;
 --   -- sender: allowed
 --   select set_config('request.jwt.claims', json_build_object('sub', ':sender')::text, true);
 --   select public.can_update_document(':doc');   -- expect true
---   select public.doc_forward(':doc', (select id from public.doc_current_step(':doc')), null, null); -- ok
+--   select public.doc_forward(
+--     ':doc',
+--     (select s.id from public.document_steps s
+--       where s.document_id = ':doc' and s.received_at is not null and s.done_at is null
+--       order by s.step_order limit 1),
+--     null, null);                                -- expect ok
 --
---   -- unrelated member: rejected (42501)
+--   -- unrelated member: rejected (42501), caught so the transaction goes on
 --   select set_config('request.jwt.claims', json_build_object('sub', ':other')::text, true);
 --   select public.can_update_document(':doc');   -- expect false
---   select public.doc_send(':doc', null);         -- expect error 42501
+--   do $$ begin
+--     perform public.doc_send(':doc', null);
+--     raise exception 'expected 42501';
+--   exception when insufficient_privilege then null;
+--   end $$;
 --
---   -- admin: allowed
+--   -- admin: allowed (real write path)
 --   select set_config('request.jwt.claims', json_build_object('sub', ':admin')::text, true);
 --   select public.can_update_document(':doc');   -- expect true
 --   select public.can_manage_documents();         -- expect true
+--   select public.doc_return(
+--     ':doc',
+--     (select s.id from public.document_steps s
+--       where s.document_id = ':doc' and s.received_at is not null and s.done_at is null
+--       order by s.step_order limit 1),
+--     'verification');                            -- expect ok
 -- rollback;
 -- =============================================================
