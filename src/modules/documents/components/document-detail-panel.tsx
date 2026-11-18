@@ -59,6 +59,7 @@ const ACTION_ICON: Record<DocumentActionKey, React.ElementType> = {
   hand_over: HandHelping,
   sender_confirm: CheckCircle2,
   report_missing: TriangleAlert,
+  complete: CheckCircle2,
 };
 
 const ACTION_LABEL: Record<DocumentEventAction, string> = {
@@ -149,7 +150,7 @@ function editLines(
   });
 }
 
-/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0022). */
+/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0026). */
 const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "send",
   "forward",
@@ -160,6 +161,7 @@ const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "hand_over",
   "sender_confirm",
   "report_missing",
+  "complete",
 ];
 
 /**
@@ -243,7 +245,7 @@ export function DocumentDetailPanel({
         : status.status === "returned"
           ? ["resend", "finish_early"]
           : status.handback === "awaiting_return"
-            ? ["receive_back", "report_missing"]
+            ? ["receive_back", "complete", "report_missing"]
             : status.handback === "received_back"
               ? ["hand_over", "report_missing"]
               : status.handback === "awaiting_sender"
@@ -327,7 +329,8 @@ export function DocumentDetailPanel({
                               key === "send" ||
                               key === "forward" ||
                               (status.status === "returning" &&
-                                key !== "report_missing")
+                                key !== "report_missing" &&
+                                key !== "complete")
                                 ? "default"
                                 : "outline"
                             }
@@ -394,8 +397,8 @@ export function DocumentDetailPanel({
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-medium">Lộ trình</h3>
                   {/* The route is locked once done (doc_set_route, 0019). The
-                      creator may edit it only while the document is a draft
-                      (0023). */}
+                      creator, sender and admin may edit it while the route is
+                      open (0026). */}
                   {canEditRoute && !document.finished_at &&
                     status.status !== "returning" && (
                     <Button

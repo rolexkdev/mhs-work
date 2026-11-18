@@ -256,18 +256,21 @@ export type DocumentActionKey =
   | "receive_back"
   | "hand_over"
   | "sender_confirm"
-  | "report_missing";
+  | "report_missing"
+  | "complete";
 
 /** Hand-back actions (0019): no step id, the RPC checks the state itself. */
 export type DocumentHandbackActionKey =
   | "receive_back"
   | "hand_over"
-  | "sender_confirm";
+  | "sender_confirm"
+  | "complete";
 
 const HANDBACK_RPC = {
   receive_back: "doc_receive_back",
   hand_over: "doc_hand_over",
   sender_confirm: "doc_sender_confirm",
+  complete: "doc_complete",
 } as const satisfies Record<DocumentHandbackActionKey, string>;
 
 export type DocumentActionInput =
@@ -315,6 +318,7 @@ const DOCUMENT_ACTION_SUCCESS: Record<DocumentActionKey, string> = {
   hand_over: "Đã bàn giao cho người gửi",
   sender_confirm: "Đã xác nhận nhận hồ sơ",
   report_missing: "Đã báo thiếu, hồ sơ chuyển sang Cần bổ sung",
+  complete: "Đã hoàn thành hồ sơ",
 };
 
 /**
@@ -383,7 +387,8 @@ export function useDocumentAction() {
         }
         case "receive_back":
         case "hand_over":
-        case "sender_confirm": {
+        case "sender_confirm":
+        case "complete": {
           const { error } = await supabase.rpc(HANDBACK_RPC[input.action], {
             p_document_id: input.documentId,
             p_note: input.note,

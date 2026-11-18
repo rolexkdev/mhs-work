@@ -27,6 +27,7 @@ export const DOCUMENT_ACTION_LABEL: Record<DocumentActionKey, string> = {
   hand_over: "Bàn giao người gửi",
   sender_confirm: "Đã nhận hồ sơ",
   report_missing: "Báo thiếu",
+  complete: "Hoàn thành",
 };
 
 const ACTION_DESCRIPTION: Record<DocumentActionKey, string> = {
@@ -42,6 +43,8 @@ const ACTION_DESCRIPTION: Record<DocumentActionKey, string> = {
   sender_confirm: "Xác nhận người gửi đã nhận lại hồ sơ. Hồ sơ sẽ Hoàn thành.",
   report_missing:
     "Hồ sơ còn thiếu: bước cuối mở lại ở trạng thái Cần bổ sung để gửi lại cho phòng ban đó bổ sung.",
+  complete:
+    "Xác nhận hồ sơ đã xong, không cần nhận lại. Hồ sơ sẽ Hoàn thành.",
 };
 
 const NOTE_PLACEHOLDER: Record<DocumentActionKey, string> = {
@@ -54,6 +57,7 @@ const NOTE_PLACEHOLDER: Record<DocumentActionKey, string> = {
   hand_over: "Ghi chú khi bàn giao (không bắt buộc)",
   sender_confirm: "Ghi chú khi nhận (không bắt buộc)",
   report_missing: "Hồ sơ còn thiếu gì, cần bổ sung gì...",
+  complete: "Ghi chú khi hoàn thành (không bắt buộc)",
 };
 
 /**
@@ -91,7 +95,8 @@ export function DocumentActionDialog({
   const isHandback =
     action === "receive_back" ||
     action === "hand_over" ||
-    action === "sender_confirm";
+    action === "sender_confirm" ||
+    action === "complete";
   const needsStep =
     action !== "send" && action !== "report_missing" && !isHandback;
   const canSubmit =
@@ -153,6 +158,7 @@ export function DocumentActionDialog({
         case "receive_back":
         case "hand_over":
         case "sender_confirm":
+        case "complete":
           await mutation.mutateAsync({
             action,
             documentId,
