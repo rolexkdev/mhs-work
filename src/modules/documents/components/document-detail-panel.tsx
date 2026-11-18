@@ -20,6 +20,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   DOCUMENT_STATUS_BADGE,
+  canUpdateDocument,
   documentStatus,
 } from "@/modules/documents/status";
 import {
@@ -31,7 +32,7 @@ import { useProfiles } from "@/modules/auth/use-profiles";
 import { DocumentStepper } from "@/modules/documents/components/document-stepper";
 import { DocumentRouteEditor } from "@/modules/documents/components/document-route-editor";
 import {
-  useCanManageDocuments,
+  useIsAdmin,
   useDocumentEvents,
   useUndoDocumentAction,
   type DocumentActionKey,
@@ -58,6 +59,7 @@ const ACTION_ICON: Record<DocumentActionKey, React.ElementType> = {
   hand_over: HandHelping,
   sender_confirm: CheckCircle2,
   report_missing: TriangleAlert,
+  complete: CheckCircle2,
 };
 
 const ACTION_LABEL: Record<DocumentEventAction, string> = {
@@ -73,6 +75,7 @@ const ACTION_LABEL: Record<DocumentEventAction, string> = {
   hand_over: "Bàn giao người gửi",
   sender_confirm: "Người gửi đã nhận",
   report_missing: "Báo thiếu hồ sơ",
+  complete: "Hoàn thành trực tiếp",
 };
 
 /** Màu chấm mốc thời gian, cùng bảng màu trạng thái của /tasks. */
@@ -89,6 +92,7 @@ const ACTION_DOT: Record<DocumentEventAction, string> = {
   hand_over: "bg-violet-500",
   sender_confirm: "bg-emerald-500",
   report_missing: "bg-orange-500",
+  complete: "bg-emerald-500",
 };
 
 function payloadOf(event: DocumentEvent): Record<string, unknown> {
@@ -110,7 +114,7 @@ function eventTitle(event: DocumentEvent): string {
   }
 
   if (event.action === "sender_confirm" && payload.on_behalf === true) {
-    return `${ACTION_LABEL.sender_confirm} (quản lý xác nhận thay)`;
+    return `${ACTION_LABEL.sender_confirm} (xác nhận thay người gửi)`;
   }
 
   return ACTION_LABEL[event.action];
@@ -146,7 +150,7 @@ function editLines(
   });
 }
 
-/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0022). */
+/** Thao tác tiến trình có thể hoàn tác (khớp doc_undo trong 0026). */
 const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "send",
   "forward",
@@ -157,6 +161,7 @@ const UNDOABLE_ACTIONS: DocumentEventAction[] = [
   "hand_over",
   "sender_confirm",
   "report_missing",
+  "complete",
 ];
 
 /**
@@ -183,7 +188,7 @@ function latestUndoableEvent(events: DocumentEvent[]): DocumentEvent | null {
 
 /**
  * Tấm trượt bên phải: thông tin hồ sơ, lộ trình, nút thao tác tiến trình
- * (chỉ quản lý hồ sơ) và toàn bộ lịch sử xử lý.
+ * (người tạo, người gửi, quản trị viên) và toàn bộ lịch sử xử lý.
  */
 export function DocumentDetailPanel({
   document,
@@ -197,7 +202,7 @@ export function DocumentDetailPanel({
   const { data: events = [], isLoading: eventsLoading } = useDocumentEvents(
     document?.id ?? null,
   );
-  const canManage = useCanManageDocuments();
+  const isAdmin = useIsAdmin();
   const { data: profiles = [] } = useProfiles();
   const profileName = (id: string | null) => {
     const profile = profiles.find((p) => p.id === id);
@@ -240,25 +245,22 @@ export function DocumentDetailPanel({
         : status.status === "returned"
           ? ["resend", "finish_early"]
           : status.handback === "awaiting_return"
-            ? ["receive_back", "report_missing"]
+            ? ["receive_back", "complete", "report_missing"]
             : status.handback === "received_back"
               ? ["hand_over", "report_missing"]
               : status.handback === "awaiting_sender"
                 ? ["sender_confirm"]
                 : [];
 
-  // The sender confirms receipt themself; every other action is manager-only.
-  const isSender =
-    !!currentUserId && document?.sender_id === currentUserId;
-  const canRunActions =
-    status?.handback === "awaiting_sender" ? canManage || isSender : canManage;
+  // Admin, creator and sender share one rule (mirrors can_update_document).
+  const canUpdate = document
+    ? canUpdateDocument(document, currentUserId, isAdmin)
+    : false;
+  const canRunActions = canUpdate;
   const showActions = canRunActions && actions.length > 0;
-  const isCreator =
-    !!currentUserId && document?.created_by === currentUserId;
-  const canEditRoute =
-    canManage || (isCreator && status?.status === "pending");
+  const canEditRoute = canUpdate;
 
-  const undoableEvent = canManage ? latestUndoableEvent(events) : null;
+  const undoableEvent = canUpdate ? latestUndoableEvent(events) : null;
 
   return (
     <Sheet
@@ -327,7 +329,8 @@ export function DocumentDetailPanel({
                               key === "send" ||
                               key === "forward" ||
                               (status.status === "returning" &&
-                                key !== "report_missing")
+                                key !== "report_missing" &&
+                                key !== "complete")
                                 ? "default"
                                 : "outline"
                             }
@@ -394,8 +397,8 @@ export function DocumentDetailPanel({
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-medium">Lộ trình</h3>
                   {/* The route is locked once done (doc_set_route, 0019). The
-                      creator may edit it only while the document is a draft
-                      (0023). */}
+                      creator, sender and admin may edit it while the route is
+                      open (0026). */}
                   {canEditRoute && !document.finished_at &&
                     status.status !== "returning" && (
                     <Button

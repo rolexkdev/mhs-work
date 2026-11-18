@@ -109,17 +109,20 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
   due date changed) and `task_comments` (comment), for users in `assignee_ids` other
   than the actor. Add a new kind by extending those triggers and the `kind` check.
 - Document progress changes go only through the security definer RPCs in
-  `0018_document_actions.sql`, `0019_document_handback.sql` and
-  `0020_document_report_missing.sql`, and require admin or
-  `profiles.is_doc_manager` (toggled in `/accounts`). The one exception is
-  `doc_sender_confirm`, which the document's sender may also call. These RPCs set the
-  transaction-local flag `app.doc_rpc` so the guard trigger lets them write progress
-  columns.
+  `0018_document_actions.sql`, `0019_document_handback.sql`,
+  `0020_document_report_missing.sql` and `0026_document_self_service.sql`. Every RPC
+  (including `doc_sender_confirm` and `doc_undo`) requires `can_update_document(id)`:
+  admin, the document creator or its sender. There is no document manager role any
+  more: `can_manage_documents()` is admin only, and `profiles.is_doc_manager` is kept
+  but unused. The client mirrors the rule with `canUpdateDocument()` in
+  `src/modules/documents/status.ts`. These RPCs set the transaction-local flag
+  `app.doc_rpc` so the guard trigger lets them write progress columns.
+- After the route ends (Chờ nhận lại) `doc_complete` (0026) finishes the document
+  directly (`complete` event) instead of the hand-back; its undo restores Chờ nhận lại.
 - Undo keeps no history: `doc_undo` (`0022_document_undo_no_history.sql`) restores the
   document and deletes the reverted event; no `undo` event is ever written.
-- The route is set by the document creator: it is required when creating a document,
-  and `doc_set_route` (`0023_document_creator_route.sql`) lets the creator edit it only
-  while the document is a draft (Chờ gửi). Managers can edit it any time the route is
-  still open.
+- The route is set by the document creator: it is required when creating a document.
+  Since 0026, `doc_set_route` lets the creator, the sender and admins edit it any time
+  while the route is still open (0023 limited the creator to drafts).
 - Zalo APIs reject non-Vietnamese IPs, so Edge Functions call Zalo through `zalo-bridge`.
   See `zalo-bridge/README.md` before changing anything in the Zalo flow.

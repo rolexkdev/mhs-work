@@ -24,19 +24,19 @@ const GRID_STYLE = {
 
 /**
  * Edit / delete permissions shared by the table rows and the mobile cards:
- * creator or manager may edit info; delete only while pending, or in any
- * status for a manager (mirrors the RLS policies). RLS still decides.
+ * creator or admin may edit info (not the sender); delete only while pending,
+ * or in any status for an admin (mirrors the RLS policies). RLS still decides.
  */
 function editDeletePermissions(
   doc: DocumentWithSteps,
   currentUserId: string | null,
-  canManage: boolean,
+  isAdmin: boolean,
 ): { canEdit: boolean; canDelete: boolean } {
   const status = documentStatus(doc);
   const isCreator = !!currentUserId && doc.created_by === currentUserId;
   return {
-    canEdit: canManage || isCreator,
-    canDelete: canManage || (isCreator && status.status === "pending"),
+    canEdit: isAdmin || isCreator,
+    canDelete: isAdmin || (isCreator && status.status === "pending"),
   };
 }
 
@@ -48,14 +48,14 @@ function editDeletePermissions(
 export function DocumentListView({
   documents,
   currentUserId,
-  canManage,
+  isAdmin,
   onOpen,
   onEdit,
   onDelete,
 }: {
   documents: DocumentWithSteps[];
   currentUserId: string | null;
-  canManage: boolean;
+  isAdmin: boolean;
   onOpen: (doc: DocumentWithSteps) => void;
   onEdit: (doc: DocumentWithSteps) => void;
   onDelete: (doc: DocumentWithSteps) => void;
@@ -69,7 +69,7 @@ export function DocumentListView({
             key={doc.id}
             doc={doc}
             currentUserId={currentUserId}
-            canManage={canManage}
+            isAdmin={isAdmin}
             onOpen={onOpen}
             onEdit={onEdit}
             onDelete={onDelete}
@@ -98,7 +98,7 @@ export function DocumentListView({
             const { canEdit, canDelete } = editDeletePermissions(
               doc,
               currentUserId,
-              canManage,
+              isAdmin,
             );
 
             return (
@@ -200,14 +200,14 @@ export function DocumentListView({
 function MobileDocumentCard({
   doc,
   currentUserId,
-  canManage,
+  isAdmin,
   onOpen,
   onEdit,
   onDelete,
 }: {
   doc: DocumentWithSteps;
   currentUserId: string | null;
-  canManage: boolean;
+  isAdmin: boolean;
   onOpen: (doc: DocumentWithSteps) => void;
   onEdit: (doc: DocumentWithSteps) => void;
   onDelete: (doc: DocumentWithSteps) => void;
@@ -217,7 +217,7 @@ function MobileDocumentCard({
   const { canEdit, canDelete } = editDeletePermissions(
     doc,
     currentUserId,
-    canManage,
+    isAdmin,
   );
 
   return (

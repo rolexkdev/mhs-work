@@ -59,11 +59,12 @@ export function useDocumentEvents(documentId: string | null) {
 }
 
 /**
- * True when the signed-in user may manage document progress: role 'admin'
- * or profiles.is_doc_manager (mirrors can_manage_documents() from 0017).
+ * True when the signed-in user has role 'admin' (mirrors
+ * can_manage_documents(), admin only since 0026). Per-document rights for
+ * everyone else come from canUpdateDocument() in status.ts.
  * Invalidated together with the profiles list when an admin edits accounts.
  */
-export function useCanManageDocuments(): boolean {
+export function useIsAdmin(): boolean {
   const { data } = useQuery({
     queryKey: queryKeys.currentProfile,
     queryFn: async (): Promise<boolean> => {
@@ -75,12 +76,12 @@ export function useCanManageDocuments(): boolean {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("role, is_doc_manager")
+        .select("role")
         .eq("id", user.id)
         .single();
       if (error) throw error;
 
-      return profile.role === "admin" || profile.is_doc_manager;
+      return profile.role === "admin";
     },
     staleTime: 5 * 60_000,
   });
@@ -255,18 +256,21 @@ export type DocumentActionKey =
   | "receive_back"
   | "hand_over"
   | "sender_confirm"
-  | "report_missing";
+  | "report_missing"
+  | "complete";
 
 /** Hand-back actions (0019): no step id, the RPC checks the state itself. */
 export type DocumentHandbackActionKey =
   | "receive_back"
   | "hand_over"
-  | "sender_confirm";
+  | "sender_confirm"
+  | "complete";
 
 const HANDBACK_RPC = {
   receive_back: "doc_receive_back",
   hand_over: "doc_hand_over",
   sender_confirm: "doc_sender_confirm",
+  complete: "doc_complete",
 } as const satisfies Record<DocumentHandbackActionKey, string>;
 
 export type DocumentActionInput =
@@ -314,6 +318,7 @@ const DOCUMENT_ACTION_SUCCESS: Record<DocumentActionKey, string> = {
   hand_over: "Đã bàn giao cho người gửi",
   sender_confirm: "Đã xác nhận nhận hồ sơ",
   report_missing: "Đã báo thiếu, hồ sơ chuyển sang Cần bổ sung",
+  complete: "Đã hoàn thành hồ sơ",
 };
 
 /**
@@ -382,7 +387,8 @@ export function useDocumentAction() {
         }
         case "receive_back":
         case "hand_over":
-        case "sender_confirm": {
+        case "sender_confirm":
+        case "complete": {
           const { error } = await supabase.rpc(HANDBACK_RPC[input.action], {
             p_document_id: input.documentId,
             p_note: input.note,
@@ -405,7 +411,7 @@ export function useDocumentAction() {
       toast.success(DOCUMENT_ACTION_SUCCESS[input.action]);
     },
     onError: (e: Error, input) => {
-      // Another manager may have moved the document meanwhile.
+      // Another user may have moved the document meanwhile.
       invalidate(input.documentId);
       toast.error(friendlyError(e));
     },
@@ -423,7 +429,7 @@ export interface UndoDocumentActionInput {
 
 /**
  * Hoàn tác thao tác tiến trình gần nhất. RPC tự chọn event mới nhất chưa bị
- * hoàn tác và từ chối khi p_event_id đã cũ (hai quản lý bấm cùng lúc).
+ * hoàn tác và từ chối khi p_event_id đã cũ (hai người bấm cùng lúc).
  */
 export function useUndoDocumentAction() {
   const qc = useQueryClient();
