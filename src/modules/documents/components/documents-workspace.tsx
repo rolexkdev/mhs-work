@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { friendlyError } from "@/lib/errors";
 import { useCurrentUserId } from "@/modules/auth/use-current-user";
 import {
-  useCanManageDocuments,
+  useIsAdmin,
   useDeleteDocument,
   useDocuments,
 } from "@/modules/documents/hooks";
@@ -53,7 +53,7 @@ function searchText(doc: DocumentWithSteps): string {
 export function DocumentsWorkspace() {
   const { data: documents = [], isLoading, error } = useDocuments();
   const currentUserId = useCurrentUserId();
-  const canManage = useCanManageDocuments();
+  const isAdmin = useIsAdmin();
   const deleteDocument = useDeleteDocument();
 
   const documentStatusFilter = useUiStore((s) => s.documentStatus);
@@ -175,7 +175,7 @@ export function DocumentsWorkspace() {
         <DocumentListView
           documents={filtered}
           currentUserId={currentUserId}
-          canManage={canManage}
+          isAdmin={isAdmin}
           onOpen={openDetail}
           onEdit={setEditing}
           onDelete={setPendingDelete}

@@ -59,11 +59,12 @@ export function useDocumentEvents(documentId: string | null) {
 }
 
 /**
- * True when the signed-in user may manage document progress: role 'admin'
- * or profiles.is_doc_manager (mirrors can_manage_documents() from 0017).
+ * True when the signed-in user has role 'admin' (mirrors
+ * can_manage_documents(), admin only since 0026). Per-document rights for
+ * everyone else come from canUpdateDocument() in status.ts.
  * Invalidated together with the profiles list when an admin edits accounts.
  */
-export function useCanManageDocuments(): boolean {
+export function useIsAdmin(): boolean {
   const { data } = useQuery({
     queryKey: queryKeys.currentProfile,
     queryFn: async (): Promise<boolean> => {
@@ -75,12 +76,12 @@ export function useCanManageDocuments(): boolean {
 
       const { data: profile, error } = await supabase
         .from("profiles")
-        .select("role, is_doc_manager")
+        .select("role")
         .eq("id", user.id)
         .single();
       if (error) throw error;
 
-      return profile.role === "admin" || profile.is_doc_manager;
+      return profile.role === "admin";
     },
     staleTime: 5 * 60_000,
   });

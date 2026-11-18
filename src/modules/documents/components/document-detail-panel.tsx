@@ -20,6 +20,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   DOCUMENT_STATUS_BADGE,
+  canUpdateDocument,
   documentStatus,
 } from "@/modules/documents/status";
 import {
@@ -31,7 +32,7 @@ import { useProfiles } from "@/modules/auth/use-profiles";
 import { DocumentStepper } from "@/modules/documents/components/document-stepper";
 import { DocumentRouteEditor } from "@/modules/documents/components/document-route-editor";
 import {
-  useCanManageDocuments,
+  useIsAdmin,
   useDocumentEvents,
   useUndoDocumentAction,
   type DocumentActionKey,
@@ -199,7 +200,7 @@ export function DocumentDetailPanel({
   const { data: events = [], isLoading: eventsLoading } = useDocumentEvents(
     document?.id ?? null,
   );
-  const canManage = useCanManageDocuments();
+  const isAdmin = useIsAdmin();
   const { data: profiles = [] } = useProfiles();
   const profileName = (id: string | null) => {
     const profile = profiles.find((p) => p.id === id);
@@ -249,18 +250,15 @@ export function DocumentDetailPanel({
                 ? ["sender_confirm"]
                 : [];
 
-  // The sender confirms receipt themself; every other action is manager-only.
-  const isSender =
-    !!currentUserId && document?.sender_id === currentUserId;
-  const canRunActions =
-    status?.handback === "awaiting_sender" ? canManage || isSender : canManage;
+  // Admin, creator and sender share one rule (mirrors can_update_document).
+  const canUpdate = document
+    ? canUpdateDocument(document, currentUserId, isAdmin)
+    : false;
+  const canRunActions = canUpdate;
   const showActions = canRunActions && actions.length > 0;
-  const isCreator =
-    !!currentUserId && document?.created_by === currentUserId;
-  const canEditRoute =
-    canManage || (isCreator && status?.status === "pending");
+  const canEditRoute = canUpdate;
 
-  const undoableEvent = canManage ? latestUndoableEvent(events) : null;
+  const undoableEvent = canUpdate ? latestUndoableEvent(events) : null;
 
   return (
     <Sheet

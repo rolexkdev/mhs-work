@@ -89,6 +89,19 @@ function handback(
 }
 
 /**
+ * Who may update a document's progress: admin, its creator or its sender.
+ * Mirrors can_update_document() from 0026; RLS and the RPCs still decide.
+ */
+export function canUpdateDocument(
+  doc: Pick<DocumentRecord, "created_by" | "sender_id">,
+  userId: string | null,
+  isAdmin: boolean,
+): boolean {
+  if (!userId) return false;
+  return isAdmin || doc.created_by === userId || doc.sender_id === userId;
+}
+
+/**
  * Derive the display status and current holder from the step rows and the
  * hand-back columns. No stored status field is read because status is
  * never stored.
