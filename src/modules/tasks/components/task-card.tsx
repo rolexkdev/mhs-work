@@ -46,11 +46,11 @@ export function TaskCard({
         <PriorityBadge priority={task.priority} />
       </div>
 
-      {task.progress > 0 && (
+      {task.manual_progress > 0 && (
         <div className="flex items-center gap-2">
-          <Progress value={task.progress} className="h-1.5" />
+          <Progress value={task.manual_progress} className="h-1.5" />
           <span className="text-[10px] text-muted-foreground">
-            {task.progress}%
+            {task.manual_progress}%
           </span>
         </div>
       )}
