@@ -556,7 +556,360 @@ begin
 end;
 $$;
 
--- Grants from 0018 are kept by create or replace.
+-- ---------- Hand-back and undo ----------
+-- Same bodies as 0019/0020/0022; only the permission check changed.
+
+create or replace function public.doc_receive_back(
+  p_document_id uuid,
+  p_note text default null
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_undo jsonb;
+begin
+  if not public.can_update_document(p_document_id) then
+    raise exception 'Chỉ người tạo, người gửi hoặc quản trị viên mới được thực hiện thao tác này.'
+      using errcode = '42501';
+  end if;
+
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  if v_doc.finished_at is not null then
+    raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
+  end if;
+
+  if not public.doc_route_done(p_document_id) then
+    raise exception 'Hồ sơ chưa đi hết lộ trình.' using errcode = 'P0001';
+  end if;
+
+  if v_doc.received_back_at is not null then
+    raise exception 'Hồ sơ vừa được cập nhật, vui lòng tải lại rồi thử lại.'
+      using errcode = 'P0001';
+  end if;
+
+  v_undo := public.doc_handback_snapshot(v_doc);
+
+  perform set_config('app.doc_rpc', 'on', true);
+
+  update public.documents
+  set received_back_at = now()
+  where id = p_document_id;
+
+  perform public.doc_log_event(
+    p_document_id, 'receive_back', null, null, null, p_note, null, v_undo, null
+  );
+end;
+$$;
+
+create or replace function public.doc_hand_over(
+  p_document_id uuid,
+  p_note text default null
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_undo jsonb;
+begin
+  if not public.can_update_document(p_document_id) then
+    raise exception 'Chỉ người tạo, người gửi hoặc quản trị viên mới được thực hiện thao tác này.'
+      using errcode = '42501';
+  end if;
+
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  if v_doc.finished_at is not null then
+    raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
+  end if;
+
+  if v_doc.received_back_at is null or v_doc.handed_over_at is not null then
+    raise exception 'Hồ sơ vừa được cập nhật, vui lòng tải lại rồi thử lại.'
+      using errcode = 'P0001';
+  end if;
+
+  v_undo := public.doc_handback_snapshot(v_doc);
+
+  perform set_config('app.doc_rpc', 'on', true);
+
+  update public.documents
+  set handed_over_at = now()
+  where id = p_document_id;
+
+  perform public.doc_log_event(
+    p_document_id, 'hand_over', null, null, null, p_note, null, v_undo, null
+  );
+end;
+$$;
+
+create or replace function public.doc_report_missing(
+  p_document_id uuid,
+  p_reason text
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_last public.document_steps;
+  v_undo jsonb;
+begin
+  if not public.can_update_document(p_document_id) then
+    raise exception 'Chỉ người tạo, người gửi hoặc quản trị viên mới được thực hiện thao tác này.'
+      using errcode = '42501';
+  end if;
+
+  if p_reason is null or length(btrim(p_reason)) = 0 then
+    raise exception 'Vui lòng nhập nội dung còn thiếu.' using errcode = 'P0001';
+  end if;
+
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  if v_doc.finished_at is not null then
+    raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
+  end if;
+
+  -- Only between the end of the route and the hand-over.
+  if not public.doc_route_done(p_document_id)
+     or v_doc.handed_over_at is not null then
+    raise exception 'Hồ sơ vừa được cập nhật, vui lòng tải lại rồi thử lại.'
+      using errcode = 'P0001';
+  end if;
+
+  select * into v_last
+  from public.document_steps
+  where document_id = p_document_id
+  order by step_order desc
+  limit 1;
+
+  v_undo := public.doc_handback_snapshot(v_doc)
+    || jsonb_build_object('steps', public.doc_step_snapshot(array[v_last.id]));
+
+  perform set_config('app.doc_rpc', 'on', true);
+
+  -- Reopen the last step as returned: status becomes Cần bổ sung.
+  update public.document_steps
+  set done_at = null,
+      returned_at = now(),
+      note = btrim(p_reason)
+  where id = v_last.id;
+
+  update public.documents
+  set received_back_at = null
+  where id = p_document_id;
+
+  perform public.doc_log_event(
+    p_document_id,
+    'report_missing',
+    v_last.step_order,
+    v_last.department,
+    null,
+    btrim(p_reason),
+    jsonb_build_object('received_back', v_doc.received_back_at is not null),
+    v_undo,
+    null
+  );
+end;
+$$;
+
+create or replace function public.doc_undo(
+  p_document_id uuid,
+  p_event_id uuid
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_event public.document_events;
+  v_step jsonb;
+  v_deleted jsonb;
+begin
+  if not public.can_update_document(p_document_id) then
+    raise exception 'Chỉ người tạo, người gửi hoặc quản trị viên mới được thực hiện thao tác này.'
+      using errcode = '42501';
+  end if;
+
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  select * into v_event
+  from public.document_events e
+  where e.document_id = p_document_id
+    and e.action in (
+      'send',
+      'forward',
+      'return',
+      'resend',
+      'finish_early',
+      'receive_back',
+      'hand_over',
+      'sender_confirm',
+      'report_missing'
+    )
+  order by e.created_at desc, e.id desc
+  limit 1;
+
+  if v_event.id is null then
+    raise exception 'Không còn thao tác nào để hoàn tác.' using errcode = 'P0001';
+  end if;
+
+  perform public.doc_assert_current(v_event.id, p_event_id);
+
+  if v_event.undo_data is null then
+    raise exception 'Thao tác này không thể hoàn tác.' using errcode = 'P0001';
+  end if;
+
+  perform set_config('app.doc_rpc', 'on', true);
+
+  update public.documents
+  set finished_at = (v_event.undo_data ->> 'finished_at')::timestamptz,
+      received_back_at = (v_event.undo_data ->> 'received_back_at')::timestamptz,
+      handed_over_at = (v_event.undo_data ->> 'handed_over_at')::timestamptz,
+      sender_confirmed_at = (v_event.undo_data ->> 'sender_confirmed_at')::timestamptz,
+      sender_confirmed_by = (v_event.undo_data ->> 'sender_confirmed_by')::uuid
+  where id = p_document_id;
+
+  for v_step in
+    select *
+    from jsonb_array_elements(coalesce(v_event.undo_data -> 'steps', '[]'::jsonb))
+  loop
+    update public.document_steps
+    set received_at = (v_step ->> 'received_at')::timestamptz,
+        done_at = (v_step ->> 'done_at')::timestamptz,
+        returned_at = (v_step ->> 'returned_at')::timestamptz,
+        handler_name = v_step ->> 'handler_name',
+        note = v_step ->> 'note'
+    where id = (v_step ->> 'id')::uuid;
+  end loop;
+
+  for v_deleted in
+    select *
+    from jsonb_array_elements(coalesce(v_event.undo_data -> 'deleted_steps', '[]'::jsonb))
+  loop
+    insert into public.document_steps (
+      id,
+      document_id,
+      step_order,
+      department,
+      received_at,
+      done_at,
+      returned_at,
+      handler_name,
+      note,
+      created_at
+    )
+    values (
+      (v_deleted ->> 'id')::uuid,
+      p_document_id,
+      (v_deleted ->> 'step_order')::int,
+      v_deleted ->> 'department',
+      (v_deleted ->> 'received_at')::timestamptz,
+      (v_deleted ->> 'done_at')::timestamptz,
+      (v_deleted ->> 'returned_at')::timestamptz,
+      v_deleted ->> 'handler_name',
+      v_deleted ->> 'note',
+      coalesce((v_deleted ->> 'created_at')::timestamptz, now())
+    )
+    on conflict (id) do update
+    set received_at = excluded.received_at,
+        done_at = excluded.done_at,
+        returned_at = excluded.returned_at,
+        handler_name = excluded.handler_name,
+        note = excluded.note;
+  end loop;
+
+  delete from public.document_events where id = v_event.id;
+end;
+$$;
+
+-- Sender, creator or admin confirms receipt; on_behalf is set when the
+-- actor is not the sender.
+create or replace function public.doc_sender_confirm(
+  p_document_id uuid,
+  p_note text default null
+)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  v_doc public.documents;
+  v_undo jsonb;
+  v_now timestamptz := now();
+begin
+  select * into v_doc
+  from public.documents
+  where id = p_document_id
+  for update;
+
+  if not found then
+    raise exception 'Không tìm thấy hồ sơ.' using errcode = 'P0002';
+  end if;
+
+  if not public.can_update_document(p_document_id) then
+    raise exception 'Chỉ người tạo, người gửi hoặc quản trị viên mới được thực hiện thao tác này.'
+      using errcode = '42501';
+  end if;
+
+  if v_doc.finished_at is not null then
+    raise exception 'Hồ sơ đã hoàn thành.' using errcode = 'P0001';
+  end if;
+
+  if v_doc.handed_over_at is null then
+    raise exception 'Hồ sơ vừa được cập nhật, vui lòng tải lại rồi thử lại.'
+      using errcode = 'P0001';
+  end if;
+
+  v_undo := public.doc_handback_snapshot(v_doc);
+
+  perform set_config('app.doc_rpc', 'on', true);
+
+  update public.documents
+  set sender_confirmed_at = v_now,
+      sender_confirmed_by = auth.uid(),
+      finished_at = v_now
+  where id = p_document_id;
+
+  perform public.doc_log_event(
+    p_document_id,
+    'sender_confirm',
+    null,
+    null,
+    null,
+    p_note,
+    jsonb_build_object('on_behalf', v_doc.sender_id is distinct from auth.uid()),
+    v_undo,
+    null
+  );
+end;
+$$;
+
+-- Grants from 0018/0019/0020/0022 are kept by create or replace.
 
 -- =============================================================
 -- Verification (run on dev in the SQL Editor; everything is rolled back).
@@ -603,5 +956,34 @@ $$;
 --       where s.document_id = ':doc' and s.received_at is not null and s.done_at is null
 --       order by s.step_order limit 1),
 --     'verification');                            -- expect ok
+-- rollback;
+--
+-- Step 2 scenario (new transaction; use a finished-route document created by
+-- a non-admin :creator who is not the sender, with every step done, status
+-- Chờ nhận lại; :doc2 is its id, :other is unrelated):
+--
+-- begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claims', json_build_object('sub', ':creator')::text, true);
+--   select public.doc_receive_back(':doc2', null);      -- ok
+--   select public.doc_hand_over(':doc2', null);         -- ok
+--   select public.doc_sender_confirm(':doc2', null);    -- ok, event payload on_behalf = true
+--   select finished_at is not null from public.documents where id = ':doc2';  -- expect true
+--   select public.doc_undo(':doc2', (select id from public.document_events
+--     where document_id = ':doc2' order by created_at desc, id desc limit 1)); -- ok, back to Chờ người gửi nhận
+--   select finished_at is null and handed_over_at is not null
+--     from public.documents where id = ':doc2';         -- expect true
+--
+--   select set_config('request.jwt.claims', json_build_object('sub', ':other')::text, true);
+--   do $$ begin
+--     perform public.doc_receive_back(':doc2', null);
+--     raise exception 'expected 42501';
+--   exception when insufficient_privilege then null;
+--   end $$;
+--   do $$ begin
+--     perform public.doc_sender_confirm(':doc2', null);
+--     raise exception 'expected 42501';
+--   exception when insufficient_privilege then null;
+--   end $$;
 -- rollback;
 -- =============================================================
