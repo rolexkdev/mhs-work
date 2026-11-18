@@ -114,7 +114,7 @@ function eventTitle(event: DocumentEvent): string {
   }
 
   if (event.action === "sender_confirm" && payload.on_behalf === true) {
-    return `${ACTION_LABEL.sender_confirm} (quản lý xác nhận thay)`;
+    return `${ACTION_LABEL.sender_confirm} (xác nhận thay người gửi)`;
   }
 
   return ACTION_LABEL[event.action];

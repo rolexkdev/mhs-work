@@ -411,7 +411,7 @@ export function useDocumentAction() {
       toast.success(DOCUMENT_ACTION_SUCCESS[input.action]);
     },
     onError: (e: Error, input) => {
-      // Another manager may have moved the document meanwhile.
+      // Another user may have moved the document meanwhile.
       invalidate(input.documentId);
       toast.error(friendlyError(e));
     },
@@ -429,7 +429,7 @@ export interface UndoDocumentActionInput {
 
 /**
  * Hoàn tác thao tác tiến trình gần nhất. RPC tự chọn event mới nhất chưa bị
- * hoàn tác và từ chối khi p_event_id đã cũ (hai quản lý bấm cùng lúc).
+ * hoàn tác và từ chối khi p_event_id đã cũ (hai người bấm cùng lúc).
  */
 export function useUndoDocumentAction() {
   const qc = useQueryClient();
