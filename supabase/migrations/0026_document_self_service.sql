@@ -1134,8 +1134,9 @@ $$;
 --   select set_config('request.jwt.claims', json_build_object('sub', ':creator')::text, true);
 --   do $$ begin
 --     perform public.doc_complete(':doc3', null);
---     raise exception 'expected P0001';
---   exception when raise_exception then null;
+--     raise exception 'expected rejection';
+--   exception when raise_exception then
+--     if sqlerrm = 'expected rejection' then raise; end if;
 --   end $$;
 -- rollback;
 -- =============================================================
