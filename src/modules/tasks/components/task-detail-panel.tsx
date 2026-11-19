@@ -64,7 +64,14 @@ import {
   useAddComment,
   useUpdateComment,
   useDeleteComment,
+  useCommentEdits,
 } from "@/modules/tasks/comment-hooks";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCurrentUserId } from "@/modules/auth/use-current-user";
 import { useIsAdmin } from "@/modules/documents/hooks";
@@ -85,6 +92,7 @@ import type {
   Meeting,
   Task,
   TaskAttachment,
+  TaskComment,
   TaskLog,
   TaskStatus,
   TaskPriority,
@@ -942,6 +950,7 @@ function CommentSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [historyId, setHistoryId] = useState<string | null>(null);
 
   return (
     <div className="space-y-3 pt-5">
@@ -966,7 +975,18 @@ function CommentSection({
                   <span className="font-medium">{name}</span>{" "}
                   <span className="text-muted-foreground">
                     · {formatDateTime(c.created_at)}
-                    {c.edited_at && " (đã sửa)"}
+                    {c.edited_at && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          className="hover:text-foreground hover:underline"
+                          onClick={() => setHistoryId(c.id)}
+                        >
+                          (đã sửa)
+                        </button>
+                      </>
+                    )}
                   </span>
                   {!editing && (isAuthor || isAdmin) && (
                     <span className="ml-2 text-muted-foreground">
@@ -1058,6 +1078,11 @@ function CommentSection({
         </Button>
       </form>
 
+      <CommentHistoryDialog
+        comment={comments.find((c) => c.id === historyId) ?? null}
+        onClose={() => setHistoryId(null)}
+        nameOf={nameOf}
+      />
       <ConfirmDialog
         open={deletingId !== null}
         onOpenChange={(v) => !v && setDeletingId(null)}
@@ -1068,5 +1093,70 @@ function CommentSection({
         onConfirm={() => deletingId && remove.mutate(deletingId)}
       />
     </div>
+  );
+}
+
+/** Every version of an edited comment, newest first; visible to everyone. */
+function CommentHistoryDialog({
+  comment,
+  onClose,
+  nameOf,
+}: {
+  comment: TaskComment | null;
+  onClose: () => void;
+  nameOf: (id: string | null) => string | null;
+}) {
+  const { data: edits = [], isLoading } = useCommentEdits(
+    comment?.id ?? "",
+    !!comment,
+  );
+
+  // Each history row holds the text that was replaced; the version that
+  // replaced it was written at that row's created_at. So version i was written
+  // at edits[i-1].created_at (the first at the comment's creation), and the
+  // live text at the last edit's time.
+  const versions = comment
+    ? [
+        ...edits.map((e, i) => ({
+          id: e.id,
+          content: e.content,
+          at: i === 0 ? comment.created_at : edits[i - 1].created_at,
+        })),
+        {
+          id: "current",
+          content: comment.content,
+          at: edits.length
+            ? edits[edits.length - 1].created_at
+            : (comment.edited_at ?? comment.created_at),
+        },
+      ].reverse()
+    : [];
+
+  return (
+    <Dialog open={!!comment} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg grid-cols-[minmax(0,1fr)]">
+        <DialogHeader>
+          <DialogTitle>Lịch sử chỉnh sửa</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Đang tải...</p>
+        ) : (
+          <ol className="space-y-3">
+            {versions.map((v, i) => (
+              <li key={v.id} className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">
+                  {i === 0 ? "Hiện tại" : "Phiên bản cũ"} ·{" "}
+                  {nameOf(comment?.user_id ?? null) ?? "Người dùng"} ·{" "}
+                  {formatDateTime(v.at)}
+                </p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm">
+                  {v.content}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

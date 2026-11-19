@@ -116,6 +116,14 @@ export type TaskComment = Timestamps & {
   edited_at: string | null;
 };
 
+/** Previous text of an edited comment (written by a trigger). */
+export type TaskCommentEdit = Timestamps & {
+  id: string;
+  comment_id: string;
+  content: string;
+  edited_by: string | null;
+};
+
 export type TaskChecklist = Timestamps & {
   id: string;
   task_id: string;
@@ -339,6 +347,12 @@ export interface Database {
         Row: Row<TaskComment>;
         Insert: Insert<TaskComment, "id" | "created_at" | "edited_at">;
         Update: Update<TaskComment>;
+        Relationships: Rel[];
+      };
+      task_comment_edits: {
+        Row: Row<TaskCommentEdit>;
+        Insert: Insert<TaskCommentEdit, "id" | "created_at">;
+        Update: Update<TaskCommentEdit>;
         Relationships: Rel[];
       };
       task_checklists: {

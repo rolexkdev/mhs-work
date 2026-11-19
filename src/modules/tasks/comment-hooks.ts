@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { queryKeys } from "@/lib/query-keys";
 import { friendlyError } from "@/lib/errors";
-import type { TaskComment } from "@/types/database";
+import type { TaskComment, TaskCommentEdit } from "@/types/database";
 
 const key = queryKeys.taskComments;
 
@@ -111,5 +111,24 @@ export function useDeleteComment(taskId: string) {
       qc.invalidateQueries({ queryKey: key(taskId) });
     },
     onError: (e: unknown) => toast.error(friendlyError(e)),
+  });
+}
+
+/** Previous texts of a comment, oldest first. Fetched only while `enabled`. */
+export function useCommentEdits(commentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.taskCommentEdits(commentId),
+    queryFn: async (): Promise<TaskCommentEdit[]> => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("task_comment_edits")
+        .select("*")
+        .eq("comment_id", commentId)
+        .order("created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled,
+    staleTime: 0,
   });
 }
