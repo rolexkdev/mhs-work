@@ -62,7 +62,12 @@ import {
 import {
   useComments,
   useAddComment,
+  useUpdateComment,
+  useDeleteComment,
 } from "@/modules/tasks/comment-hooks";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useCurrentUserId } from "@/modules/auth/use-current-user";
+import { useIsAdmin } from "@/modules/documents/hooks";
 import {
   useAttachments,
   useUploadAttachment,
@@ -895,7 +900,14 @@ function CommentSection({
 }) {
   const { data: comments = [] } = useComments(taskId);
   const add = useAddComment(taskId);
+  const update = useUpdateComment(taskId);
+  const remove = useDeleteComment(taskId);
+  const userId = useCurrentUserId();
+  const isAdmin = useIsAdmin();
   const [text, setText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   return (
     <div className="space-y-3 pt-5">
@@ -905,6 +917,8 @@ function CommentSection({
         {comments.map((c) => {
           const name = nameOf(c.user_id) ?? "Người dùng";
           const avatar = avatarOf(c.user_id);
+          const isAuthor = c.user_id === userId;
+          const editing = editingId === c.id;
           return (
             <div key={c.id} className="flex gap-2">
               <Avatar className="h-7 w-7">
@@ -918,9 +932,67 @@ function CommentSection({
                   <span className="font-medium">{name}</span>{" "}
                   <span className="text-muted-foreground">
                     · {formatDateTime(c.created_at)}
+                    {c.edited_at && " (đã sửa)"}
                   </span>
+                  {!editing && (isAuthor || isAdmin) && (
+                    <span className="ml-2 text-muted-foreground">
+                      {isAuthor && (
+                        <button
+                          type="button"
+                          className="hover:text-foreground hover:underline"
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setDraft(c.content);
+                          }}
+                        >
+                          Sửa
+                        </button>
+                      )}
+                      {isAuthor && " · "}
+                      <button
+                        type="button"
+                        className="hover:text-destructive hover:underline"
+                        onClick={() => setDeletingId(c.id)}
+                      >
+                        Xoá
+                      </button>
+                    </span>
+                  )}
                 </p>
-                <p className="whitespace-pre-wrap text-sm">{c.content}</p>
+                {editing ? (
+                  <div className="space-y-2 pt-1">
+                    <AutoGrowTextarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingId(null)}
+                      >
+                        Huỷ
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={!draft.trim() || update.isPending}
+                        onClick={() =>
+                          update.mutate(
+                            { id: c.id, content: draft.trim() },
+                            { onSuccess: () => setEditingId(null) },
+                          )
+                        }
+                      >
+                        Lưu
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm">{c.content}</p>
+                )}
               </div>
             </div>
           );
@@ -951,6 +1023,16 @@ function CommentSection({
           <Send className="h-4 w-4" />
         </Button>
       </form>
+
+      <ConfirmDialog
+        open={deletingId !== null}
+        onOpenChange={(v) => !v && setDeletingId(null)}
+        title="Xoá bình luận?"
+        description="Bình luận sẽ bị xoá vĩnh viễn."
+        confirmLabel="Xoá"
+        destructive
+        onConfirm={() => deletingId && remove.mutate(deletingId)}
+      />
     </div>
   );
 }
