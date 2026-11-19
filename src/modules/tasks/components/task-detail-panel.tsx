@@ -494,6 +494,9 @@ export function TaskDetailPanel({
                   taskId={task.id}
                   nameOf={nameOf}
                   avatarOf={avatarOf}
+                  meetingTitleOf={(id) =>
+                    meetings.find((m) => m.id === id)?.title ?? null
+                  }
                 />
               </TabsContent>
             </Tabs>
@@ -760,6 +763,7 @@ const B = ({ children }: { children: React.ReactNode }) => (
 export function describeLog(
   log: TaskLog,
   nameOf: (id: string | null) => string | null,
+  meetingTitleOf?: (id: string) => string | null,
 ): React.ReactNode {
   const oldV = log.old_value;
   const newV = log.new_value;
@@ -774,6 +778,9 @@ export function describeLog(
     );
     return ids.length ? ids.map((id) => nameOf(id) ?? "—").join(", ") : "trống";
   };
+
+  const meeting = (v: unknown) =>
+    typeof v === "string" && v ? meetingTitleOf?.(v) ?? "một cuộc họp" : null;
 
   switch (log.action) {
     case "created":
@@ -836,6 +843,31 @@ export function describeLog(
       return <>cập nhật tình hình mới nhất</>;
     case "description":
       return <>sửa mô tả</>;
+    case "meeting": {
+      const from = meeting(oldV);
+      const to = meeting(newV);
+      if (from && to) {
+        return (
+          <>
+            chuyển họp <B>{from}</B> → <B>{to}</B>
+          </>
+        );
+      }
+      if (to) {
+        return (
+          <>
+            gắn vào họp <B>{to}</B>
+          </>
+        );
+      }
+      return from ? (
+        <>
+          gỡ khỏi họp <B>{from}</B>
+        </>
+      ) : (
+        <>cập nhật họp</>
+      );
+    }
     case "deleted":
       return <>chuyển công việc vào thùng rác</>;
     case "restored":
@@ -849,10 +881,12 @@ function HistorySection({
   taskId,
   nameOf,
   avatarOf,
+  meetingTitleOf,
 }: {
   taskId: string;
   nameOf: (id: string | null) => string | null;
   avatarOf: (id: string | null) => string | null;
+  meetingTitleOf: (id: string) => string | null;
 }) {
   const { data: logs = [] } = useTaskLogs(taskId);
 
@@ -875,7 +909,7 @@ function HistorySection({
                 </Avatar>
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   <span className="font-medium text-foreground">{name}</span>{" "}
-                  {describeLog(log, nameOf)}{" "}
+                  {describeLog(log, nameOf, meetingTitleOf)}{" "}
                   <span className="whitespace-nowrap">
                     · {formatDateTime(log.created_at)}
                   </span>
