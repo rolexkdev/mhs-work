@@ -8,9 +8,11 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { queryKeys } from "@/lib/query-keys";
+import { friendlyError } from "@/lib/errors";
 import type { TaskComment } from "@/types/database";
 
-const key = (taskId: string) => ["comments", taskId] as const;
+const key = queryKeys.taskComments;
 
 export function useComments(taskId: string | null) {
   const qc = useQueryClient();
@@ -72,6 +74,42 @@ export function useAddComment(taskId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: key(taskId) });
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: unknown) => toast.error(friendlyError(e)),
+  });
+}
+
+export function useUpdateComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("task_comments")
+        .update({ content })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key(taskId) });
+    },
+    onError: (e: unknown) => toast.error(friendlyError(e)),
+  });
+}
+
+export function useDeleteComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("task_comments")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: key(taskId) });
+    },
+    onError: (e: unknown) => toast.error(friendlyError(e)),
   });
 }
