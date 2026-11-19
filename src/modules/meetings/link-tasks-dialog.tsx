@@ -33,7 +33,7 @@ export function LinkTasksDialog({
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl grid-cols-[minmax(0,1fr)]">
         <DialogHeader>
           <DialogTitle>Thêm việc có sẵn</DialogTitle>
           <DialogDescription>

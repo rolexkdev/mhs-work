@@ -114,7 +114,7 @@ export function MeetingFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] grid-cols-[minmax(0,1fr)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Chỉnh sửa cuộc họp" : "Tạo cuộc họp giao ban"}

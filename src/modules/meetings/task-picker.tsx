@@ -56,7 +56,7 @@ export function TaskPicker({
     );
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
@@ -89,7 +89,7 @@ export function TaskPicker({
                   onCheckedChange={() => toggle(t.id)}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">{t.title}</span>
+                  <span className="block truncate text-sm" title={t.title}>{t.title}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                     <span
                       className={cn(
