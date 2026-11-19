@@ -12,7 +12,15 @@ import { friendlyError } from "@/lib/errors";
 import { DEPARTMENTS } from "@/modules/tasks/constants";
 import { dueIso, resolveDeadline } from "@/modules/meetings/resolve-deadline";
 import type { Database, MeetingItem, Profile } from "@/types/database";
-import type { ParsedItem } from "@/modules/meetings/parse-minutes";
+
+/** Item fields for useAddMeetingItems; removed together with item creation. */
+type ParsedItem = {
+  section: string | null;
+  title: string | null;
+  content: string;
+  department: string | null;
+  deadline: string | null;
+};
 
 type TaskInsert = Database["public"]["Tables"]["tasks"]["Insert"];
 

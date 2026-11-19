@@ -33,7 +33,6 @@ import {
 } from "@/modules/meetings/item-hooks";
 import { ItemFormDialog } from "@/modules/meetings/item-dialogs";
 import { dueIso, resolveDeadline } from "@/modules/meetings/resolve-deadline";
-import { ImportItemsDialog } from "@/modules/meetings/import-items-dialog";
 import type { Meeting, MeetingItem, Task, TaskStatus } from "@/types/database";
 
 type StatusFilter = "all" | "todo" | "doing" | "done";
@@ -75,7 +74,6 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
 
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [dept, setDept] = useState<string | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<MeetingItem | null>(null);
   const [deleting, setDeleting] = useState<MeetingItem | null>(null);
@@ -218,9 +216,6 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
         </div>
         {canManage && (
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-              <FileUp className="h-4 w-4" /> Nhập từ biên bản
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -266,11 +261,6 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
           <p className="mt-2 text-sm text-muted-foreground">
             Chưa có đầu mục nào trong cuộc họp này.
           </p>
-          {canManage && (
-            <Button className="mt-4" onClick={() => setImportOpen(true)}>
-              <FileUp className="h-4 w-4" /> Nhập từ biên bản
-            </Button>
-          )}
         </div>
       ) : visible.length === 0 ? (
         <p className="py-10 text-center text-sm text-muted-foreground">
@@ -401,12 +391,6 @@ export function MeetingItems({ meeting }: { meeting: Meeting }) {
         </ol>
       )}
 
-      <ImportItemsDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        meeting={meeting}
-        canEditMeeting={canManage}
-      />
       <ItemFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}

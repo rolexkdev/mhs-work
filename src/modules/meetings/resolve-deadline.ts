@@ -7,7 +7,7 @@ import {
   lastDayOfMonth,
   startOfWeek,
 } from "date-fns";
-import { norm } from "@/modules/meetings/parse-minutes";
+import { norm } from "@/lib/text";
 
 export type ResolvedDeadline = {
   /** Chữ hiển thị, đã quy ra ngày nếu quy được. */

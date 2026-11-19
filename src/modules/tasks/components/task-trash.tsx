@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import { useMeetings } from "@/modules/meetings/hooks";
-import { norm } from "@/modules/meetings/parse-minutes";
+import { norm } from "@/lib/text";
 import {
   usePurgeTask,
   useRestoreTask,
