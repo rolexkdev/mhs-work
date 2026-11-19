@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMeeting } from "@/modules/meetings/hooks";
 import { MeetingItems } from "@/modules/meetings/meeting-items";
-import { useMe } from "@/modules/meetings/item-hooks";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
 import { MarkdownView } from "@/components/markdown-view";
@@ -19,8 +18,6 @@ import { TasksWorkspace } from "@/modules/tasks/components/tasks-workspace";
 
 export function MeetingDetail({ id }: { id: string }) {
   const { data: meeting, isLoading } = useMeeting(id);
-  const { data: me } = useMe();
-  const canManage = me?.role === "admin" || me?.role === "leader";
   const [editOpen, setEditOpen] = useState(false);
   const [showText, setShowText] = useState(false);
 
@@ -106,16 +103,14 @@ export function MeetingDetail({ id }: { id: string }) {
                 </div>
               )}
             </div>
-            {canManage && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => setEditOpen(true)}
-              >
-                <Pencil className="h-4 w-4" /> Sửa
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setEditOpen(true)}
+            >
+              <Pencil className="h-4 w-4" /> Sửa
+            </Button>
           </div>
         </CardContent>
       </Card>

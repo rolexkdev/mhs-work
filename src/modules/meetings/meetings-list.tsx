@@ -21,7 +21,7 @@ export function MeetingsList() {
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const { data: me } = useMe();
-  // Tạo/sửa cuộc họp: chỉ admin/leader (RLS meetings_write_leader_admin)
+  // Import from minutes writes meeting_items (leader/admin only); removed in a later step.
   const canManage = me?.role === "admin" || me?.role === "leader";
   const { data: meetings = [], isLoading } = useMeetings();
   const { data: counts = {} } = useMeetingTaskCounts();
@@ -32,16 +32,16 @@ export function MeetingsList() {
         <p className="text-sm text-muted-foreground">
           {meetings.length} cuộc họp
         </p>
-        {canManage && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setOpen(true)}>
-              <Plus className="h-4 w-4" /> Tạo trống
-            </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setOpen(true)}>
+            <Plus className="h-4 w-4" /> Tạo trống
+          </Button>
+          {canManage && (
             <Button onClick={() => setImportOpen(true)}>
               <FileUp className="h-4 w-4" /> Tạo từ biên bản
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {isLoading ? (
