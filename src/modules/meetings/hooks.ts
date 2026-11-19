@@ -122,3 +122,32 @@ export function useUpdateMeeting() {
     onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }
+
+/** Link existing tasks to a meeting (tasks already in another meeting move). */
+export function useLinkTasksToMeeting() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      meetingId,
+      taskIds,
+    }: {
+      meetingId: string;
+      taskIds: string[];
+    }) => {
+      if (!taskIds.length) return 0;
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("tasks")
+        .update({ meeting_id: meetingId })
+        .in("id", taskIds);
+      if (error) throw error;
+      return taskIds.length;
+    },
+    onSuccess: (n) => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
+      if (n) toast.success(`Đã thêm ${n} công việc vào cuộc họp`);
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
