@@ -379,6 +379,11 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           onPatch={handlePatch}
           canHideWeek={period.mode === "week"}
           onToggleWeekHidden={handleToggleWeekHidden}
+          onUnlinkMeeting={
+            meetingId
+              ? (t) => handlePatch(t.id, { meeting_id: null })
+              : undefined
+          }
         />
       )}
 

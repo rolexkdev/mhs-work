@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Circle,
   MoreHorizontal,
+  Unlink,
   Pencil,
   Trash2,
   EyeOff,
@@ -209,6 +210,7 @@ export function TaskListView({
   onPatch,
   canHideWeek = false,
   onToggleWeekHidden,
+  onUnlinkMeeting,
 }: {
   tasks: Task[];
   groupBy: GroupBy;
@@ -220,6 +222,8 @@ export function TaskListView({
   onPatch: (taskId: string, patch: Partial<Task>) => void;
   canHideWeek?: boolean;
   onToggleWeekHidden?: (t: Task) => void;
+  /** Set on a meeting page: removes the task from the meeting (keeps the task). */
+  onUnlinkMeeting?: (t: Task) => void;
 }) {
   const groups = useMemo(
     () => buildGroups(tasks, groupBy, profiles, meetings),
@@ -330,6 +334,9 @@ export function TaskListView({
                       canHideWeek={canHideWeek}
                       onToggleWeekHidden={
                         onToggleWeekHidden ? () => onToggleWeekHidden(t) : undefined
+                      }
+                      onUnlinkMeeting={
+                        onUnlinkMeeting ? () => onUnlinkMeeting(t) : undefined
                       }
                     />
                   ))}
@@ -502,6 +509,11 @@ export function TaskListView({
                               <EyeOff className="h-4 w-4" /> Ẩn khỏi tuần này
                             </DropdownMenuItem>
                           )}
+                          {onUnlinkMeeting && (
+                            <DropdownMenuItem onClick={() => onUnlinkMeeting(t)}>
+                              <Unlink className="h-4 w-4" /> Gỡ khỏi họp
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             onClick={() => onDelete(t)}
                             className="text-red-600 focus:text-red-600"
@@ -538,6 +550,7 @@ function MobileTaskRow({
   onDelete,
   canHideWeek,
   onToggleWeekHidden,
+  onUnlinkMeeting,
 }: {
   task: Task;
   showDept: boolean;
@@ -547,6 +560,7 @@ function MobileTaskRow({
   onDelete: () => void;
   canHideWeek?: boolean;
   onToggleWeekHidden?: () => void;
+  onUnlinkMeeting?: () => void;
 }) {
   const isDone = t.status === "done";
   const due = dueLabel(t.due_date, { done: isDone });
@@ -638,6 +652,11 @@ function MobileTaskRow({
             {canHideWeek && onToggleWeekHidden && (
               <DropdownMenuItem onClick={onToggleWeekHidden}>
                 <EyeOff className="h-4 w-4" /> Ẩn khỏi tuần này
+              </DropdownMenuItem>
+            )}
+            {onUnlinkMeeting && (
+              <DropdownMenuItem onClick={onUnlinkMeeting}>
+                <Unlink className="h-4 w-4" /> Gỡ khỏi họp
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
