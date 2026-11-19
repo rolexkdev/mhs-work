@@ -33,7 +33,7 @@ export function LinkTasksDialog({
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Thêm việc có sẵn</DialogTitle>
           <DialogDescription>
@@ -44,6 +44,7 @@ export function LinkTasksDialog({
           meetingId={meetingId}
           selected={selected}
           onChange={setSelected}
+          listClassName="h-[50dvh] min-h-64"
         />
         <DialogFooter>
           <Button variant="outline" onClick={() => close(false)}>

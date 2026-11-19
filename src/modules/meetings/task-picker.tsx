@@ -19,10 +19,13 @@ export function TaskPicker({
   meetingId,
   selected,
   onChange,
+  listClassName = "max-h-64",
 }: {
   meetingId?: string | null;
   selected: string[];
   onChange: (ids: string[]) => void;
+  /** Height of the scrolling list; defaults to a compact 16rem. */
+  listClassName?: string;
 }) {
   const { data: tasks = [], isLoading } = useTasks();
   const { data: meetings = [] } = useMeetings();
@@ -64,7 +67,7 @@ export function TaskPicker({
         />
       </div>
 
-      <div className="max-h-64 overflow-y-auto rounded-md border">
+      <div className={cn("overflow-y-auto rounded-md border", listClassName)}>
         {isLoading ? (
           <p className="p-3 text-xs text-muted-foreground">Đang tải...</p>
         ) : visible.length === 0 ? (
