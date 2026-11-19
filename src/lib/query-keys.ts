@@ -22,6 +22,8 @@ export const queryKeys = {
   taskTrash: ["tasks", "trash"] as const,
   task: (id: string) => ["tasks", "detail", id] as const,
   taskComments: (taskId: string) => ["comments", taskId] as const,
+  taskCommentEdits: (commentId: string) =>
+    ["comments", "edits", commentId] as const,
   /** Bell notifications of the signed-in user. */
   notifications: ["notifications"] as const,
   documents: ["documents"] as const,
