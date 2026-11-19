@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useMeeting } from "@/modules/meetings/hooks";
+import { useMeetingItems } from "@/modules/meetings/item-hooks";
 import { MeetingItems } from "@/modules/meetings/meeting-items";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
@@ -18,6 +19,7 @@ import { TasksWorkspace } from "@/modules/tasks/components/tasks-workspace";
 
 export function MeetingDetail({ id }: { id: string }) {
   const { data: meeting, isLoading } = useMeeting(id);
+  const { data: items = [] } = useMeetingItems(id);
   const [editOpen, setEditOpen] = useState(false);
   const [showText, setShowText] = useState(false);
 
@@ -115,17 +117,21 @@ export function MeetingDetail({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="items">
+      <Tabs defaultValue="tasks">
         <TabsList>
-          <TabsTrigger value="items">Đầu mục chỉ đạo</TabsTrigger>
-          <TabsTrigger value="tasks">Công việc được giao</TabsTrigger>
+          <TabsTrigger value="tasks">Công việc</TabsTrigger>
+          {items.length > 0 && (
+            <TabsTrigger value="items">Đầu mục (lưu trữ)</TabsTrigger>
+          )}
         </TabsList>
-        <TabsContent value="items" className="mt-4">
-          <MeetingItems meeting={meeting} />
-        </TabsContent>
         <TabsContent value="tasks" className="mt-4">
           <TasksWorkspace meetingId={meeting.id} />
         </TabsContent>
+        {items.length > 0 && (
+          <TabsContent value="items" className="mt-4">
+            <MeetingItems meeting={meeting} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <MeetingFormDialog
