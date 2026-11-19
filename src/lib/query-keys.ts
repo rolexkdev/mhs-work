@@ -12,7 +12,6 @@ export const queryKeys = {
   meetings: ["meetings"] as const,
   meeting: (id: string) => ["meetings", id] as const,
   meetingItems: (meetingId: string) => ["meeting-items", meetingId] as const,
-  meetingItemStats: ["meeting-items", "stats"] as const,
   tasks: (
     filters?: Partial<TaskFilters> & {
       meetingId?: string | null;
@@ -22,6 +21,7 @@ export const queryKeys = {
   /** Trashed tasks (admin trash page). */
   taskTrash: ["tasks", "trash"] as const,
   task: (id: string) => ["tasks", "detail", id] as const,
+  taskComments: (taskId: string) => ["comments", taskId] as const,
   /** Bell notifications of the signed-in user. */
   notifications: ["notifications"] as const,
   documents: ["documents"] as const,

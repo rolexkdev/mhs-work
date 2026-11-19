@@ -108,6 +108,12 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - Bell notifications (0025) are written only by DB triggers on `tasks` (assigned,
   due date changed) and `task_comments` (comment), for users in `assignee_ids` other
   than the actor. Add a new kind by extending those triggers and the `kind` check.
+- Meetings are epics (0027): a meeting groups tasks through `tasks.meeting_id` (one
+  meeting per task). Any authenticated user can create and update meetings; only admins
+  delete. Linking and unlinking tasks are plain `tasks` updates, and `log_task_change`
+  records them as `meeting` rows in `task_logs`. `meeting_items` is a read-only archive:
+  nothing creates items any more. Task comments can be edited by their author (the
+  trigger sets `edited_at`); authors and admins can delete them.
 - Document progress changes go only through the security definer RPCs in
   `0018_document_actions.sql`, `0019_document_handback.sql`,
   `0020_document_report_missing.sql` and `0026_document_self_service.sql`. Every RPC

@@ -6,12 +6,14 @@ import {
   LayoutGrid,
   List,
   Plus,
+  Link2,
   Filter,
   Layers,
   FileSpreadsheet,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { LinkTasksDialog } from "@/modules/meetings/link-tasks-dialog";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { exportWeeklyReport } from "@/lib/export-report";
@@ -79,6 +81,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const [assigneeFilter, setAssigneeFilter] = useState<string>(ALL);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
@@ -331,6 +334,11 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
               Xuất Excel
             </Button>
           )}
+          {meetingId && (
+            <Button variant="outline" onClick={() => setLinkOpen(true)}>
+              <Link2 className="h-4 w-4" /> Thêm việc có sẵn
+            </Button>
+          )}
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" /> Tạo công việc
           </Button>
@@ -371,6 +379,11 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           onPatch={handlePatch}
           canHideWeek={period.mode === "week"}
           onToggleWeekHidden={handleToggleWeekHidden}
+          onUnlinkMeeting={
+            meetingId
+              ? (t) => handlePatch(t.id, { meeting_id: null })
+              : undefined
+          }
         />
       )}
 
@@ -474,6 +487,13 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         </SheetContent>
       </Sheet>
 
+      {meetingId && (
+        <LinkTasksDialog
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+          meetingId={meetingId}
+        />
+      )}
       <TaskFormDialog
         open={createOpen}
         onOpenChange={setCreateOpen}

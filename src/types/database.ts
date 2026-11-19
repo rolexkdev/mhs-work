@@ -112,6 +112,8 @@ export type TaskComment = Timestamps & {
   task_id: string;
   user_id: string;
   content: string;
+  /** Set by a trigger when the content is edited. */
+  edited_at: string | null;
 };
 
 export type TaskChecklist = Timestamps & {
@@ -335,7 +337,7 @@ export interface Database {
       };
       task_comments: {
         Row: Row<TaskComment>;
-        Insert: Insert<TaskComment, "id" | "created_at">;
+        Insert: Insert<TaskComment, "id" | "created_at" | "edited_at">;
         Update: Update<TaskComment>;
         Relationships: Rel[];
       };

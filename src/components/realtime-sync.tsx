@@ -64,7 +64,7 @@ export function RealtimeSync() {
         { event: "*", schema: "public", table: "task_comments" },
         (payload) => {
           const id = taskIdFrom(payload);
-          if (id) qc.invalidateQueries({ queryKey: ["comments", id] });
+          if (id) qc.invalidateQueries({ queryKey: queryKeys.taskComments(id) });
         },
       )
       .on(

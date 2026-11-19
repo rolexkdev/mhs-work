@@ -62,7 +62,12 @@ import {
 import {
   useComments,
   useAddComment,
+  useUpdateComment,
+  useDeleteComment,
 } from "@/modules/tasks/comment-hooks";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useCurrentUserId } from "@/modules/auth/use-current-user";
+import { useIsAdmin } from "@/modules/documents/hooks";
 import {
   useAttachments,
   useUploadAttachment,
@@ -489,6 +494,9 @@ export function TaskDetailPanel({
                   taskId={task.id}
                   nameOf={nameOf}
                   avatarOf={avatarOf}
+                  meetingTitleOf={(id) =>
+                    meetings.find((m) => m.id === id)?.title ?? null
+                  }
                 />
               </TabsContent>
             </Tabs>
@@ -755,6 +763,7 @@ const B = ({ children }: { children: React.ReactNode }) => (
 export function describeLog(
   log: TaskLog,
   nameOf: (id: string | null) => string | null,
+  meetingTitleOf?: (id: string) => string | null,
 ): React.ReactNode {
   const oldV = log.old_value;
   const newV = log.new_value;
@@ -769,6 +778,9 @@ export function describeLog(
     );
     return ids.length ? ids.map((id) => nameOf(id) ?? "—").join(", ") : "trống";
   };
+
+  const meeting = (v: unknown) =>
+    typeof v === "string" && v ? meetingTitleOf?.(v) ?? "một cuộc họp" : null;
 
   switch (log.action) {
     case "created":
@@ -831,6 +843,31 @@ export function describeLog(
       return <>cập nhật tình hình mới nhất</>;
     case "description":
       return <>sửa mô tả</>;
+    case "meeting": {
+      const from = meeting(oldV);
+      const to = meeting(newV);
+      if (from && to) {
+        return (
+          <>
+            chuyển họp <B>{from}</B> → <B>{to}</B>
+          </>
+        );
+      }
+      if (to) {
+        return (
+          <>
+            gắn vào họp <B>{to}</B>
+          </>
+        );
+      }
+      return from ? (
+        <>
+          gỡ khỏi họp <B>{from}</B>
+        </>
+      ) : (
+        <>cập nhật họp</>
+      );
+    }
     case "deleted":
       return <>chuyển công việc vào thùng rác</>;
     case "restored":
@@ -844,10 +881,12 @@ function HistorySection({
   taskId,
   nameOf,
   avatarOf,
+  meetingTitleOf,
 }: {
   taskId: string;
   nameOf: (id: string | null) => string | null;
   avatarOf: (id: string | null) => string | null;
+  meetingTitleOf: (id: string) => string | null;
 }) {
   const { data: logs = [] } = useTaskLogs(taskId);
 
@@ -870,7 +909,7 @@ function HistorySection({
                 </Avatar>
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   <span className="font-medium text-foreground">{name}</span>{" "}
-                  {describeLog(log, nameOf)}{" "}
+                  {describeLog(log, nameOf, meetingTitleOf)}{" "}
                   <span className="whitespace-nowrap">
                     · {formatDateTime(log.created_at)}
                   </span>
@@ -895,7 +934,14 @@ function CommentSection({
 }) {
   const { data: comments = [] } = useComments(taskId);
   const add = useAddComment(taskId);
+  const update = useUpdateComment(taskId);
+  const remove = useDeleteComment(taskId);
+  const userId = useCurrentUserId();
+  const isAdmin = useIsAdmin();
   const [text, setText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   return (
     <div className="space-y-3 pt-5">
@@ -905,6 +951,8 @@ function CommentSection({
         {comments.map((c) => {
           const name = nameOf(c.user_id) ?? "Người dùng";
           const avatar = avatarOf(c.user_id);
+          const isAuthor = c.user_id === userId;
+          const editing = editingId === c.id;
           return (
             <div key={c.id} className="flex gap-2">
               <Avatar className="h-7 w-7">
@@ -918,9 +966,67 @@ function CommentSection({
                   <span className="font-medium">{name}</span>{" "}
                   <span className="text-muted-foreground">
                     · {formatDateTime(c.created_at)}
+                    {c.edited_at && " (đã sửa)"}
                   </span>
+                  {!editing && (isAuthor || isAdmin) && (
+                    <span className="ml-2 text-muted-foreground">
+                      {isAuthor && (
+                        <button
+                          type="button"
+                          className="hover:text-foreground hover:underline"
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setDraft(c.content);
+                          }}
+                        >
+                          Sửa
+                        </button>
+                      )}
+                      {isAuthor && " · "}
+                      <button
+                        type="button"
+                        className="hover:text-destructive hover:underline"
+                        onClick={() => setDeletingId(c.id)}
+                      >
+                        Xoá
+                      </button>
+                    </span>
+                  )}
                 </p>
-                <p className="whitespace-pre-wrap text-sm">{c.content}</p>
+                {editing ? (
+                  <div className="space-y-2 pt-1">
+                    <AutoGrowTextarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingId(null)}
+                      >
+                        Huỷ
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={!draft.trim() || update.isPending}
+                        onClick={() =>
+                          update.mutate(
+                            { id: c.id, content: draft.trim() },
+                            { onSuccess: () => setEditingId(null) },
+                          )
+                        }
+                      >
+                        Lưu
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm">{c.content}</p>
+                )}
               </div>
             </div>
           );
@@ -951,6 +1057,16 @@ function CommentSection({
           <Send className="h-4 w-4" />
         </Button>
       </form>
+
+      <ConfirmDialog
+        open={deletingId !== null}
+        onOpenChange={(v) => !v && setDeletingId(null)}
+        title="Xoá bình luận?"
+        description="Bình luận sẽ bị xoá vĩnh viễn."
+        confirmLabel="Xoá"
+        destructive
+        onConfirm={() => deletingId && remove.mutate(deletingId)}
+      />
     </div>
   );
 }

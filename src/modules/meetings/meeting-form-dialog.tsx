@@ -22,7 +22,12 @@ import {
 } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
-import { useCreateMeeting, useUpdateMeeting } from "@/modules/meetings/hooks";
+import {
+  useCreateMeeting,
+  useLinkTasksToMeeting,
+  useUpdateMeeting,
+} from "@/modules/meetings/hooks";
+import { TaskPicker } from "@/modules/meetings/task-picker";
 import type { Meeting, MeetingStatus } from "@/types/database";
 
 const STATUS_ORDER: MeetingStatus[] = ["planned", "ongoing", "closed"];
@@ -47,11 +52,13 @@ export function MeetingFormDialog({
   const router = useRouter();
   const createMeeting = useCreateMeeting();
   const updateMeeting = useUpdateMeeting();
+  const linkTasks = useLinkTasksToMeeting();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState("");
   const [status, setStatus] = useState<MeetingStatus>("planned");
+  const [taskIds, setTaskIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -61,9 +68,10 @@ export function MeetingFormDialog({
       toLocalInput(meeting?.meeting_date ?? new Date().toISOString()),
     );
     setStatus(meeting?.status ?? "planned");
+    setTaskIds([]);
   }, [open, meeting]);
 
-  const pending = createMeeting.isPending || updateMeeting.isPending;
+  const pending = createMeeting.isPending || updateMeeting.isPending || linkTasks.isPending;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -90,8 +98,14 @@ export function MeetingFormDialog({
         meeting_date,
         created_by: user.id,
       });
+      if (taskIds.length) {
+        // The meeting already exists; a failed link (toast shown by the hook)
+        // must not leave the dialog open for a duplicate submit.
+        await linkTasks
+          .mutateAsync({ meetingId: created.id, taskIds })
+          .catch(() => undefined);
+      }
       onOpenChange(false);
-      // Sang trang chi tiết để nhập đầu mục từ biên bản
       router.push(`/meetings/${created.id}`);
       return;
     }
@@ -100,7 +114,7 @@ export function MeetingFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] grid-cols-[minmax(0,1fr)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Chỉnh sửa cuộc họp" : "Tạo cuộc họp giao ban"}
@@ -126,7 +140,7 @@ export function MeetingFormDialog({
               id="m-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Có thể để trống — tải file biên bản ở bước sau sẽ tự điền."
+              placeholder="Có thể để trống."
             />
           </div>
 
@@ -159,6 +173,13 @@ export function MeetingFormDialog({
               </Select>
             </div>
           </div>
+
+          {!isEdit && (
+            <div className="space-y-1.5">
+              <Label>Gắn công việc có sẵn (tuỳ chọn)</Label>
+              <TaskPicker selected={taskIds} onChange={setTaskIds} />
+            </div>
+          )}
 
           <DialogFooter>
             <Button

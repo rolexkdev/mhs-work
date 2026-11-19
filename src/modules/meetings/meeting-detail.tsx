@@ -7,11 +7,12 @@ import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useMeeting } from "@/modules/meetings/hooks";
+import { useMeeting, useMeetingTaskCounts } from "@/modules/meetings/hooks";
+import { useMeetingItems } from "@/modules/meetings/item-hooks";
 import { MeetingItems } from "@/modules/meetings/meeting-items";
-import { useMe } from "@/modules/meetings/item-hooks";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
 import { MEETING_STATUS_META } from "@/modules/tasks/constants";
 import { MarkdownView } from "@/components/markdown-view";
@@ -19,8 +20,8 @@ import { TasksWorkspace } from "@/modules/tasks/components/tasks-workspace";
 
 export function MeetingDetail({ id }: { id: string }) {
   const { data: meeting, isLoading } = useMeeting(id);
-  const { data: me } = useMe();
-  const canManage = me?.role === "admin" || me?.role === "leader";
+  const { data: items = [] } = useMeetingItems(id);
+  const { data: counts = {} } = useMeetingTaskCounts();
   const [editOpen, setEditOpen] = useState(false);
   const [showText, setShowText] = useState(false);
 
@@ -44,6 +45,7 @@ export function MeetingDetail({ id }: { id: string }) {
   }
 
   const meta = MEETING_STATUS_META[meeting.status];
+  const count = counts[meeting.id] ?? { total: 0, done: 0 };
 
   return (
     <div className="space-y-6">
@@ -76,6 +78,15 @@ export function MeetingDetail({ id }: { id: string }) {
               <h1 className="text-xl font-semibold tracking-tight">
                 {meeting.title}
               </h1>
+              <div className="flex items-center gap-3 pt-1">
+                <Progress
+                  value={count.total ? (count.done / count.total) * 100 : 0}
+                  className="max-w-xs flex-1"
+                />
+                <span className="text-xs text-muted-foreground">
+                  {count.done}/{count.total} công việc hoàn thành
+                </span>
+              </div>
               {meeting.description && (
                 <div className="pt-1">
                   <div
@@ -106,31 +117,33 @@ export function MeetingDetail({ id }: { id: string }) {
                 </div>
               )}
             </div>
-            {canManage && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => setEditOpen(true)}
-              >
-                <Pencil className="h-4 w-4" /> Sửa
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setEditOpen(true)}
+            >
+              <Pencil className="h-4 w-4" /> Sửa
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="items">
+      <Tabs defaultValue="tasks">
         <TabsList>
-          <TabsTrigger value="items">Đầu mục chỉ đạo</TabsTrigger>
-          <TabsTrigger value="tasks">Công việc được giao</TabsTrigger>
+          <TabsTrigger value="tasks">Công việc</TabsTrigger>
+          {items.length > 0 && (
+            <TabsTrigger value="items">Đầu mục (lưu trữ)</TabsTrigger>
+          )}
         </TabsList>
-        <TabsContent value="items" className="mt-4">
-          <MeetingItems meeting={meeting} />
-        </TabsContent>
         <TabsContent value="tasks" className="mt-4">
           <TasksWorkspace meetingId={meeting.id} />
         </TabsContent>
+        {items.length > 0 && (
+          <TabsContent value="items" className="mt-4">
+            <MeetingItems meeting={meeting} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <MeetingFormDialog
