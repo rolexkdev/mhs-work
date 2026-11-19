@@ -1,8 +1,7 @@
 -- 0027: comment edit marker + meetings as epics.
 -- Idempotent; run in the Supabase SQL Editor (applied manually).
 --
--- Section 1: task_comments.edited_at + task_comment_edits (previous texts),
---            both written by a trigger when content changes.
+-- Section 1: task_comments.edited_at, set by a trigger when content changes.
 -- Section 2: every authenticated user can create/update meetings, only admin
 --            deletes; meeting_id changes on tasks are logged in task_logs.
 
@@ -13,31 +12,9 @@
 alter table public.task_comments
   add column if not exists edited_at timestamptz;
 
--- Edit history: every content change keeps the previous text. Readable by any
--- authenticated user; rows are written only by the trigger below (no insert,
--- update or delete policy) and removed with their comment (cascade).
-create table if not exists public.task_comment_edits (
-  id         uuid primary key default gen_random_uuid(),
-  comment_id uuid not null references public.task_comments (id) on delete cascade,
-  content    text not null,
-  edited_by  uuid references public.profiles (id) on delete set null,
-  created_at timestamptz not null default now()
-);
-
-create index if not exists idx_comment_edits_comment
-  on public.task_comment_edits (comment_id, created_at);
-
-alter table public.task_comment_edits enable row level security;
-
-drop policy if exists "comment_edits_select" on public.task_comment_edits;
-create policy "comment_edits_select" on public.task_comment_edits
-  for select to authenticated using (true);
-
--- created_at = when the old text was replaced (the edit time).
 create or replace function public.touch_task_comment()
 returns trigger
 language plpgsql
-security definer set search_path = public
 as $$
 begin
   if new.task_id is distinct from old.task_id
@@ -46,8 +23,6 @@ begin
   end if;
   if new.content is distinct from old.content then
     new.edited_at := now();
-    insert into public.task_comment_edits (comment_id, content, edited_by)
-    values (old.id, old.content, auth.uid());
   end if;
   return new;
 end;
@@ -72,8 +47,6 @@ create trigger trg_touch_task_comment
 --     update public.task_comments set content = 'b' where id = v_comment;
 --     select edited_at into v_edited from public.task_comments where id = v_comment;
 --     if v_edited is null then raise exception 'edited_at not set'; end if;
---     if (select count(*) from public.task_comment_edits where comment_id = v_comment) <> 1
---       then raise exception 'history row missing'; end if;
 --     begin
 --       update public.task_comments
 --         set task_id = (select id from public.tasks where id <> v_task limit 1)

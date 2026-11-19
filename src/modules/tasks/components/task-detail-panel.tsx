@@ -1127,7 +1127,7 @@ function CommentHistoryDialog({
           content: comment.content,
           at: edits.length
             ? edits[edits.length - 1].created_at
-            : comment.created_at,
+            : (comment.edited_at ?? comment.created_at),
         },
       ].reverse()
     : [];
