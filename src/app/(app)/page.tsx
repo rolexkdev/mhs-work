@@ -15,7 +15,7 @@ import { PeriodPicker } from "@/components/period-picker";
 import { type Period, periodLabel } from "@/lib/period";
 import { useTasks } from "@/modules/tasks/hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
-import { DEPARTMENTS } from "@/modules/tasks/constants";
+import { TASK_DEPARTMENTS } from "@/modules/tasks/constants";
 import {
   UNASSIGNED,
   computeScope,
@@ -104,7 +104,7 @@ export default function DashboardPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Tất cả phòng/nhóm</SelectItem>
-              {DEPARTMENTS.map((d) => (
+              {TASK_DEPARTMENTS.map((d) => (
                 <SelectItem key={d.value} value={d.value}>
                   {d.value}
                 </SelectItem>

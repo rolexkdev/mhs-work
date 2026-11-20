@@ -23,6 +23,7 @@ export type TagColor =
   | "green"
   | "orange"
   | "red"
+  | "crimson"
   | "purple"
   | "brown"
   | "pink"
@@ -35,6 +36,7 @@ export const TAG_COLOR_CLASS: Record<TagColor, string> = {
   green: "bg-emerald-100 text-emerald-700 border-emerald-200",
   orange: "bg-orange-100 text-orange-700 border-orange-200",
   red: "bg-red-100 text-red-700 border-red-200",
+  crimson: "bg-red-200 text-red-900 border-red-400",
   purple: "bg-purple-100 text-purple-700 border-purple-200",
   brown: "bg-amber-100 text-amber-800 border-amber-200",
   pink: "bg-pink-100 text-pink-700 border-pink-200",
@@ -83,7 +85,12 @@ export const TASK_STATUS_ORDER: TaskStatus[] = [
 ];
 
 // ----- Phòng/Nhóm -----
-export const DEPARTMENTS: { value: string; color: TagColor }[] = [
+export const DEPARTMENTS: {
+  value: string;
+  color: TagColor;
+  /** Used for documents only; not offered for new tasks. */
+  documentOnly?: boolean;
+}[] = [
   { value: "Cây xanh", color: "green" },
   { value: "Hạ tầng", color: "orange" },
   { value: "Nguyên Vũ", color: "brown" },
@@ -91,10 +98,26 @@ export const DEPARTMENTS: { value: string; color: TagColor }[] = [
   { value: "NM Xử lý nước thải", color: "red" },
   { value: "NM Cấp nước", color: "purple" },
   { value: "Hành chính", color: "gray" },
-  { value: "Tổng giám đốc", color: "pink" },
-  { value: "Kế toán", color: "sky" },
-  { value: "Pháp chế", color: "yellow" },
+  { value: "Tổng giám đốc", color: "pink", documentOnly: true },
+  { value: "Kế toán", color: "sky", documentOnly: true },
+  { value: "Pháp chế", color: "yellow", documentOnly: true },
+  { value: "PCCC", color: "crimson" },
 ];
+
+/** Departments a task can be assigned to (DEPARTMENTS minus the document-only ones). */
+export const TASK_DEPARTMENTS = DEPARTMENTS.filter((d) => !d.documentOnly);
+
+/**
+ * TASK_DEPARTMENTS plus the task's current department when it is a
+ * document-only one, so older tasks keep showing their department.
+ */
+export function taskDepartmentsFor(current: string | null) {
+  const legacy =
+    current && !TASK_DEPARTMENTS.some((d) => d.value === current)
+      ? DEPARTMENTS.find((d) => d.value === current)
+      : undefined;
+  return legacy ? [...TASK_DEPARTMENTS, legacy] : TASK_DEPARTMENTS;
+}
 
 // ----- Hạng mục -----
 export const CATEGORIES: { value: string; color: TagColor }[] = [

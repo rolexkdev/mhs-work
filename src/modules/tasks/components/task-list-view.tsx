@@ -31,6 +31,7 @@ import {
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
   DEPARTMENTS,
+  taskDepartmentsFor,
   TAG_COLOR_CLASS,
   colorOf,
   type TagColor,
@@ -59,44 +60,35 @@ const DUE_TONE: Record<string, string> = {
   none: "text-muted-foreground",
 };
 
-const DEPT_OPTIONS: CellOption[] = DEPARTMENTS.map((d) => ({
-  value: d.value,
-  label: d.value,
-  className: TAG_COLOR_CLASS[d.color],
-}));
+const deptOptionsFor = (current: string | null): CellOption[] =>
+  taskDepartmentsFor(current).map((d) => ({
+    value: d.value,
+    label: d.value,
+    className: TAG_COLOR_CLASS[d.color],
+  }));
+
 const STATUS_OPTIONS: CellOption[] = TASK_STATUS_ORDER.map((s) => ({
   value: s,
   label: TASK_STATUS_META[s].label,
   className: TASK_STATUS_META[s].badge,
 }));
 
-// Màu chấm tròn đậm theo màu pill (để dấu hiệu màu ở thanh nhóm rõ hơn).
-const DOT_CLASS: Record<TagColor, string> = {
-  gray: "bg-slate-400",
-  blue: "bg-blue-500",
-  green: "bg-emerald-500",
-  orange: "bg-orange-500",
-  red: "bg-red-500",
-  purple: "bg-purple-500",
-  brown: "bg-amber-600",
-  pink: "bg-pink-500",
-  sky: "bg-sky-500",
-  yellow: "bg-yellow-500",
-};
-
-// Viền dọc bên trái: kéo màu của nhóm chạy suốt các hàng thuộc nhóm đó, để
-// nhìn là biết ngay khối này thuộc phòng nào mà không phải dò ngược lên header.
-const BORDER_CLASS: Record<TagColor, string> = {
-  gray: "border-l-slate-400",
-  blue: "border-l-blue-500",
-  green: "border-l-emerald-500",
-  orange: "border-l-orange-500",
-  red: "border-l-red-500",
-  purple: "border-l-purple-500",
-  brown: "border-l-amber-600",
-  pink: "border-l-pink-500",
-  sky: "border-l-sky-500",
-  yellow: "border-l-yellow-500",
+// Màu chấm tròn đậm theo màu pill (để dấu hiệu màu ở thanh nhóm rõ hơn) và viền
+// dọc bên trái: kéo màu của nhóm chạy suốt các hàng thuộc nhóm đó, để nhìn là
+// biết ngay khối này thuộc phòng nào mà không phải dò ngược lên header.
+// Class names stay literal so Tailwind can see them.
+const ACCENT_CLASS: Record<TagColor, { dot: string; border: string }> = {
+  gray: { dot: "bg-slate-400", border: "border-l-slate-400" },
+  blue: { dot: "bg-blue-500", border: "border-l-blue-500" },
+  green: { dot: "bg-emerald-500", border: "border-l-emerald-500" },
+  orange: { dot: "bg-orange-500", border: "border-l-orange-500" },
+  red: { dot: "bg-red-500", border: "border-l-red-500" },
+  crimson: { dot: "bg-red-800", border: "border-l-red-800" },
+  purple: { dot: "bg-purple-500", border: "border-l-purple-500" },
+  brown: { dot: "bg-amber-600", border: "border-l-amber-600" },
+  pink: { dot: "bg-pink-500", border: "border-l-pink-500" },
+  sky: { dot: "bg-sky-500", border: "border-l-sky-500" },
+  yellow: { dot: "bg-yellow-500", border: "border-l-yellow-500" },
 };
 
 const STATUS_BORDER: Record<TaskStatus, string> = {
@@ -116,8 +108,7 @@ function groupAccent(
     const c = colorOf(DEPARTMENTS, key);
     return {
       bar: cn(TAG_COLOR_CLASS[c], "hover:brightness-95"),
-      dot: DOT_CLASS[c],
-      border: BORDER_CLASS[c],
+      ...ACCENT_CLASS[c],
     };
   }
   if (groupBy === "status") {
@@ -415,7 +406,7 @@ export function TaskListView({
                         <div className="min-w-0">
                           <InlineSelectCell
                             value={t.department}
-                            options={DEPT_OPTIONS}
+                            options={deptOptionsFor(t.department)}
                             onChange={(v) => onPatch(t.id, { department: v })}
                           />
                         </div>
