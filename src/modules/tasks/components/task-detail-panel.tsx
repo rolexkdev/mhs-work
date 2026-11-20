@@ -47,7 +47,7 @@ import {
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
   TASK_PRIORITY_META,
-  DEPARTMENTS,
+  taskDepartmentsFor,
   RECURRENCE_LABEL,
   RECURRENCE_ORDER,
 } from "@/modules/tasks/constants";
@@ -360,7 +360,7 @@ export function TaskDetailPanel({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">Chưa phân phòng</SelectItem>
-                      {DEPARTMENTS.map((d) => (
+                      {taskDepartmentsFor(task.department).map((d) => (
                         <SelectItem key={d.value} value={d.value}>
                           {d.value}
                         </SelectItem>

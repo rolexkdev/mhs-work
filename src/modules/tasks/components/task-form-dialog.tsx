@@ -22,7 +22,7 @@ import {
 import {
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
-  DEPARTMENTS,
+  taskDepartmentsFor,
   CATEGORIES,
   RECURRENCE_LABEL,
   RECURRENCE_ORDER,
@@ -228,7 +228,7 @@ export function TaskFormDialog({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NO_DEPT}>Chưa phân phòng</SelectItem>
-                      {DEPARTMENTS.map((d) => (
+                      {taskDepartmentsFor(department === NO_DEPT ? null : department).map((d) => (
                         <SelectItem key={d.value} value={d.value}>
                           {d.value}
                         </SelectItem>
