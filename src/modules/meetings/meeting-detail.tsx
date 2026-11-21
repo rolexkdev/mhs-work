@@ -2,15 +2,22 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, ChevronDown, Pencil } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, CalendarDays, ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useMeeting, useMeetingTaskCounts } from "@/modules/meetings/hooks";
+import {
+  useDeleteMeeting,
+  useMeeting,
+  useMeetingTaskCounts,
+} from "@/modules/meetings/hooks";
+import { useIsAdmin } from "@/modules/documents/hooks";
 import { useMeetingItems } from "@/modules/meetings/item-hooks";
 import { MeetingItems } from "@/modules/meetings/meeting-items";
 import { MeetingFormDialog } from "@/modules/meetings/meeting-form-dialog";
@@ -22,7 +29,11 @@ export function MeetingDetail({ id }: { id: string }) {
   const { data: meeting, isLoading } = useMeeting(id);
   const { data: items = [] } = useMeetingItems(id);
   const { data: counts = {} } = useMeetingTaskCounts();
+  const router = useRouter();
+  const isAdmin = useIsAdmin();
+  const deleteMeeting = useDeleteMeeting();
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [showText, setShowText] = useState(false);
 
   if (isLoading) {
@@ -117,14 +128,25 @@ export function MeetingDetail({ id }: { id: string }) {
                 </div>
               )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => setEditOpen(true)}
-            >
-              <Pencil className="h-4 w-4" /> Sửa
-            </Button>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditOpen(true)}
+              >
+                <Pencil className="h-4 w-4" /> Sửa
+              </Button>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600 hover:text-red-600"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" /> Xoá
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -150,6 +172,19 @@ export function MeetingDetail({ id }: { id: string }) {
         open={editOpen}
         onOpenChange={setEditOpen}
         meeting={meeting}
+      />
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Xoá cuộc họp?"
+        description="Các công việc của cuộc họp vẫn được giữ lại nhưng không còn thuộc cuộc họp nào. Đầu mục lưu trữ sẽ bị xoá cùng cuộc họp, và lịch sử của các việc sẽ không còn hiện tên cuộc họp này. Không thể hoàn tác."
+        confirmLabel="Xoá"
+        destructive
+        onConfirm={() =>
+          deleteMeeting.mutate(meeting.id, {
+            onSuccess: () => router.push("/meetings"),
+          })
+        }
       />
     </div>
   );
