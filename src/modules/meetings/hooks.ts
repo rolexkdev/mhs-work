@@ -151,3 +151,34 @@ export function useLinkTasksToMeeting() {
     onError: (e: Error) => toast.error(friendlyError(e)),
   });
 }
+
+/**
+ * Delete a meeting (admin only by RLS). Its tasks stay and lose the link
+ * (tasks.meeting_id is set null); its archived items are deleted with it.
+ */
+export function useDeleteMeeting() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const supabase = createClient();
+      // RLS hides the row from non-admins and returns no error, so check the count.
+      const { data, error } = await supabase
+        .from("meetings")
+        .delete()
+        .eq("id", id)
+        .select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Không có quyền xoá cuộc họp này");
+    },
+    onSuccess: (_, id) => {
+      // Drop the deleted meeting instead of refetching it (the open detail
+      // page would otherwise briefly show "not found").
+      qc.removeQueries({ queryKey: queryKeys.meeting(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.meetings, exact: true });
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["meeting-task-counts"] });
+      toast.success("Đã xoá cuộc họp");
+    },
+    onError: (e: Error) => toast.error(friendlyError(e)),
+  });
+}
