@@ -140,6 +140,8 @@ export function TaskDetailPanel({
   const [description, setDescription] = useState("");
   const [latestUpdate, setLatestUpdate] = useState("");
   const [note, setNote] = useState("");
+  // Target meeting waiting for confirmation when the task is already in another.
+  const [pendingMeetingId, setPendingMeetingId] = useState<string | null>(null);
   const loadedId = useRef<string | null>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
@@ -412,9 +414,15 @@ export function TaskDetailPanel({
                 <Row icon={CalendarDays} label="Cuộc họp">
                   <Select
                     value={task.meeting_id ?? NO_MEETING}
-                    onValueChange={(v) =>
-                      patch({ meeting_id: v === NO_MEETING ? null : v })
-                    }
+                    onValueChange={(v) => {
+                      if (v === NO_MEETING) {
+                        patch({ meeting_id: null });
+                      } else if (task.meeting_id && task.meeting_id !== v) {
+                        setPendingMeetingId(v);
+                      } else {
+                        patch({ meeting_id: v });
+                      }
+                    }}
                   >
                     <SelectTrigger className="h-8">
                       <SelectValue />
@@ -511,6 +519,23 @@ export function TaskDetailPanel({
           </div>
         )}
       </SheetContent>
+      <ConfirmDialog
+        open={pendingMeetingId !== null}
+        onOpenChange={(v) => {
+          if (!v) setPendingMeetingId(null);
+        }}
+        title="Chuyển công việc sang cuộc họp khác?"
+        description={`Công việc đang thuộc cuộc họp "${
+          meetings.find((m) => m.id === task?.meeting_id)?.title ?? "khác"
+        }" và sẽ được chuyển sang "${
+          meetings.find((m) => m.id === pendingMeetingId)?.title ?? "cuộc họp mới"
+        }".`}
+        confirmLabel="Chuyển"
+        onConfirm={() => {
+          if (pendingMeetingId) patch({ meeting_id: pendingMeetingId });
+          setPendingMeetingId(null);
+        }}
+      />
     </Sheet>
   );
 }
