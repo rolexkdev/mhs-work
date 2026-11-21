@@ -10,6 +10,38 @@ import { TASK_STATUS_META } from "@/modules/tasks/constants";
 import { useTasks } from "@/modules/tasks/hooks";
 import { useMeetings } from "@/modules/meetings/hooks";
 
+/** Selected tasks that already belong to a meeting (linking would move them). */
+export function useMovingTasks(selected: string[], targetMeetingId?: string) {
+  const { data: tasks = [] } = useTasks();
+  const { data: meetings = [] } = useMeetings();
+  return useMemo(() => {
+    const titles = new Map(meetings.map((m) => [m.id, m.title]));
+    return tasks
+      .filter(
+        (t) =>
+          selected.includes(t.id) &&
+          t.meeting_id &&
+          t.meeting_id !== targetMeetingId,
+      )
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        meetingTitle: titles.get(t.meeting_id!) ?? "họp khác",
+      }));
+  }, [tasks, meetings, selected, targetMeetingId]);
+}
+
+/** Confirmation text listing the tasks that will leave their current meeting. */
+export function movingDescription(
+  moving: { title: string; meetingTitle: string }[],
+): string {
+  return (
+    `${moving.length} công việc đang thuộc cuộc họp khác và sẽ bị chuyển sang cuộc họp này: ` +
+    moving.map((t) => `${t.title} (${t.meetingTitle})`).join("; ") +
+    ". Bạn có chắc chắn muốn chuyển?"
+  );
+}
+
 /**
  * Searchable multi-select over non-deleted tasks. Tasks already in
  * `meetingId` are hidden; picking one that belongs to another meeting shows a

@@ -10,7 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TaskPicker } from "@/modules/meetings/task-picker";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  TaskPicker,
+  movingDescription,
+  useMovingTasks,
+} from "@/modules/meetings/task-picker";
 import { useLinkTasksToMeeting } from "@/modules/meetings/hooks";
 
 /** Pick existing tasks and link them to a meeting. */
@@ -25,11 +30,19 @@ export function LinkTasksDialog({
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const link = useLinkTasksToMeeting();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const moving = useMovingTasks(selected, meetingId);
 
   const close = (v: boolean) => {
     if (!v) setSelected([]);
     onOpenChange(v);
   };
+
+  const submit = () =>
+    link.mutate(
+      { meetingId, taskIds: selected },
+      { onSuccess: () => close(false) },
+    );
 
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -52,17 +65,23 @@ export function LinkTasksDialog({
           </Button>
           <Button
             disabled={selected.length === 0 || link.isPending}
-            onClick={() =>
-              link.mutate(
-                { meetingId, taskIds: selected },
-                { onSuccess: () => close(false) },
-              )
-            }
+            onClick={() => (moving.length > 0 ? setConfirmOpen(true) : submit())}
           >
             {link.isPending ? "Đang lưu..." : `Thêm ${selected.length || ""} việc`}
           </Button>
         </DialogFooter>
       </DialogContent>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Chuyển công việc từ cuộc họp khác?"
+        description={movingDescription(moving)}
+        confirmLabel="Chuyển"
+        onConfirm={() => {
+          setConfirmOpen(false);
+          submit();
+        }}
+      />
     </Dialog>
   );
 }

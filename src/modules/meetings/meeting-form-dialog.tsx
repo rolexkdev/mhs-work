@@ -27,7 +27,12 @@ import {
   useLinkTasksToMeeting,
   useUpdateMeeting,
 } from "@/modules/meetings/hooks";
-import { TaskPicker } from "@/modules/meetings/task-picker";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  TaskPicker,
+  movingDescription,
+  useMovingTasks,
+} from "@/modules/meetings/task-picker";
 import type { Meeting, MeetingStatus } from "@/types/database";
 
 const STATUS_ORDER: MeetingStatus[] = ["planned", "ongoing", "closed"];
@@ -59,6 +64,8 @@ export function MeetingFormDialog({
   const [date, setDate] = useState("");
   const [status, setStatus] = useState<MeetingStatus>("planned");
   const [taskIds, setTaskIds] = useState<string[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const moving = useMovingTasks(taskIds);
 
   useEffect(() => {
     if (!open) return;
@@ -73,9 +80,17 @@ export function MeetingFormDialog({
 
   const pending = createMeeting.isPending || updateMeeting.isPending || linkTasks.isPending;
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
+    if (!isEdit && moving.length > 0) {
+      setConfirmOpen(true);
+      return;
+    }
+    void save();
+  }
+
+  async function save() {
     const meeting_date = date ? new Date(date).toISOString() : new Date().toISOString();
 
     if (isEdit && meeting) {
@@ -195,6 +210,17 @@ export function MeetingFormDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Chuyển công việc từ cuộc họp khác?"
+        description={movingDescription(moving)}
+        confirmLabel="Chuyển và tạo"
+        onConfirm={() => {
+          setConfirmOpen(false);
+          void save();
+        }}
+      />
     </Dialog>
   );
 }
