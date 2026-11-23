@@ -27,7 +27,9 @@ import {
   RECURRENCE_LABEL,
   RECURRENCE_ORDER,
 } from "@/modules/tasks/constants";
+import { toast } from "sonner";
 import { useCreateTask, useUpdateTask } from "@/modules/tasks/hooks";
+import { DATE_RANGE_ERROR, isDateRangeValid } from "@/modules/tasks/dates";
 import {
   AssigneePicker,
   AssigneeStack,
@@ -99,6 +101,10 @@ export function TaskFormDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
+    if (!isDateRangeValid(startDate, dueDate)) {
+      toast.error(DATE_RANGE_ERROR);
+      return;
+    }
 
     const common = {
       title: title.trim(),
