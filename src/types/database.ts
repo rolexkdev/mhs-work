@@ -90,7 +90,6 @@ export type Task = Timestamps & {
   due_date: string | null;
   // Trường theo "Công việc KCN" (Notion)
   department: string | null;
-  category: string | null;
   latest_update: string | null;
   note: string | null;
   /** Việc lặp lại: luôn hiện ở mọi tuần. */
@@ -331,7 +330,6 @@ export interface Database {
           | "start_date"
           | "due_date"
           | "department"
-          | "category"
           | "latest_update"
           | "note"
           | "recurrence"

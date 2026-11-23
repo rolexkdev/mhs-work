@@ -23,11 +23,12 @@ import {
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
   taskDepartmentsFor,
-  CATEGORIES,
   RECURRENCE_LABEL,
   RECURRENCE_ORDER,
 } from "@/modules/tasks/constants";
+import { toast } from "sonner";
 import { useCreateTask, useUpdateTask } from "@/modules/tasks/hooks";
+import { DATE_RANGE_ERROR, isDateRangeValid } from "@/modules/tasks/dates";
 import {
   AssigneePicker,
   AssigneeStack,
@@ -38,7 +39,6 @@ import type { Task, Meeting } from "@/types/database";
 
 const NO_MEETING = "__none__";
 const NO_DEPT = "__none__";
-const NO_CAT = "__none__";
 
 function toDateInput(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
@@ -73,7 +73,6 @@ export function TaskFormDialog({
   const [assignees, setAssignees] = useState<string[]>([]);
   const [meetingId, setMeetingId] = useState<string>(NO_MEETING);
   const [department, setDepartment] = useState<string>(NO_DEPT);
-  const [category, setCategory] = useState<string>(NO_CAT);
   const [status, setStatus] = useState<Task["status"]>("todo");
   const [recurrence, setRecurrence] = useState<Task["recurrence"]>("none");
   const [startDate, setStartDate] = useState("");
@@ -87,7 +86,6 @@ export function TaskFormDialog({
     setAssignees(task?.assignee_ids ?? []);
     setMeetingId(task?.meeting_id ?? defaultMeetingId ?? NO_MEETING);
     setDepartment(task?.department ?? NO_DEPT);
-    setCategory(task?.category ?? NO_CAT);
     setStatus(task?.status ?? "todo");
     setRecurrence(task?.recurrence ?? "none");
     setStartDate(toDateInput(task?.start_date ?? null));
@@ -99,6 +97,10 @@ export function TaskFormDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
+    if (!isDateRangeValid(startDate, dueDate)) {
+      toast.error(DATE_RANGE_ERROR);
+      return;
+    }
 
     const common = {
       title: title.trim(),
@@ -106,7 +108,6 @@ export function TaskFormDialog({
       assignee_ids: assignees,
       meeting_id: meetingId === NO_MEETING ? null : meetingId,
       department: department === NO_DEPT ? null : department,
-      category: category === NO_CAT ? null : category,
       status,
       recurrence,
       start_date: toIso(startDate),
@@ -231,23 +232,6 @@ export function TaskFormDialog({
                       {taskDepartmentsFor(department === NO_DEPT ? null : department).map((d) => (
                         <SelectItem key={d.value} value={d.value}>
                           {d.value}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <FieldLabel>Hạng mục</FieldLabel>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_CAT}>—</SelectItem>
-                      {CATEGORIES.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>
-                          {c.value}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -71,7 +71,6 @@ export interface CreateTaskInput {
   start_date?: string | null;
   due_date?: string | null;
   department?: string | null;
-  category?: string | null;
   latest_update?: string | null;
   note?: string | null;
 }
@@ -97,7 +96,6 @@ export function useCreateTask() {
         start_date: input.start_date ?? null,
         due_date: input.due_date ?? null,
         department: input.department ?? null,
-        category: input.category ?? null,
         latest_update: input.latest_update ?? null,
         note: input.note ?? null,
         created_by: user.id,

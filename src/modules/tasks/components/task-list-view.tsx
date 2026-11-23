@@ -89,6 +89,7 @@ const ACCENT_CLASS: Record<TagColor, { dot: string; border: string }> = {
   pink: { dot: "bg-pink-500", border: "border-l-pink-500" },
   sky: { dot: "bg-sky-500", border: "border-l-sky-500" },
   yellow: { dot: "bg-yellow-500", border: "border-l-yellow-500" },
+  teal: { dot: "bg-teal-500", border: "border-l-teal-500" },
 };
 
 const STATUS_BORDER: Record<TaskStatus, string> = {

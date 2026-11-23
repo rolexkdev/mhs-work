@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { DATE_RANGE_ERROR, isDateRangeValid } from "@/modules/tasks/dates";
 import { LinkTasksDialog } from "@/modules/meetings/link-tasks-dialog";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -149,6 +150,16 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
     updateTask.mutate({ id, status });
   }
   function handlePatch(id: string, patch: Partial<Task>) {
+    if ("start_date" in patch || "due_date" in patch) {
+      const current = tasks.find((t) => t.id === id);
+      const start =
+        "start_date" in patch ? patch.start_date : current?.start_date;
+      const due = "due_date" in patch ? patch.due_date : current?.due_date;
+      if (!isDateRangeValid(start, due)) {
+        toast.error(DATE_RANGE_ERROR);
+        return;
+      }
+    }
     updateTask.mutate({ id, ...patch });
   }
   function handleDelete(t: Task) {
