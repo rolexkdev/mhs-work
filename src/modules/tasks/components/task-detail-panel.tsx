@@ -73,6 +73,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DATE_RANGE_ERROR, isDateRangeValid } from "@/modules/tasks/dates";
 import { useCurrentUserId } from "@/modules/auth/use-current-user";
 import { useIsAdmin } from "@/modules/documents/hooks";
 import {
@@ -183,6 +184,17 @@ export function TaskDetailPanel({
 
   function patch(p: Partial<Task>) {
     if (task) update.mutate({ id: task.id, ...p });
+  }
+  /** Saves a start/due date unless it would put the start after the due date. */
+  function patchDate(field: "start_date" | "due_date", value: string | null) {
+    if (!task) return;
+    const start = field === "start_date" ? value : task.start_date;
+    const due = field === "due_date" ? value : task.due_date;
+    if (!isDateRangeValid(start, due)) {
+      toast.error(DATE_RANGE_ERROR);
+      return;
+    }
+    patch({ [field]: value });
   }
   function copyLink() {
     if (!task) return;
@@ -312,16 +324,33 @@ export function TaskDetailPanel({
               </div>
 
               <div className="divide-y">
+                <Row icon={CalendarDays} label="Ngày bắt đầu">
+                  <Input
+                    type="date"
+                    value={task.start_date ? task.start_date.slice(0, 10) : ""}
+                    onChange={(e) =>
+                      patchDate(
+                        "start_date",
+                        e.target.value
+                          ? new Date(e.target.value).toISOString()
+                          : null,
+                      )
+                    }
+                    className="h-8 w-44"
+                  />
+                </Row>
+
                 <Row icon={CalendarClock} label="Hạn chót">
                   <Input
                     type="date"
                     value={task.due_date ? task.due_date.slice(0, 10) : ""}
                     onChange={(e) =>
-                      patch({
-                        due_date: e.target.value
+                      patchDate(
+                        "due_date",
+                        e.target.value
                           ? new Date(e.target.value).toISOString()
                           : null,
-                      })
+                      )
                     }
                     className="h-8 w-44"
                   />
