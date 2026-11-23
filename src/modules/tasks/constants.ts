@@ -15,7 +15,7 @@ type Meta = {
 
 /**
  * Bảng màu pill kiểu Notion (nền nhạt + chữ đậm) cho các trường select:
- * Phòng/Nhóm, Hạng mục, Người phụ trách...
+ * Phòng/Nhóm, Người phụ trách...
  */
 export type TagColor =
   | "gray"
@@ -121,13 +121,6 @@ export function taskDepartmentsFor(current: string | null) {
       : undefined;
   return legacy ? [...TASK_DEPARTMENTS, legacy] : TASK_DEPARTMENTS;
 }
-
-// ----- Hạng mục -----
-export const CATEGORIES: { value: string; color: TagColor }[] = [
-  { value: "HC", color: "blue" },
-  { value: "IT", color: "purple" },
-  { value: "Bảo trì", color: "green" },
-];
 
 export function colorOf(
   options: { value: string; color: TagColor }[],
