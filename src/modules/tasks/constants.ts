@@ -28,7 +28,8 @@ export type TagColor =
   | "brown"
   | "pink"
   | "sky"
-  | "yellow";
+  | "yellow"
+  | "teal";
 
 export const TAG_COLOR_CLASS: Record<TagColor, string> = {
   gray: "bg-slate-100 text-slate-700 border-slate-200",
@@ -42,6 +43,7 @@ export const TAG_COLOR_CLASS: Record<TagColor, string> = {
   pink: "bg-pink-100 text-pink-700 border-pink-200",
   sky: "bg-sky-100 text-sky-700 border-sky-200",
   yellow: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  teal: "bg-teal-100 text-teal-700 border-teal-200",
 };
 
 // ----- Trạng thái (đặt theo Notion "Công việc KCN") -----
@@ -102,6 +104,7 @@ export const DEPARTMENTS: {
   { value: "Kế toán", color: "sky", documentOnly: true },
   { value: "Pháp chế", color: "yellow", documentOnly: true },
   { value: "PCCC", color: "crimson" },
+  { value: "IT", color: "teal" },
 ];
 
 /** Departments a task can be assigned to (DEPARTMENTS minus the document-only ones). */
