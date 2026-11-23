@@ -116,6 +116,9 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
   trigger sets `edited_at`); authors and admins can delete them. Since 0028 the trigger
   also keeps each previous text in `task_comment_edits` (readable by everyone, written
   only by the trigger).
+- `tasks.category` (Hạng mục) was dropped in 0029; old `task_logs` rows with action
+  `category` stay and are still rendered in the task history. Start date and due date
+  are validated client-side only (`src/modules/tasks/dates.ts`), no DB constraint.
 - Document progress changes go only through the security definer RPCs in
   `0018_document_actions.sql`, `0019_document_handback.sql`,
   `0020_document_report_missing.sql` and `0026_document_self_service.sql`. Every RPC
