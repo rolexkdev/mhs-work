@@ -89,6 +89,16 @@ export function DocumentsWorkspace() {
     [documents, detailId],
   );
 
+  // Close the panel and clear ?document=<id> when the open document is gone
+  // (deleted, or a link to an unknown id), so the URL never points at it.
+  const detailMissing = !isLoading && detailOpen && !detailDocument;
+  useEffect(() => {
+    if (!detailMissing) return;
+    setDetailOpen(false);
+    setDetailId(null);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [detailMissing]);
+
   function openDetail(doc: DocumentWithSteps) {
     setDetailId(doc.id);
     setDetailOpen(true);
