@@ -24,6 +24,19 @@ import { documentStatus } from "@/modules/documents/status";
 import { useUiStore, type DocumentView } from "@/store/ui-store";
 import type { DocumentWithSteps } from "@/types/database";
 
+/** Set or clear ?document=<id> and keep any other query params on the page. */
+function setDocumentParam(id: string | null) {
+  const params = new URLSearchParams(window.location.search);
+  if (id) params.set("document", id);
+  else params.delete("document");
+  const query = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    query ? `${window.location.pathname}?${query}` : window.location.pathname,
+  );
+}
+
 /** Bỏ dấu tiếng Việt để tìm kiếm không phân biệt hoa thường và dấu. */
 function normalize(value: string): string {
   return value
@@ -96,24 +109,20 @@ export function DocumentsWorkspace() {
     if (!detailMissing) return;
     setDetailOpen(false);
     setDetailId(null);
-    window.history.replaceState(null, "", window.location.pathname);
+    setDocumentParam(null);
   }, [detailMissing]);
 
   function openDetail(doc: DocumentWithSteps) {
     setDetailId(doc.id);
     setDetailOpen(true);
     // Put ?document=<id> in the address bar so the link can be copied.
-    window.history.replaceState(
-      null,
-      "",
-      `${window.location.pathname}?document=${doc.id}`,
-    );
+    setDocumentParam(doc.id);
   }
   function handleDetailOpenChange(v: boolean) {
     setDetailOpen(v);
     if (!v) {
       setDetailId(null);
-      window.history.replaceState(null, "", window.location.pathname);
+      setDocumentParam(null);
     }
   }
 
