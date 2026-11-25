@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { LayoutGrid, List, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -22,6 +23,19 @@ import { DocumentStats } from "@/modules/documents/components/document-stats";
 import { documentStatus } from "@/modules/documents/status";
 import { useUiStore, type DocumentView } from "@/store/ui-store";
 import type { DocumentWithSteps } from "@/types/database";
+
+/** Set or clear ?document=<id> and keep any other query params on the page. */
+function setDocumentParam(id: string | null) {
+  const params = new URLSearchParams(window.location.search);
+  if (id) params.set("document", id);
+  else params.delete("document");
+  const query = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    query ? `${window.location.pathname}?${query}` : window.location.pathname,
+  );
+}
 
 /** Bỏ dấu tiếng Việt để tìm kiếm không phân biệt hoa thường và dấu. */
 function normalize(value: string): string {
@@ -71,6 +85,16 @@ export function DocumentsWorkspace() {
     null,
   );
 
+  // Open the detail panel when the URL carries ?document=<id> (shared link).
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get("document");
+    if (id) {
+      setDetailId(id);
+      setDetailOpen(true);
+    }
+  }, [searchParams]);
+
   // Lấy lại từ danh sách mỗi lần render để tấm chi tiết luôn hiện dữ liệu mới
   // sau khi query được invalidate.
   const detailDocument = useMemo(
@@ -78,9 +102,28 @@ export function DocumentsWorkspace() {
     [documents, detailId],
   );
 
+  // Close the panel and clear ?document=<id> when the open document is gone
+  // (deleted, or a link to an unknown id), so the URL never points at it.
+  const detailMissing = !isLoading && detailOpen && !detailDocument;
+  useEffect(() => {
+    if (!detailMissing) return;
+    setDetailOpen(false);
+    setDetailId(null);
+    setDocumentParam(null);
+  }, [detailMissing]);
+
   function openDetail(doc: DocumentWithSteps) {
     setDetailId(doc.id);
     setDetailOpen(true);
+    // Put ?document=<id> in the address bar so the link can be copied.
+    setDocumentParam(doc.id);
+  }
+  function handleDetailOpenChange(v: boolean) {
+    setDetailOpen(v);
+    if (!v) {
+      setDetailId(null);
+      setDocumentParam(null);
+    }
   }
 
   const filtered = useMemo(() => {
@@ -192,11 +235,9 @@ export function DocumentsWorkspace() {
       />
       <DocumentDetailPanel
         document={detailDocument}
-        open={detailOpen}
-        onOpenChange={(v) => {
-          setDetailOpen(v);
-          if (!v) setDetailId(null);
-        }}
+        // A link to a deleted or unknown id must not leave an endless spinner.
+        open={detailOpen && (isLoading || !!detailDocument)}
+        onOpenChange={handleDetailOpenChange}
       />
       <ConfirmDialog
         open={!!pendingDelete}
