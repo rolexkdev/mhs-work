@@ -384,7 +384,9 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         <div className="rounded-lg border border-dashed py-16 text-center">
           <p className="text-sm text-muted-foreground">
             {tasks.length === 0
-              ? "Chưa có công việc nào. Bấm Tạo công việc để bắt đầu."
+              ? activeFilterCount > 0
+                ? "Không có công việc nào khớp bộ lọc hiện tại."
+                : "Chưa có công việc nào. Bấm Tạo công việc để bắt đầu."
               : "Không có công việc nào trong kỳ này. Đổi bộ lọc kỳ để xem thêm."}
           </p>
         </div>
