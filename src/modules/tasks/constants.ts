@@ -93,18 +93,18 @@ export const DEPARTMENTS: {
   /** Used for documents only; not offered for new tasks. */
   documentOnly?: boolean;
 }[] = [
+  { value: "Ban lãnh đạo", color: "pink" },
   { value: "Cây xanh", color: "green" },
-  { value: "Hạ tầng", color: "orange" },
-  { value: "Nguyên Vũ", color: "brown" },
-  { value: "Môi trường", color: "blue" },
-  { value: "NM Xử lý nước thải", color: "red" },
-  { value: "NM Cấp nước", color: "purple" },
   { value: "Hành chính", color: "gray" },
-  { value: "Tổng giám đốc", color: "pink", documentOnly: true },
-  { value: "Kế toán", color: "sky", documentOnly: true },
-  { value: "Pháp chế", color: "yellow", documentOnly: true },
-  { value: "PCCC", color: "crimson" },
+  { value: "Hạ tầng", color: "orange" },
   { value: "IT", color: "teal" },
+  { value: "Kế toán", color: "sky", documentOnly: true },
+  { value: "Môi trường", color: "blue" },
+  { value: "Nguyên Vũ", color: "brown" },
+  { value: "NM Cấp nước", color: "purple" },
+  { value: "NM Xử lý nước thải", color: "red" },
+  { value: "PCCC", color: "crimson" },
+  { value: "Pháp chế", color: "yellow", documentOnly: true },
 ];
 
 /** Departments a task can be assigned to (DEPARTMENTS minus the document-only ones). */
