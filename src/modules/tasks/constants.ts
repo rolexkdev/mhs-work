@@ -100,7 +100,7 @@ export const DEPARTMENTS: {
   { value: "NM Xử lý nước thải", color: "red" },
   { value: "NM Cấp nước", color: "purple" },
   { value: "Hành chính", color: "gray" },
-  { value: "Tổng giám đốc", color: "pink", documentOnly: true },
+  { value: "Ban lãnh đạo", color: "pink" },
   { value: "Kế toán", color: "sky", documentOnly: true },
   { value: "Pháp chế", color: "yellow", documentOnly: true },
   { value: "PCCC", color: "crimson" },
