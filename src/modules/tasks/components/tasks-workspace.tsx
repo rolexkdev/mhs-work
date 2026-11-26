@@ -34,9 +34,11 @@ import {
   useTasks,
   useUpdateTask,
   useDeleteTask,
+  NO_DEPARTMENT,
   type TaskQueryFilters,
 } from "@/modules/tasks/hooks";
 import {
+  TASK_DEPARTMENTS,
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
   TASK_PRIORITY_META,
@@ -62,6 +64,11 @@ import type { Task, TaskStatus, TaskLog } from "@/types/database";
 
 const ALL = "__all__";
 
+const DEPARTMENT_OPTIONS = [
+  ...TASK_DEPARTMENTS.map((d) => ({ value: d.value, label: d.value })),
+  { value: NO_DEPARTMENT, label: "Chưa phân phòng" },
+];
+
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "none", label: "Bảng mặc định" },
   { value: "department", label: "Phòng/Nhóm" },
@@ -77,6 +84,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const [period, setPeriod] = useState<Period>(() =>
     meetingId ? { mode: "all", anchor: new Date().toISOString() } : currentPeriod(),
   );
+  const [departmentFilter, setDepartmentFilter] = useState<string>(ALL);
   const [statusFilter, setStatusFilter] = useState<string>(ALL);
   const [priorityFilter, setPriorityFilter] = useState<string>(ALL);
   const [assigneeFilter, setAssigneeFilter] = useState<string>(ALL);
@@ -105,6 +113,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
 
   const filters: TaskQueryFilters = {
     meetingId: meetingId ?? null,
+    department: departmentFilter === ALL ? null : departmentFilter,
     status: statusFilter === ALL ? null : (statusFilter as Task["status"]),
     priority:
       priorityFilter === ALL ? null : (priorityFilter as Task["priority"]),
@@ -207,9 +216,12 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
     updateTask.mutate({ id: t.id, hidden_weeks });
   }
 
-  const activeFilterCount = [statusFilter, priorityFilter, assigneeFilter].filter(
-    (v) => v !== ALL,
-  ).length;
+  const activeFilterCount = [
+    departmentFilter,
+    statusFilter,
+    priorityFilter,
+    assigneeFilter,
+  ].filter((v) => v !== ALL).length;
 
   return (
     <div className="space-y-4">
@@ -305,6 +317,12 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <FilterSelect
+            value={departmentFilter}
+            onChange={setDepartmentFilter}
+            placeholder="Phòng/Nhóm"
+            options={DEPARTMENT_OPTIONS}
+          />
+          <FilterSelect
             value={statusFilter}
             onChange={setStatusFilter}
             placeholder="Trạng thái"
@@ -366,7 +384,9 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         <div className="rounded-lg border border-dashed py-16 text-center">
           <p className="text-sm text-muted-foreground">
             {tasks.length === 0
-              ? "Chưa có công việc nào. Bấm Tạo công việc để bắt đầu."
+              ? activeFilterCount > 0
+                ? "Không có công việc nào khớp bộ lọc hiện tại."
+                : "Chưa có công việc nào. Bấm Tạo công việc để bắt đầu."
               : "Không có công việc nào trong kỳ này. Đổi bộ lọc kỳ để xem thêm."}
           </p>
         </div>
@@ -438,6 +458,15 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
               </MobileFilterField>
             )}
 
+            <MobileFilterField label="Phòng/Nhóm">
+              <MobileFilterSelect
+                value={departmentFilter}
+                onChange={setDepartmentFilter}
+                allLabel="Tất cả phòng/nhóm"
+                options={DEPARTMENT_OPTIONS}
+              />
+            </MobileFilterField>
+
             <MobileFilterField label="Trạng thái">
               <MobileFilterSelect
                 value={statusFilter}
@@ -480,6 +509,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
                 className="h-11 flex-1"
                 disabled={activeFilterCount === 0}
                 onClick={() => {
+                  setDepartmentFilter(ALL);
                   setStatusFilter(ALL);
                   setPriorityFilter(ALL);
                   setAssigneeFilter(ALL);
