@@ -69,6 +69,36 @@ const DEPARTMENT_OPTIONS = [
   { value: NO_DEPARTMENT, label: "Chưa phân phòng" },
 ];
 
+const VALID_DEPARTMENTS = new Set(DEPARTMENT_OPTIONS.map((o) => o.value));
+const VALID_STATUSES = new Set<string>(TASK_STATUS_ORDER);
+const VALID_PRIORITIES = new Set<string>(TASK_PRIORITY_ORDER);
+
+function readParam(
+  params: Pick<URLSearchParams, "get">,
+  key: string,
+  valid?: Set<string>,
+): string {
+  const value = params.get(key);
+  if (!value) return ALL;
+  if (valid && !valid.has(value)) return ALL;
+  return value;
+}
+
+/** Set or clear URL query params while preserving all other params on the page. */
+function updateUrlParams(patch: Record<string, string | null>) {
+  const params = new URLSearchParams(window.location.search);
+  for (const [key, value] of Object.entries(patch)) {
+    if (value && value !== ALL) params.set(key, value);
+    else params.delete(key);
+  }
+  const query = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    query ? `${window.location.pathname}?${query}` : window.location.pathname,
+  );
+}
+
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "none", label: "Bảng mặc định" },
   { value: "department", label: "Phòng/Nhóm" },
@@ -78,16 +108,25 @@ const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
 ];
 
 export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
+  const searchParams = useSearchParams();
   const [view, setView] = useState<"board" | "list">("list");
   const [groupBy, setGroupBy] = useState<GroupBy>("department");
   // Trong trang chi tiết cuộc họp: xem tất cả task của họp, không lọc theo tuần.
   const [period, setPeriod] = useState<Period>(() =>
     meetingId ? { mode: "all", anchor: new Date().toISOString() } : currentPeriod(),
   );
-  const [departmentFilter, setDepartmentFilter] = useState<string>(ALL);
-  const [statusFilter, setStatusFilter] = useState<string>(ALL);
-  const [priorityFilter, setPriorityFilter] = useState<string>(ALL);
-  const [assigneeFilter, setAssigneeFilter] = useState<string>(ALL);
+  const [departmentFilter, setDepartmentFilter] = useState<string>(() =>
+    readParam(searchParams, "department", VALID_DEPARTMENTS),
+  );
+  const [statusFilter, setStatusFilter] = useState<string>(() =>
+    readParam(searchParams, "status", VALID_STATUSES),
+  );
+  const [priorityFilter, setPriorityFilter] = useState<string>(() =>
+    readParam(searchParams, "priority", VALID_PRIORITIES),
+  );
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(() =>
+    readParam(searchParams, "assignee"),
+  );
 
   const [createOpen, setCreateOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -98,15 +137,61 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   // Trên điện thoại các bộ lọc nằm trong một tấm kéo từ đáy, không bày ra hàng ngang.
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
-  // Mở chi tiết khi điều hướng kèm ?task=<id> (vd từ Cmd-K).
-  const searchParams = useSearchParams();
+  // Sync filters and open task detail when URL query params change.
   useEffect(() => {
+    const dept = readParam(searchParams, "department", VALID_DEPARTMENTS);
+    const status = readParam(searchParams, "status", VALID_STATUSES);
+    const priority = readParam(searchParams, "priority", VALID_PRIORITIES);
+    const assignee = readParam(searchParams, "assignee");
+    setDepartmentFilter(dept);
+    setStatusFilter(status);
+    setPriorityFilter(priority);
+    setAssigneeFilter(assignee);
+
+    const invalidPatch: Record<string, null> = {};
+    if (searchParams.get("department") && dept === ALL)
+      invalidPatch.department = null;
+    if (searchParams.get("status") && status === ALL)
+      invalidPatch.status = null;
+    if (searchParams.get("priority") && priority === ALL)
+      invalidPatch.priority = null;
+    if (Object.keys(invalidPatch).length > 0) updateUrlParams(invalidPatch);
+
     const tid = searchParams.get("task");
     if (tid) {
       setDetailId(tid);
       setDetailOpen(true);
     }
   }, [searchParams]);
+
+  function handleDepartmentFilterChange(v: string) {
+    setDepartmentFilter(v);
+    updateUrlParams({ department: v });
+  }
+  function handleStatusFilterChange(v: string) {
+    setStatusFilter(v);
+    updateUrlParams({ status: v });
+  }
+  function handlePriorityFilterChange(v: string) {
+    setPriorityFilter(v);
+    updateUrlParams({ priority: v });
+  }
+  function handleAssigneeFilterChange(v: string) {
+    setAssigneeFilter(v);
+    updateUrlParams({ assignee: v });
+  }
+  function handleClearFilters() {
+    setDepartmentFilter(ALL);
+    setStatusFilter(ALL);
+    setPriorityFilter(ALL);
+    setAssigneeFilter(ALL);
+    updateUrlParams({
+      department: null,
+      status: null,
+      priority: null,
+      assignee: null,
+    });
+  }
 
   const { data: profiles = [] } = useProfiles();
   const { data: meetings = [] } = useMeetings();
@@ -149,11 +234,11 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
     setDetailId(t.id);
     setDetailOpen(true);
     // Đưa ?task=<id> lên thanh địa chỉ để có thể copy link chia sẻ.
-    window.history.replaceState(null, "", `${window.location.pathname}?task=${t.id}`);
+    updateUrlParams({ task: t.id });
   }
   function handleDetailOpenChange(v: boolean) {
     setDetailOpen(v);
-    if (!v) window.history.replaceState(null, "", window.location.pathname);
+    if (!v) updateUrlParams({ task: null });
   }
   function handleStatusChange(id: string, status: TaskStatus) {
     updateTask.mutate({ id, status });
@@ -279,28 +364,38 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
       </div>
 
       {/* ── Thanh công cụ trên máy tính ── */}
-      <div className="hidden flex-wrap items-center gap-2 md:flex">
+      <div className="hidden flex-wrap items-center gap-1 md:flex 2xl:gap-1.5">
         {!meetingId && <PeriodPicker value={period} onChange={setPeriod} />}
 
         <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
-          <TabsList>
-            <TabsTrigger value="list">
-              <List className="h-4 w-4" /> Danh sách
+          <TabsList className="h-8 p-0.5">
+            <TabsTrigger
+              value="list"
+              className="h-7 px-2"
+              title="Danh sách"
+              aria-label="Danh sách"
+            >
+              <List className="h-4 w-4" />
             </TabsTrigger>
-            <TabsTrigger value="board">
-              <LayoutGrid className="h-4 w-4" /> Kanban
+            <TabsTrigger
+              value="board"
+              className="h-7 px-2"
+              title="Kanban"
+              aria-label="Kanban"
+            >
+              <LayoutGrid className="h-4 w-4" />
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
         {view === "list" && (
           <div className="flex items-center gap-1.5">
-            <Layers className="h-4 w-4 text-muted-foreground" />
+            <Layers className="hidden h-4 w-4 shrink-0 text-muted-foreground 2xl:block" />
             <Select
               value={groupBy}
               onValueChange={(v) => setGroupBy(v as GroupBy)}
             >
-              <SelectTrigger className="h-8 w-[150px] text-xs">
+              <SelectTrigger className="h-8 w-[108px] px-2 text-xs 2xl:w-[136px] 2xl:px-3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -314,17 +409,17 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           </div>
         )}
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
+        <div className="ml-auto flex flex-wrap items-center gap-1 2xl:gap-1.5">
+          <Filter className="hidden h-4 w-4 shrink-0 text-muted-foreground 2xl:block" />
           <FilterSelect
             value={departmentFilter}
-            onChange={setDepartmentFilter}
+            onChange={handleDepartmentFilterChange}
             placeholder="Phòng/Nhóm"
             options={DEPARTMENT_OPTIONS}
           />
           <FilterSelect
             value={statusFilter}
-            onChange={setStatusFilter}
+            onChange={handleStatusFilterChange}
             placeholder="Trạng thái"
             options={TASK_STATUS_ORDER.map((s) => ({
               value: s,
@@ -333,7 +428,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           />
           <FilterSelect
             value={priorityFilter}
-            onChange={setPriorityFilter}
+            onChange={handlePriorityFilterChange}
             placeholder="Ưu tiên"
             options={TASK_PRIORITY_ORDER.map((p) => ({
               value: p,
@@ -342,7 +437,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           />
           <FilterSelect
             value={assigneeFilter}
-            onChange={setAssigneeFilter}
+            onChange={handleAssigneeFilterChange}
             placeholder="Người làm"
             options={profiles.map((p) => ({
               value: p.id,
@@ -352,6 +447,10 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           {!meetingId && (
             <Button
               variant="outline"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              title="Xuất Excel"
+              aria-label="Xuất Excel"
               onClick={handleExport}
               disabled={exporting}
             >
@@ -360,15 +459,23 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
               ) : (
                 <FileSpreadsheet className="h-4 w-4" />
               )}
-              Xuất Excel
             </Button>
           )}
           {meetingId && (
-            <Button variant="outline" onClick={() => setLinkOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setLinkOpen(true)}
+            >
               <Link2 className="h-4 w-4" /> Thêm việc có sẵn
             </Button>
           )}
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button
+            size="sm"
+            className="h-8 px-2 text-xs 2xl:px-3"
+            onClick={() => setCreateOpen(true)}
+          >
             <Plus className="h-4 w-4" /> Tạo công việc
           </Button>
         </div>
@@ -461,7 +568,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
             <MobileFilterField label="Phòng/Nhóm">
               <MobileFilterSelect
                 value={departmentFilter}
-                onChange={setDepartmentFilter}
+                onChange={handleDepartmentFilterChange}
                 allLabel="Tất cả phòng/nhóm"
                 options={DEPARTMENT_OPTIONS}
               />
@@ -470,7 +577,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
             <MobileFilterField label="Trạng thái">
               <MobileFilterSelect
                 value={statusFilter}
-                onChange={setStatusFilter}
+                onChange={handleStatusFilterChange}
                 allLabel="Tất cả trạng thái"
                 options={TASK_STATUS_ORDER.map((s) => ({
                   value: s,
@@ -482,7 +589,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
             <MobileFilterField label="Ưu tiên">
               <MobileFilterSelect
                 value={priorityFilter}
-                onChange={setPriorityFilter}
+                onChange={handlePriorityFilterChange}
                 allLabel="Tất cả ưu tiên"
                 options={TASK_PRIORITY_ORDER.map((p) => ({
                   value: p,
@@ -494,7 +601,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
             <MobileFilterField label="Người làm">
               <MobileFilterSelect
                 value={assigneeFilter}
-                onChange={setAssigneeFilter}
+                onChange={handleAssigneeFilterChange}
                 allLabel="Tất cả người làm"
                 options={profiles.map((p) => ({
                   value: p.id,
@@ -508,12 +615,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
                 variant="outline"
                 className="h-11 flex-1"
                 disabled={activeFilterCount === 0}
-                onClick={() => {
-                  setDepartmentFilter(ALL);
-                  setStatusFilter(ALL);
-                  setPriorityFilter(ALL);
-                  setAssigneeFilter(ALL);
-                }}
+                onClick={handleClearFilters}
               >
                 Xoá lọc
               </Button>
@@ -624,7 +726,7 @@ function FilterSelect({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-8 w-[140px] text-xs">
+      <SelectTrigger className="h-8 w-[98px] px-2 text-xs 2xl:w-[126px] 2xl:px-3">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

@@ -27,12 +27,12 @@ export function PeriodPicker({
   const isAll = value.mode === "all";
   return (
     // Mobile: chiếm trọn bề ngang, ô nhãn kỳ co giãn phần còn lại.
-    <div className="flex w-full items-center gap-1.5 sm:w-auto">
+    <div className="flex w-full items-center gap-1 sm:w-auto">
       <Select
         value={value.mode}
         onValueChange={(m) => onChange({ ...value, mode: m as PeriodMode })}
       >
-        <SelectTrigger className="h-9 w-[104px] shrink-0 text-xs sm:h-8 sm:w-[112px]">
+        <SelectTrigger className="h-9 w-[104px] shrink-0 text-xs sm:h-8 sm:w-[92px] sm:px-2 2xl:w-[104px] 2xl:px-3">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -50,19 +50,19 @@ export function PeriodPicker({
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 sm:h-8 sm:w-7"
+              className="h-9 w-9 shrink-0 sm:h-8 sm:w-6 2xl:w-7"
               onClick={() => onChange(shiftPeriod(value, -1))}
               title="Kỳ trước"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="min-w-0 flex-1 truncate px-1 text-center text-xs font-medium sm:min-w-[128px] sm:flex-none">
+            <span className="min-w-0 flex-1 truncate px-1 text-center text-xs font-medium sm:min-w-[96px] sm:flex-none 2xl:min-w-[112px]">
               {periodLabel(value)}
             </span>
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 sm:h-8 sm:w-7"
+              className="h-9 w-9 shrink-0 sm:h-8 sm:w-6 2xl:w-7"
               onClick={() => onChange(shiftPeriod(value, 1))}
               title="Kỳ sau"
             >
@@ -72,7 +72,7 @@ export function PeriodPicker({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 shrink-0 px-2.5 sm:h-8 sm:px-3"
+            className="h-9 shrink-0 px-2.5 sm:h-8 sm:px-1.5 sm:text-xs 2xl:px-2.5"
             onClick={() =>
               onChange({ ...value, anchor: new Date().toISOString() })
             }
