@@ -279,28 +279,38 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
       </div>
 
       {/* ── Thanh công cụ trên máy tính ── */}
-      <div className="hidden flex-wrap items-center gap-2 md:flex">
+      <div className="hidden flex-wrap items-center gap-1.5 md:flex">
         {!meetingId && <PeriodPicker value={period} onChange={setPeriod} />}
 
         <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
-          <TabsList>
-            <TabsTrigger value="list">
-              <List className="h-4 w-4" /> Danh sách
+          <TabsList className="h-8 p-0.5">
+            <TabsTrigger
+              value="list"
+              className="h-7 px-2"
+              title="Danh sách"
+              aria-label="Danh sách"
+            >
+              <List className="h-4 w-4" />
             </TabsTrigger>
-            <TabsTrigger value="board">
-              <LayoutGrid className="h-4 w-4" /> Kanban
+            <TabsTrigger
+              value="board"
+              className="h-7 px-2"
+              title="Kanban"
+              aria-label="Kanban"
+            >
+              <LayoutGrid className="h-4 w-4" />
             </TabsTrigger>
           </TabsList>
         </Tabs>
 
         {view === "list" && (
           <div className="flex items-center gap-1.5">
-            <Layers className="h-4 w-4 text-muted-foreground" />
+            <Layers className="h-4 w-4 shrink-0 text-muted-foreground" />
             <Select
               value={groupBy}
               onValueChange={(v) => setGroupBy(v as GroupBy)}
             >
-              <SelectTrigger className="h-8 w-[150px] text-xs">
+              <SelectTrigger className="h-8 w-[136px] text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -314,8 +324,8 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           </div>
         )}
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
           <FilterSelect
             value={departmentFilter}
             onChange={setDepartmentFilter}
@@ -352,6 +362,10 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           {!meetingId && (
             <Button
               variant="outline"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              title="Xuất Excel"
+              aria-label="Xuất Excel"
               onClick={handleExport}
               disabled={exporting}
             >
@@ -360,15 +374,19 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
               ) : (
                 <FileSpreadsheet className="h-4 w-4" />
               )}
-              Xuất Excel
             </Button>
           )}
           {meetingId && (
-            <Button variant="outline" onClick={() => setLinkOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setLinkOpen(true)}
+            >
               <Link2 className="h-4 w-4" /> Thêm việc có sẵn
             </Button>
           )}
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button size="sm" className="h-8" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" /> Tạo công việc
           </Button>
         </div>
@@ -624,7 +642,7 @@ function FilterSelect({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-8 w-[140px] text-xs">
+      <SelectTrigger className="h-8 w-[126px] text-xs">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
