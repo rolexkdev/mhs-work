@@ -99,7 +99,15 @@ export function AssigneePicker({
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+      {/* The menu is portaled outside the dialog, so the dialog's scroll
+          lock would cancel wheel and touch scrolling on it. Stop those
+          events before they reach the lock's document listener. */}
+      <DropdownMenuContent
+        align="start"
+        className="max-h-72 overflow-y-auto"
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+      >
         <DropdownMenuItem onClick={() => onChange([])}>
           <span className="text-xs text-muted-foreground">Chưa giao</span>
         </DropdownMenuItem>
