@@ -139,10 +139,24 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
 
   // Sync filters and open task detail when URL query params change.
   useEffect(() => {
-    setDepartmentFilter(readParam(searchParams, "department", VALID_DEPARTMENTS));
-    setStatusFilter(readParam(searchParams, "status", VALID_STATUSES));
-    setPriorityFilter(readParam(searchParams, "priority", VALID_PRIORITIES));
-    setAssigneeFilter(readParam(searchParams, "assignee"));
+    const dept = readParam(searchParams, "department", VALID_DEPARTMENTS);
+    const status = readParam(searchParams, "status", VALID_STATUSES);
+    const priority = readParam(searchParams, "priority", VALID_PRIORITIES);
+    const assignee = readParam(searchParams, "assignee");
+    setDepartmentFilter(dept);
+    setStatusFilter(status);
+    setPriorityFilter(priority);
+    setAssigneeFilter(assignee);
+
+    const invalidPatch: Record<string, null> = {};
+    if (searchParams.get("department") && dept === ALL)
+      invalidPatch.department = null;
+    if (searchParams.get("status") && status === ALL)
+      invalidPatch.status = null;
+    if (searchParams.get("priority") && priority === ALL)
+      invalidPatch.priority = null;
+    if (Object.keys(invalidPatch).length > 0) updateUrlParams(invalidPatch);
+
     const tid = searchParams.get("task");
     if (tid) {
       setDetailId(tid);
@@ -376,12 +390,12 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
 
         {view === "list" && (
           <div className="flex items-center gap-1.5">
-            <Layers className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Layers className="hidden h-4 w-4 shrink-0 text-muted-foreground 2xl:block" />
             <Select
               value={groupBy}
               onValueChange={(v) => setGroupBy(v as GroupBy)}
             >
-              <SelectTrigger className="h-8 w-[136px] text-xs">
+              <SelectTrigger className="h-8 w-[120px] text-xs 2xl:w-[136px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -395,8 +409,8 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           </div>
         )}
 
-        <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="ml-auto flex flex-wrap items-center gap-1 2xl:gap-1.5">
+          <Filter className="hidden h-4 w-4 shrink-0 text-muted-foreground 2xl:block" />
           <FilterSelect
             value={departmentFilter}
             onChange={handleDepartmentFilterChange}
@@ -457,7 +471,11 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
               <Link2 className="h-4 w-4" /> Thêm việc có sẵn
             </Button>
           )}
-          <Button size="sm" className="h-8" onClick={() => setCreateOpen(true)}>
+          <Button
+            size="sm"
+            className="h-8 px-2.5 text-xs"
+            onClick={() => setCreateOpen(true)}
+          >
             <Plus className="h-4 w-4" /> Tạo công việc
           </Button>
         </div>
@@ -708,7 +726,7 @@ function FilterSelect({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-8 w-[126px] text-xs">
+      <SelectTrigger className="h-8 w-[108px] text-xs 2xl:w-[126px]">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

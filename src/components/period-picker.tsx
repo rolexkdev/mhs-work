@@ -27,12 +27,12 @@ export function PeriodPicker({
   const isAll = value.mode === "all";
   return (
     // Mobile: chiếm trọn bề ngang, ô nhãn kỳ co giãn phần còn lại.
-    <div className="flex w-full items-center gap-1.5 sm:w-auto">
+    <div className="flex w-full items-center gap-1 sm:w-auto">
       <Select
         value={value.mode}
         onValueChange={(m) => onChange({ ...value, mode: m as PeriodMode })}
       >
-        <SelectTrigger className="h-9 w-[104px] shrink-0 text-xs sm:h-8 sm:w-[112px]">
+        <SelectTrigger className="h-9 w-[104px] shrink-0 text-xs sm:h-8 sm:w-[100px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -56,7 +56,7 @@ export function PeriodPicker({
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="min-w-0 flex-1 truncate px-1 text-center text-xs font-medium sm:min-w-[128px] sm:flex-none">
+            <span className="min-w-0 flex-1 truncate px-1 text-center text-xs font-medium sm:min-w-[108px] sm:flex-none">
               {periodLabel(value)}
             </span>
             <Button
@@ -72,7 +72,7 @@ export function PeriodPicker({
           <Button
             variant="outline"
             size="sm"
-            className="h-9 shrink-0 px-2.5 sm:h-8 sm:px-3"
+            className="h-9 shrink-0 px-2.5 sm:h-8 sm:px-2 sm:text-xs"
             onClick={() =>
               onChange({ ...value, anchor: new Date().toISOString() })
             }

@@ -198,7 +198,11 @@ export function TaskDetailPanel({
   }
   function copyLink() {
     if (!task) return;
-    const url = `${window.location.origin}/tasks?task=${task.id}`;
+    const params = new URLSearchParams(
+      window.location.pathname === "/tasks" ? window.location.search : "",
+    );
+    params.set("task", task.id);
+    const url = `${window.location.origin}/tasks?${params.toString()}`;
     navigator.clipboard
       .writeText(url)
       .then(() => toast.success("Đã chép liên kết công việc"))
