@@ -14,9 +14,13 @@ import type { Task, Database } from "@/types/database";
 type TaskInsert = Database["public"]["Tables"]["tasks"]["Insert"];
 type TaskUpdate = Database["public"]["Tables"]["tasks"]["Update"];
 
+/** Sentinel value for filtering tasks with no department assigned. */
+export const NO_DEPARTMENT = "__none__";
+
 export interface TaskQueryFilters {
   meetingId?: string | null;
   assigneeId?: string | null;
+  department?: string | null;
   status?: Task["status"] | null;
   priority?: Task["priority"] | null;
   /** Also return trashed tasks (the meeting page needs them to hide items). */
@@ -32,6 +36,8 @@ export function useTasks(filters: TaskQueryFilters = {}) {
       if (!filters.withDeleted) q = q.is("deleted_at", null);
       if (filters.meetingId) q = q.eq("meeting_id", filters.meetingId);
       if (filters.assigneeId) q = q.contains("assignee_ids", [filters.assigneeId]);
+      if (filters.department === NO_DEPARTMENT) q = q.is("department", null);
+      else if (filters.department) q = q.eq("department", filters.department);
       if (filters.status) q = q.eq("status", filters.status);
       if (filters.priority) q = q.eq("priority", filters.priority);
       const { data, error } = await q.order("created_at", {

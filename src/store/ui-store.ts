@@ -13,6 +13,7 @@ export type DocumentView = "list" | "board";
 
 export interface TaskFilters {
   assigneeId: string | null;
+  department: string | null;
   status: TaskStatus | null;
   priority: TaskPriority | null;
   meetingId: string | null;
@@ -38,6 +39,7 @@ interface UiState {
 
 const defaultFilters: TaskFilters = {
   assigneeId: null,
+  department: null,
   status: null,
   priority: null,
   meetingId: null,
