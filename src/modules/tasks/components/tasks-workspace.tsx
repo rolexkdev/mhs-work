@@ -364,7 +364,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
       </div>
 
       {/* ── Thanh công cụ trên máy tính ── */}
-      <div className="hidden flex-wrap items-center gap-1.5 md:flex">
+      <div className="hidden flex-wrap items-center gap-1 md:flex 2xl:gap-1.5">
         {!meetingId && <PeriodPicker value={period} onChange={setPeriod} />}
 
         <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
@@ -395,7 +395,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
               value={groupBy}
               onValueChange={(v) => setGroupBy(v as GroupBy)}
             >
-              <SelectTrigger className="h-8 w-[120px] text-xs 2xl:w-[136px]">
+              <SelectTrigger className="h-8 w-[108px] px-2 text-xs 2xl:w-[136px] 2xl:px-3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -473,7 +473,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           )}
           <Button
             size="sm"
-            className="h-8 px-2.5 text-xs"
+            className="h-8 px-2 text-xs 2xl:px-3"
             onClick={() => setCreateOpen(true)}
           >
             <Plus className="h-4 w-4" /> Tạo công việc
@@ -726,7 +726,7 @@ function FilterSelect({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-8 w-[108px] text-xs 2xl:w-[126px]">
+      <SelectTrigger className="h-8 w-[98px] px-2 text-xs 2xl:w-[126px] 2xl:px-3">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
