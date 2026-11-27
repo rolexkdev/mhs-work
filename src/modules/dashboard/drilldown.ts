@@ -51,10 +51,13 @@ export function departmentTasks(
   return scope.rows
     .filter((t) => (t.department ?? null) === department)
     .sort((a, b) => {
-      if (a.status === "done" && b.status === "done") {
-        return compareCompletedDesc(a, b);
-      }
-      return compareDueAsc(a, b);
+      const statusDiff =
+        TASK_STATUS_ORDER.indexOf(a.status) -
+        TASK_STATUS_ORDER.indexOf(b.status);
+      if (statusDiff !== 0) return statusDiff;
+      return a.status === "done"
+        ? compareCompletedDesc(a, b)
+        : compareDueAsc(a, b);
     });
 }
 
