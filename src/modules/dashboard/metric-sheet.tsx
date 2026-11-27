@@ -9,7 +9,11 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { dueLabel, formatDate } from "@/lib/format";
-import { metricTasks, type MetricKey } from "@/modules/dashboard/drilldown";
+import {
+  groupByStatus,
+  metricTasks,
+  type MetricKey,
+} from "@/modules/dashboard/drilldown";
 import {
   completedDate,
   isOnTime,
@@ -17,6 +21,7 @@ import {
   type Scope,
 } from "@/modules/dashboard/metrics";
 import { TaskRows } from "@/modules/dashboard/person";
+import { TASK_STATUS_META } from "@/modules/tasks/constants";
 import type { Task } from "@/types/database";
 
 export const METRIC_TITLE: Record<MetricKey, string> = {
@@ -82,6 +87,7 @@ export function MetricSheetBody({
 }) {
   const tasks = metricTasks(scope, metric);
   const title = METRIC_TITLE[metric];
+  const meta = rowMeta(metric);
 
   return (
     <div className="space-y-5 p-5 sm:p-6">
@@ -95,12 +101,37 @@ export function MetricSheetBody({
         </SheetDescription>
       </div>
 
-      <TaskRows
-        tasks={tasks}
-        nameOf={nameOf}
-        onSelect={onSelect}
-        meta={rowMeta(metric)}
-      />
+      {metric === "open" && tasks.length > 0 ? (
+        <div className="space-y-4">
+          {groupByStatus(tasks).map((group) => (
+            <section key={group.status} className="space-y-2">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <span
+                  className={cn(
+                    "h-2 w-2 shrink-0 rounded-full",
+                    TASK_STATUS_META[group.status].dot,
+                  )}
+                />
+                <span>{TASK_STATUS_META[group.status].label}</span>
+                <span className="tabular-nums">({group.tasks.length})</span>
+              </div>
+              <TaskRows
+                tasks={group.tasks}
+                nameOf={nameOf}
+                onSelect={onSelect}
+                meta={meta}
+              />
+            </section>
+          ))}
+        </div>
+      ) : (
+        <TaskRows
+          tasks={tasks}
+          nameOf={nameOf}
+          onSelect={onSelect}
+          meta={meta}
+        />
+      )}
     </div>
   );
 }

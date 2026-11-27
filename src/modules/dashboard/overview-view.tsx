@@ -283,6 +283,7 @@ export function OverviewView({
           iconTone="bg-blue-100 text-blue-600 dark:bg-blue-500/15"
           prevLabel={prevLabel}
           sub={`Tiến độ trung bình ${scope.avgProgress}%`}
+          onClick={onOpenMetric ? () => onOpenMetric("open") : undefined}
         >
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div
