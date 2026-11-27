@@ -22,6 +22,10 @@ npm run typecheck  # tsc --noEmit
 
 There is no test suite. After changing code, run `npm run typecheck` and `npm run lint`.
 
+Test against the local Supabase copy of production, not production itself:
+`npm run db:start`, `npm run db:pull`, `npm run db:restore` (see README, "Local test
+database"). Run new migrations on the local DB first.
+
 ## Project structure
 
 - `src/app/(app)/` — authenticated routes: dashboard (`page.tsx`), `meetings`, `tasks`,

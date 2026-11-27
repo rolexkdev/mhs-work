@@ -1,0 +1,2 @@
+# Run inside the Linux DB container
+*.awk text eol=lf
