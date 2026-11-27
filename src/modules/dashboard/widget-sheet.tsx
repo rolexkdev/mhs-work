@@ -7,7 +7,10 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  bucketTasks,
+  defaultBucketTab,
   departmentTasks,
   statusTasks,
   type WidgetDrilldown,
@@ -22,6 +25,8 @@ import { TASK_STATUS_META } from "@/modules/tasks/constants";
 import type { Task } from "@/types/database";
 
 const completedMeta = rowMeta("completed");
+const rateMeta = rowMeta("onTimeRate");
+const createdMeta = rowMeta("created");
 const openMeta = rowMeta("open");
 const statusAwareMeta = (t: Task) =>
   t.status === "done" ? completedMeta(t) : openMeta(t);
@@ -62,6 +67,51 @@ function WidgetSheetBody({
           onSelect={onSelect}
           meta={meta}
         />
+      </div>
+    );
+  }
+
+  if (widget.kind === "bucket") {
+    const { completed, created } = bucketTasks(scope, widget.index);
+    const title = scope.buckets[widget.index]?.label ?? widget.label;
+    return (
+      <div className="space-y-5 p-5 sm:p-6">
+        <div className="space-y-1 pr-10">
+          <SheetTitle className="truncate text-lg">{title}</SheetTitle>
+          <SheetDescription className="truncate">
+            {periodLabel}
+            {department ? ` · ${department}` : ""}
+          </SheetDescription>
+        </div>
+        <Tabs
+          key={widget.index}
+          defaultValue={defaultBucketTab(completed.length)}
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="completed">
+              Hoàn thành ({completed.length})
+            </TabsTrigger>
+            <TabsTrigger value="created">
+              Mới giao ({created.length})
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="completed">
+            <TaskRows
+              tasks={completed}
+              nameOf={nameOf}
+              onSelect={onSelect}
+              meta={rateMeta}
+            />
+          </TabsContent>
+          <TabsContent value="created">
+            <TaskRows
+              tasks={created}
+              nameOf={nameOf}
+              onSelect={onSelect}
+              meta={createdMeta}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }

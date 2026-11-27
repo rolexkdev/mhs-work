@@ -390,10 +390,11 @@ export function ThroughputChart({
           <div className="absolute inset-0 flex">
             {series.map((s, i) => {
               const done = s.onTime + s.late;
+              const hasActivity = done > 0 || (showCreated && s.created > 0);
               const key = String(i);
               const active = tip.active === key;
               const isSelected = !!onSelect && selected === i;
-              const selectable = !!onSelect && (done > 0 || isSelected);
+              const selectable = !!onSelect && (hasActivity || isSelected);
               const dimmed =
                 !!onSelect &&
                 selected !== null &&
@@ -408,7 +409,10 @@ export function ThroughputChart({
                   aria-label={selectable ? s.bucket.label : undefined}
                   onClick={
                     selectable
-                      ? () => onSelect(isSelected ? null : i)
+                      ? () => {
+                          tip.clear();
+                          onSelect(isSelected ? null : i);
+                        }
                       : undefined
                   }
                   onKeyDown={
@@ -416,6 +420,7 @@ export function ThroughputChart({
                       ? (e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
+                            tip.clear();
                             onSelect(isSelected ? null : i);
                           }
                         }

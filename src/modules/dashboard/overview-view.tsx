@@ -361,7 +361,22 @@ export function OverviewView({
                 ]}
               />
             </div>
-            <ThroughputChart series={series} />
+            <ThroughputChart
+              series={series}
+              onSelect={
+                onOpenWidget
+                  ? (i) => {
+                      if (i !== null) {
+                        onOpenWidget({
+                          kind: "bucket",
+                          index: i,
+                          label: buckets[i]?.label ?? "",
+                        });
+                      }
+                    }
+                  : undefined
+              }
+            />
           </CardContent>
         </Card>
 
