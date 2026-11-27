@@ -20,6 +20,11 @@ export function friendlyError(
     return DETAIL_MESSAGES[details];
   }
 
+  // Unique violation, e.g. a category name already used in the department.
+  if (code === "23505") {
+    return "Tên này đã tồn tại, vui lòng chọn tên khác.";
+  }
+
   if (code === "23503") {
     return "Không thể xoá vì dữ liệu này đang được sử dụng.";
   }

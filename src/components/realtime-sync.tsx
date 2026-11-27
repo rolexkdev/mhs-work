@@ -48,6 +48,11 @@ export function RealtimeSync() {
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "task_categories" },
+        () => qc.invalidateQueries({ queryKey: queryKeys.taskCategories }),
+      )
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "meetings" },
         () => {
           qc.invalidateQueries({ queryKey: queryKeys.meetings });

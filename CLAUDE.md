@@ -120,8 +120,16 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
   trigger sets `edited_at`); authors and admins can delete them. Since 0028 the trigger
   also keeps each previous text in `task_comment_edits` (readable by everyone, written
   only by the trigger).
-- `tasks.category` (Hạng mục) was dropped in 0029; old `task_logs` rows with action
-  `category` stay and are still rendered in the task history. Start date and due date
+- Categories (Hạng mục) are per department since 0031: `task_categories`
+  (`department`, `name`, `sort_order`, `color` — a `TagColor` key leaders pick) and
+  `tasks.category_id` (one category per task,
+  `on delete set null`). Everyone reads them; only leaders and admins
+  (`is_leader_or_admin()`) create, rename, reorder or delete them. A trigger clears
+  `category_id` when it does not belong to the task's department, and `log_task_change`
+  writes `category` rows with the category names — the same shape as the text column
+  `tasks.category` dropped in 0029, so old and new history rows render alike. The tasks
+  page opens on the category overview (`category-overview.tsx`); the `category` URL
+  param holds a category id, `none:<department>` (uncategorised) or `all`. Start date and due date
   are validated client-side only (`src/modules/tasks/dates.ts`), no DB constraint.
 - Document progress changes go only through the security definer RPCs in
   `0018_document_actions.sql`, `0019_document_handback.sql`,

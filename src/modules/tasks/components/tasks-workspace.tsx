@@ -11,6 +11,9 @@ import {
   Layers,
   FileSpreadsheet,
   Loader2,
+  ArrowLeft,
+  FolderTree,
+  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DATE_RANGE_ERROR, isDateRangeValid } from "@/modules/tasks/dates";
@@ -51,6 +54,14 @@ import {
 } from "@/modules/tasks/components/task-list-view";
 import { TaskFormDialog } from "@/modules/tasks/components/task-form-dialog";
 import { TaskDetailPanel } from "@/modules/tasks/components/task-detail-panel";
+import {
+  CategoryOverview,
+  tasksOfCategoryKey,
+  uncategorizedDepartment,
+} from "@/modules/tasks/components/category-overview";
+import { CategoryManagerDialog } from "@/modules/tasks/components/category-manager-dialog";
+import { useTaskCategories } from "@/modules/tasks/category-hooks";
+import { useCanManageCategories } from "@/modules/auth/use-current-role";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PeriodPicker } from "@/components/period-picker";
 import {
@@ -85,23 +96,31 @@ function readParam(
 }
 
 /** Set or clear URL query params while preserving all other params on the page. */
-function updateUrlParams(patch: Record<string, string | null>) {
+function updateUrlParams(
+  patch: Record<string, string | null>,
+  /** "push" adds a history entry so the browser Back button returns. */
+  mode: "replace" | "push" = "replace",
+) {
   const params = new URLSearchParams(window.location.search);
   for (const [key, value] of Object.entries(patch)) {
     if (value && value !== ALL) params.set(key, value);
     else params.delete(key);
   }
   const query = params.toString();
-  window.history.replaceState(
-    null,
-    "",
-    query ? `${window.location.pathname}?${query}` : window.location.pathname,
-  );
+  const url = query
+    ? `${window.location.pathname}?${query}`
+    : window.location.pathname;
+  if (mode === "push") window.history.pushState(null, "", url);
+  else window.history.replaceState(null, "", url);
 }
+
+/** `category` URL value that lists every task instead of the overview. */
+const ALL_TASKS = "all";
 
 const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
   { value: "none", label: "Bảng mặc định" },
   { value: "department", label: "Phòng/Nhóm" },
+  { value: "category", label: "Hạng mục" },
   { value: "assignee", label: "Người phụ trách" },
   { value: "status", label: "Trạng thái" },
   { value: "meeting", label: "Cuộc họp" },
@@ -127,6 +146,14 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const [assigneeFilter, setAssigneeFilter] = useState<string>(() =>
     readParam(searchParams, "assignee"),
   );
+  // Outside a meeting the page opens on the category overview (null); a
+  // category id, an uncategorized key ("none:<dept>") or ALL_TASKS lists tasks.
+  const [categoryKey, setCategoryKey] = useState<string | null>(() =>
+    meetingId ? ALL_TASKS : searchParams.get("category"),
+  );
+  const [manageDepartment, setManageDepartment] = useState<
+    string | null | undefined
+  >(undefined);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -147,6 +174,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
     setStatusFilter(status);
     setPriorityFilter(priority);
     setAssigneeFilter(assignee);
+    if (!meetingId) setCategoryKey(searchParams.get("category"));
 
     const invalidPatch: Record<string, null> = {};
     if (searchParams.get("department") && dept === ALL)
@@ -162,7 +190,12 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
       setDetailId(tid);
       setDetailOpen(true);
     }
-  }, [searchParams]);
+  }, [searchParams, meetingId]);
+
+  function openCategory(key: string | null) {
+    setCategoryKey(key);
+    updateUrlParams({ category: key }, "push");
+  }
 
   function handleDepartmentFilterChange(v: string) {
     setDepartmentFilter(v);
@@ -195,6 +228,9 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
 
   const { data: profiles = [] } = useProfiles();
   const { data: meetings = [] } = useMeetings();
+  const { data: categories = [], isLoading: categoriesLoading } =
+    useTaskCategories();
+  const canManageCategories = useCanManageCategories();
 
   const filters: TaskQueryFilters = {
     meetingId: meetingId ?? null,
@@ -211,6 +247,35 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
     () => tasks.filter((t) => isTaskInPeriod(t, period)),
     [tasks, period],
   );
+
+  // A category id that no longer exists (deleted) falls back to the overview.
+  const activeCategory =
+    categoryKey && categoryKey !== ALL_TASKS
+      ? categories.find((c) => c.id === categoryKey) ?? null
+      : null;
+  const uncategorizedDept =
+    categoryKey && categoryKey !== ALL_TASKS
+      ? uncategorizedDepartment(categoryKey)
+      : undefined;
+  const scope: "overview" | "all" | "category" = !categoryKey
+    ? "overview"
+    : categoryKey === ALL_TASKS
+      ? "all"
+      : activeCategory || uncategorizedDept !== undefined
+        ? "category"
+        : categoriesLoading
+          ? "category"
+          : "overview";
+  const scopedTasks = useMemo(
+    () =>
+      scope === "category" && categoryKey
+        ? tasksOfCategoryKey(visibleTasks, categoryKey)
+        : visibleTasks,
+    [scope, categoryKey, visibleTasks],
+  );
+  const scopeDepartment = activeCategory
+    ? activeCategory.department
+    : uncategorizedDept;
 
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -254,13 +319,19 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         return;
       }
     }
+    // Categories belong to a department: moving the task drops its category.
+    if ("department" in patch && !("category_id" in patch)) {
+      const current = tasks.find((t) => t.id === id);
+      if (current && current.department !== patch.department)
+        patch = { ...patch, category_id: null };
+    }
     updateTask.mutate({ id, ...patch });
   }
   function handleDelete(t: Task) {
     setPendingDelete(t);
   }
   async function handleExport() {
-    if (visibleTasks.length === 0) {
+    if (scopedTasks.length === 0) {
       toast.info("Không có công việc nào trong kỳ để xuất.");
       return;
     }
@@ -271,7 +342,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
       const { start } = periodRange(period);
       if (period.mode === "week" && start) {
         const supabase = createClient();
-        const ids = visibleTasks.map((t) => t.id);
+        const ids = scopedTasks.map((t) => t.id);
         const { data } = await supabase
           .from("task_logs")
           .select("*")
@@ -281,7 +352,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           .order("created_at", { ascending: true });
         logs = data ?? [];
       }
-      await exportWeeklyReport({ tasks: visibleTasks, logs, nameOf, period });
+      await exportWeeklyReport({ tasks: scopedTasks, logs, nameOf, period });
       toast.success("Đã xuất báo cáo Excel");
     } catch (e) {
       toast.error("Xuất báo cáo thất bại");
@@ -315,20 +386,22 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         {!meetingId && <PeriodPicker value={period} onChange={setPeriod} />}
 
         <div className="flex items-center gap-2">
-          <Tabs
-            value={view}
-            onValueChange={(v) => setView(v as typeof view)}
-            className="shrink-0"
-          >
-            <TabsList className="h-9">
-              <TabsTrigger value="list" className="px-2.5">
-                <List className="h-4 w-4" />
-              </TabsTrigger>
-              <TabsTrigger value="board" className="px-2.5">
-                <LayoutGrid className="h-4 w-4" />
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {scope !== "overview" && (
+            <Tabs
+              value={view}
+              onValueChange={(v) => setView(v as typeof view)}
+              className="shrink-0"
+            >
+              <TabsList className="h-9">
+                <TabsTrigger value="list" className="px-2.5">
+                  <List className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="board" className="px-2.5">
+                  <LayoutGrid className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
 
           <Button
             variant="outline"
@@ -367,35 +440,37 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
       <div className="hidden flex-wrap items-center gap-1 md:flex 2xl:gap-1.5">
         {!meetingId && <PeriodPicker value={period} onChange={setPeriod} />}
 
-        <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
-          <TabsList className="h-8 p-0.5">
-            <TabsTrigger
-              value="list"
-              className="h-7 px-2"
-              title="Danh sách"
-              aria-label="Danh sách"
-            >
-              <List className="h-4 w-4" />
-            </TabsTrigger>
-            <TabsTrigger
-              value="board"
-              className="h-7 px-2"
-              title="Kanban"
-              aria-label="Kanban"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {scope !== "overview" && (
+          <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
+            <TabsList className="h-8 p-0.5">
+              <TabsTrigger
+                value="list"
+                className="h-7 px-2"
+                title="Danh sách"
+                aria-label="Danh sách"
+              >
+                <List className="h-4 w-4" />
+              </TabsTrigger>
+              <TabsTrigger
+                value="board"
+                className="h-7 px-2"
+                title="Kanban"
+                aria-label="Kanban"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
-        {view === "list" && (
+        {scope !== "overview" && view === "list" && (
           <div className="flex items-center gap-1.5">
             <Layers className="hidden h-4 w-4 shrink-0 text-muted-foreground 2xl:block" />
             <Select
               value={groupBy}
               onValueChange={(v) => setGroupBy(v as GroupBy)}
             >
-              <SelectTrigger className="h-8 w-[108px] px-2 text-xs 2xl:w-[136px] 2xl:px-3">
+              <SelectTrigger className="h-8 w-auto max-w-[240px] gap-1.5 px-2.5 text-xs 2xl:px-3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -444,6 +519,22 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
               label: p.full_name ?? p.email,
             }))}
           />
+          {scope === "overview" && canManageCategories && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2 text-xs 2xl:px-3"
+              onClick={() =>
+                setManageDepartment(
+                  departmentFilter === ALL || departmentFilter === NO_DEPARTMENT
+                    ? null
+                    : departmentFilter,
+                )
+              }
+            >
+              <Settings2 className="h-4 w-4" /> Hạng mục
+            </Button>
+          )}
           {!meetingId && (
             <Button
               variant="outline"
@@ -481,25 +572,52 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         </div>
       </div>
 
-      {isLoading ? (
+      {!meetingId && (
+        <ScopeBar
+          scope={scope}
+          department={scopeDepartment}
+          categoryName={
+            activeCategory?.name ??
+            (uncategorizedDept !== undefined ? "Chưa phân hạng mục" : null)
+          }
+          count={scopedTasks.length}
+          onBack={() => openCategory(null)}
+          onShowAll={() => openCategory(ALL_TASKS)}
+        />
+      )}
+
+      {isLoading || (scope === "overview" && categoriesLoading) ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-11 w-full" />
           ))}
         </div>
-      ) : visibleTasks.length === 0 ? (
+      ) : scope === "overview" ? (
+        <CategoryOverview
+          tasks={visibleTasks}
+          categories={categories}
+          departmentFilter={departmentFilter === ALL ? null : departmentFilter}
+          onOpenCategory={openCategory}
+          canManage={canManageCategories}
+          onManage={setManageDepartment}
+          nameOf={(id) => nameOf(id) ?? ""}
+          onOpenTask={openDetail}
+        />
+      ) : scopedTasks.length === 0 ? (
         <div className="rounded-lg border border-dashed py-16 text-center">
           <p className="text-sm text-muted-foreground">
-            {tasks.length === 0
-              ? activeFilterCount > 0
-                ? "Không có công việc nào khớp bộ lọc hiện tại."
-                : "Chưa có công việc nào. Bấm Tạo công việc để bắt đầu."
-              : "Không có công việc nào trong kỳ này. Đổi bộ lọc kỳ để xem thêm."}
+            {scope === "category"
+              ? "Hạng mục này chưa có công việc nào khớp bộ lọc và kỳ hiện tại."
+              : tasks.length === 0
+                ? activeFilterCount > 0
+                  ? "Không có công việc nào khớp bộ lọc hiện tại."
+                  : "Chưa có công việc nào. Bấm Tạo công việc để bắt đầu."
+                : "Không có công việc nào trong kỳ này. Đổi bộ lọc kỳ để xem thêm."}
           </p>
         </div>
       ) : view === "board" ? (
         <TaskBoard
-          tasks={visibleTasks}
+          tasks={scopedTasks}
           nameOf={nameOf}
           avatarOf={avatarOf}
           onEdit={openDetail}
@@ -507,10 +625,11 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         />
       ) : (
         <TaskListView
-          tasks={visibleTasks}
+          tasks={scopedTasks}
           groupBy={groupBy}
           profiles={profiles}
           meetings={meetings}
+          categories={categories}
           nameOf={nameOf}
           onOpen={openDetail}
           onDelete={handleDelete}
@@ -545,7 +664,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
             Lọc &amp; nhóm
           </SheetTitle>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-6">
-            {view === "list" && (
+            {scope !== "overview" && view === "list" && (
               <MobileFilterField label="Nhóm theo">
                 <Select
                   value={groupBy}
@@ -623,7 +742,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
                 className="h-11 flex-1"
                 onClick={() => setFilterSheetOpen(false)}
               >
-                Xem {visibleTasks.length} việc
+                Xem {scopedTasks.length} việc
               </Button>
             </div>
           </div>
@@ -643,7 +762,22 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         meetings={meetings}
         defaultMeetingId={meetingId}
         lockMeeting={!!meetingId}
+        defaultDepartment={
+          scopeDepartment !== undefined
+            ? scopeDepartment
+            : departmentFilter !== ALL && departmentFilter !== NO_DEPARTMENT
+              ? departmentFilter
+              : null
+        }
+        defaultCategoryId={activeCategory?.id ?? null}
       />
+      {manageDepartment !== undefined && (
+        <CategoryManagerDialog
+          open
+          onOpenChange={(v) => !v && setManageDepartment(undefined)}
+          department={manageDepartment}
+        />
+      )}
       <TaskDetailPanel
         taskId={detailId}
         open={detailOpen}
@@ -665,6 +799,65 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           if (pendingDelete) deleteTask.mutate(pendingDelete.id);
         }}
       />
+    </div>
+  );
+}
+
+/** Breadcrumb above the tasks: overview, one category, or every task. */
+function ScopeBar({
+  scope,
+  department,
+  categoryName,
+  count,
+  onBack,
+  onShowAll,
+}: {
+  scope: "overview" | "all" | "category";
+  department: string | null | undefined;
+  categoryName: string | null;
+  count: number;
+  onBack: () => void;
+  onShowAll: () => void;
+}) {
+  if (scope === "overview") {
+    return (
+      <div className="flex items-center gap-2 text-sm">
+        <FolderTree className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium">Hạng mục theo phòng/nhóm</span>
+        <Button
+          variant="link"
+          size="sm"
+          className="ml-auto h-auto p-0 text-xs"
+          onClick={onShowAll}
+        >
+          Xem toàn bộ công việc
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-sm">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 shrink-0 px-2"
+        onClick={onBack}
+      >
+        <ArrowLeft className="h-4 w-4" /> Hạng mục
+      </Button>
+      <span className="min-w-0 truncate">
+        {scope === "all" ? (
+          <span className="font-medium">Toàn bộ công việc</span>
+        ) : (
+          <>
+            <span className="text-muted-foreground">
+              {department ?? "Chưa phân phòng"} /{" "}
+            </span>
+            <span className="font-medium">{categoryName ?? "…"}</span>
+          </>
+        )}
+      </span>
+      <span className="shrink-0 text-xs text-muted-foreground">{count} việc</span>
     </div>
   );
 }
@@ -726,7 +919,7 @@ function FilterSelect({
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-8 w-[98px] px-2 text-xs 2xl:w-[126px] 2xl:px-3">
+      <SelectTrigger className="h-8 w-auto max-w-[240px] gap-1.5 px-2.5 text-xs 2xl:px-3">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

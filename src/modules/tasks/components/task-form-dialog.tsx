@@ -35,10 +35,15 @@ import {
   peopleOf,
 } from "@/modules/tasks/components/assignee-stack";
 import { useProfiles } from "@/modules/auth/use-profiles";
+import {
+  categoriesOf,
+  useTaskCategories,
+} from "@/modules/tasks/category-hooks";
 import type { Task, Meeting } from "@/types/database";
 
 const NO_MEETING = "__none__";
 const NO_DEPT = "__none__";
+const NO_CATEGORY = "__none__";
 
 function toDateInput(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
@@ -54,6 +59,8 @@ export function TaskFormDialog({
   meetings,
   defaultMeetingId,
   lockMeeting,
+  defaultDepartment,
+  defaultCategoryId,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -62,17 +69,22 @@ export function TaskFormDialog({
   defaultMeetingId?: string | null;
   /** Khoá chọn cuộc họp (khi tạo task từ trong trang chi tiết họp) */
   lockMeeting?: boolean;
+  /** Prefilled for a new task (e.g. the category being viewed). */
+  defaultDepartment?: string | null;
+  defaultCategoryId?: string | null;
 }) {
   const isEdit = !!task;
   const { data: profiles = [] } = useProfiles();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
+  const { data: allCategories = [] } = useTaskCategories();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignees, setAssignees] = useState<string[]>([]);
   const [meetingId, setMeetingId] = useState<string>(NO_MEETING);
   const [department, setDepartment] = useState<string>(NO_DEPT);
+  const [categoryId, setCategoryId] = useState<string>(NO_CATEGORY);
   const [status, setStatus] = useState<Task["status"]>("todo");
   const [recurrence, setRecurrence] = useState<Task["recurrence"]>("none");
   const [startDate, setStartDate] = useState("");
@@ -85,12 +97,28 @@ export function TaskFormDialog({
     setDescription(task?.description ?? "");
     setAssignees(task?.assignee_ids ?? []);
     setMeetingId(task?.meeting_id ?? defaultMeetingId ?? NO_MEETING);
-    setDepartment(task?.department ?? NO_DEPT);
+    setDepartment(
+      (task ? task.department : defaultDepartment) ?? NO_DEPT,
+    );
+    setCategoryId(
+      (task ? task.category_id : defaultCategoryId) ?? NO_CATEGORY,
+    );
     setStatus(task?.status ?? "todo");
     setRecurrence(task?.recurrence ?? "none");
     setStartDate(toDateInput(task?.start_date ?? null));
     setDueDate(toDateInput(task?.due_date ?? null));
-  }, [open, task, defaultMeetingId]);
+  }, [open, task, defaultMeetingId, defaultDepartment, defaultCategoryId]);
+
+  const categoryOptions = categoriesOf(
+    allCategories,
+    department === NO_DEPT ? null : department,
+  );
+
+  function handleDepartmentChange(v: string) {
+    setDepartment(v);
+    // Categories belong to one department.
+    setCategoryId(NO_CATEGORY);
+  }
 
   const pending = createTask.isPending || updateTask.isPending;
 
@@ -108,6 +136,9 @@ export function TaskFormDialog({
       assignee_ids: assignees,
       meeting_id: meetingId === NO_MEETING ? null : meetingId,
       department: department === NO_DEPT ? null : department,
+      category_id: categoryOptions.some((c) => c.id === categoryId)
+        ? categoryId
+        : null,
       status,
       recurrence,
       start_date: toIso(startDate),
@@ -223,7 +254,7 @@ export function TaskFormDialog({
 
                 <div className="space-y-1.5">
                   <FieldLabel>Phòng/Nhóm</FieldLabel>
-                  <Select value={department} onValueChange={setDepartment}>
+                  <Select value={department} onValueChange={handleDepartmentChange}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -238,7 +269,32 @@ export function TaskFormDialog({
                   </Select>
                 </div>
 
-                <div className="space-y-1.5 sm:col-span-2">
+                <div className="space-y-1.5">
+                  <FieldLabel>Hạng mục</FieldLabel>
+                  <Select
+                    value={categoryId}
+                    onValueChange={setCategoryId}
+                    disabled={categoryOptions.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_CATEGORY}>
+                        {department === NO_DEPT
+                          ? "Chọn phòng/nhóm trước"
+                          : "Chưa phân hạng mục"}
+                      </SelectItem>
+                      {categoryOptions.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
                   <FieldLabel>Cuộc họp</FieldLabel>
                   <Select
                     value={meetingId}
