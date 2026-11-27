@@ -14,8 +14,10 @@ import {
 import { PeriodPicker } from "@/components/period-picker";
 import { type Period, periodLabel } from "@/lib/period";
 import { useTasks } from "@/modules/tasks/hooks";
+import { useMeetings } from "@/modules/meetings/hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import { TASK_DEPARTMENTS } from "@/modules/tasks/constants";
+import { TaskDetailPanel } from "@/modules/tasks/components/task-detail-panel";
 import {
   UNASSIGNED,
   computeScope,
@@ -47,8 +49,10 @@ export default function DashboardPage() {
   const [view, setView] = useState<View>("overview");
   const [openPerson, setOpenPerson] = useState<string | null>(null);
   const [openMetric, setOpenMetric] = useState<MetricKey | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const { data: allTasks = [], isLoading } = useTasks();
   const { data: profiles = [] } = useProfiles();
+  const { data: meetings = [] } = useMeetings();
 
   // Nhớ tab xem lần trước — sếp hay mở lại đúng tab quen dùng.
   useEffect(() => {
@@ -181,7 +185,16 @@ export default function DashboardPage() {
         periodLabel={periodLabel(period)}
         department={dept === ALL ? null : dept}
         nameOf={nameOf}
+        onSelect={(t) => setDetailId(t.id)}
         onClose={() => setOpenMetric(null)}
+      />
+      <TaskDetailPanel
+        taskId={detailId}
+        open={!!detailId}
+        onOpenChange={(v) => {
+          if (!v) setDetailId(null);
+        }}
+        meetings={meetings}
       />
     </div>
   );
