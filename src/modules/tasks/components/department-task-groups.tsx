@@ -1,6 +1,14 @@
 "use client";
 
 import { useMemo, type ComponentType, type ReactNode } from "react";
+import {
+  CheckCircle2,
+  Circle,
+  Eye,
+  Loader,
+  PauseCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { TaskRows } from "@/modules/dashboard/person";
@@ -9,7 +17,19 @@ import {
   TAG_ACCENT_CLASS,
   colorOf,
 } from "@/modules/tasks/constants";
-import type { Task } from "@/types/database";
+import type { Task, TaskStatus } from "@/types/database";
+
+/**
+ * Icon and solid badge of each status, shared by the task summary tiles and
+ * the dashboard sheets. Literal class names so Tailwind can see them.
+ */
+export const STATUS_BADGE: Record<TaskStatus, { icon: LucideIcon; badge: string }> = {
+  todo: { icon: Circle, badge: "bg-slate-500 text-white" },
+  in_progress: { icon: Loader, badge: "bg-blue-500 text-white" },
+  blocked: { icon: PauseCircle, badge: "bg-orange-500 text-white" },
+  review: { icon: Eye, badge: "bg-amber-500 text-white" },
+  done: { icon: CheckCircle2, badge: "bg-emerald-500 text-white" },
+};
 
 /**
  * Heading of a right-hand task sheet (dashboard metrics, task summary tiles):

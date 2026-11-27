@@ -3,13 +3,8 @@
 import { useMemo, useState, type ComponentType } from "react";
 import {
   AlertTriangle,
-  CheckCircle2,
   ChevronRight,
-  Circle,
-  Eye,
   ListTodo,
-  Loader,
-  PauseCircle,
   Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   DepartmentTaskGroups,
+  STATUS_BADGE,
   TaskSheetHeading,
   groupByDepartment,
 } from "@/modules/tasks/components/department-task-groups";
@@ -323,37 +319,32 @@ const STAT_STYLE: Record<StatKey, StatStyle> = {
   },
   todo: {
     label: SHORT_STATUS.todo,
-    icon: Circle,
+    ...STATUS_BADGE.todo,
     tile: "border-slate-200 bg-slate-50 hover:border-slate-400",
-    badge: "bg-slate-500 text-white",
     value: "text-slate-700",
   },
   in_progress: {
     label: SHORT_STATUS.in_progress,
-    icon: Loader,
+    ...STATUS_BADGE.in_progress,
     tile: "border-blue-200 bg-blue-50 hover:border-blue-400",
-    badge: "bg-blue-500 text-white",
     value: "text-blue-700",
   },
   blocked: {
     label: SHORT_STATUS.blocked,
-    icon: PauseCircle,
+    ...STATUS_BADGE.blocked,
     tile: "border-orange-200 bg-orange-50 hover:border-orange-400",
-    badge: "bg-orange-500 text-white",
     value: "text-orange-700",
   },
   review: {
     label: SHORT_STATUS.review,
-    icon: Eye,
+    ...STATUS_BADGE.review,
     tile: "border-amber-200 bg-amber-50 hover:border-amber-400",
-    badge: "bg-amber-500 text-white",
     value: "text-amber-700",
   },
   done: {
     label: SHORT_STATUS.done,
-    icon: CheckCircle2,
+    ...STATUS_BADGE.done,
     tile: "border-emerald-200 bg-emerald-50 hover:border-emerald-400",
-    badge: "bg-emerald-500 text-white",
     value: "text-emerald-700",
   },
   overdue: {

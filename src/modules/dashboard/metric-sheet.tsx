@@ -2,11 +2,14 @@
 
 import { useState, type ReactNode } from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  AlertTriangle,
+  CircleCheckBig,
+  Clock,
+  ListPlus,
+  Loader2,
+  type LucideIcon,
+} from "lucide-react";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { dueLabel, formatDate } from "@/lib/format";
 import type { PeriodMode } from "@/lib/period";
@@ -27,6 +30,10 @@ import {
 } from "@/modules/dashboard/metrics";
 import { OnTimeBadge, TaskRows } from "@/modules/dashboard/person";
 import { TASK_STATUS_META } from "@/modules/tasks/constants";
+import {
+  DepartmentTaskGroups,
+  TaskSheetHeading,
+} from "@/modules/tasks/components/department-task-groups";
 import type { Task } from "@/types/database";
 
 export const METRIC_TITLE: Record<MetricKey, string> = {
@@ -35,6 +42,16 @@ export const METRIC_TITLE: Record<MetricKey, string> = {
   created: "Việc mới giao",
   open: "Đang thực hiện",
   overdue: "Quá hạn",
+};
+
+// Same icons as the stat tiles (overview-view.tsx), as solid badges.
+// Literal class names so Tailwind can see them.
+const METRIC_ICON: Record<MetricKey, { icon: LucideIcon; badge: string }> = {
+  completed: { icon: CircleCheckBig, badge: "bg-emerald-500 text-white" },
+  onTimeRate: { icon: Clock, badge: "bg-sky-500 text-white" },
+  created: { icon: ListPlus, badge: "bg-indigo-500 text-white" },
+  open: { icon: Loader2, badge: "bg-blue-500 text-white" },
+  overdue: { icon: AlertTriangle, badge: "bg-red-500 text-white" },
 };
 
 export function rowMeta(metric: MetricKey): (t: Task) => ReactNode {
@@ -172,15 +189,12 @@ export function MetricSheetBody({
 
   return (
     <div className="space-y-5 p-5 sm:p-6">
-      <div className="space-y-1 pr-10">
-        <SheetTitle className="truncate text-lg">
-          {title} ({tasks.length})
-        </SheetTitle>
-        <SheetDescription className="truncate">
-          {periodLabel}
-          {department ? ` · ${department}` : ""}
-        </SheetDescription>
-      </div>
+      <TaskSheetHeading
+        icon={METRIC_ICON[metric].icon}
+        badge={METRIC_ICON[metric].badge}
+        title={`${title} (${tasks.length})`}
+        description={`${periodLabel}${department ? ` · ${department}` : ""}`}
+      />
 
       {isRate && tasks.length > 0 && (
         <div className="space-y-3">
@@ -238,19 +252,12 @@ export function MetricSheetBody({
         </div>
       )}
 
-      {metric === "open" && tasks.length > 0 ? (
-        <StatusGroupedTaskRows
-          tasks={tasks}
-          nameOf={nameOf}
-          onSelect={onSelect}
-          meta={meta}
-        />
-      ) : isRate && tasks.length > 0 ? (
-        <div className="space-y-2">
+      {isRate && tasks.length > 0 ? (
+        <div className="space-y-3">
           <p className="text-xs font-medium text-muted-foreground">
             {rateHeading}
           </p>
-          <TaskRows
+          <DepartmentTaskGroups
             tasks={rateTasks}
             nameOf={nameOf}
             onSelect={onSelect}
@@ -258,7 +265,7 @@ export function MetricSheetBody({
           />
         </div>
       ) : (
-        <TaskRows
+        <DepartmentTaskGroups
           tasks={tasks}
           nameOf={nameOf}
           onSelect={onSelect}
