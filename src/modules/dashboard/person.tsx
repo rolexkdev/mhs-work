@@ -351,52 +351,70 @@ function PersonDetail({ p, buckets }: { p: PersonStats; buckets: Bucket[] }) {
   );
 }
 
-export function TaskRows({ tasks }: { tasks: Task[] }) {
+export function TaskRows({
+  tasks,
+  onSelect,
+  nameOf,
+  meta,
+}: {
+  tasks: Task[];
+  onSelect?: (t: Task) => void;
+  nameOf?: (id: string | null) => string;
+  meta?: (t: Task) => ReactNode;
+}) {
   if (tasks.length === 0)
     return (
       <p className="py-6 text-center text-sm text-muted-foreground">
         Không có việc nào.
       </p>
     );
+  const rowClass =
+    "flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-muted/50";
   return (
     <ul className="divide-y rounded-xl border">
       {tasks.map((t) => {
         const doneAt = completedDate(t);
         const late = isOverdue(t);
         const progress = t.manual_progress || t.progress || 0;
-        return (
-          <li key={t.id}>
-            <Link
-              href={`/tasks?task=${t.id}`}
-              className="flex items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-muted/50"
-            >
-              <span
-                className={cn(
-                  "h-2 w-2 shrink-0 rounded-full",
-                  TASK_STATUS_META[t.status].dot,
-                )}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate">{t.title}</p>
-                {t.department && (
-                  <p className="truncate text-[11px] text-muted-foreground">
-                    {t.department}
-                  </p>
-                )}
-              </div>
-              {!doneAt && (
-                <div className="hidden w-16 sm:block">
-                  <div className="h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <p className="mt-0.5 text-right text-[10px] tabular-nums text-muted-foreground">
-                    {progress}%
-                  </p>
-                </div>
+        const assignees = nameOf
+          ? t.assignee_ids.map((id) => nameOf(id)).filter(Boolean).join(", ") ||
+            "Chưa giao"
+          : null;
+        const subtitle = nameOf
+          ? [assignees, t.department].filter(Boolean).join(" · ")
+          : t.department;
+        const content = (
+          <>
+            <span
+              className={cn(
+                "h-2 w-2 shrink-0 rounded-full",
+                TASK_STATUS_META[t.status].dot,
               )}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate">{t.title}</p>
+              {subtitle && (
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {subtitle}
+                </p>
+              )}
+            </div>
+            {!doneAt && (
+              <div className="hidden w-16 sm:block">
+                <div className="h-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <p className="mt-0.5 text-right text-[10px] tabular-nums text-muted-foreground">
+                  {progress}%
+                </p>
+              </div>
+            )}
+            {meta ? (
+              meta(t)
+            ) : (
               <span
                 className={cn(
                   "shrink-0 whitespace-nowrap text-right text-xs",
@@ -408,7 +426,24 @@ export function TaskRows({ tasks }: { tasks: Task[] }) {
                   ? formatDate(doneAt.toISOString())
                   : dueLabel(t.due_date).text}
               </span>
-            </Link>
+            )}
+          </>
+        );
+        return (
+          <li key={t.id}>
+            {onSelect ? (
+              <button
+                type="button"
+                onClick={() => onSelect(t)}
+                className={cn(rowClass, "w-full text-left")}
+              >
+                {content}
+              </button>
+            ) : (
+              <Link href={`/tasks?task=${t.id}`} className={rowClass}>
+                {content}
+              </Link>
+            )}
           </li>
         );
       })}
