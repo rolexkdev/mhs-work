@@ -336,8 +336,8 @@ export function ThroughputChart({
               const done = s.onTime + s.late;
               const key = String(i);
               const active = tip.active === key;
-              const selectable = !!onSelect && done > 0;
-              const isSelected = selectable && selected === i;
+              const isSelected = !!onSelect && selected === i;
+              const selectable = !!onSelect && (done > 0 || isSelected);
               const dimmed =
                 !!onSelect &&
                 selected !== null &&
