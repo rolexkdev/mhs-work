@@ -50,6 +50,7 @@ export default function DashboardPage() {
   const [openPerson, setOpenPerson] = useState<string | null>(null);
   const [openMetric, setOpenMetric] = useState<MetricKey | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const { data: allTasks = [], isLoading } = useTasks();
   const { data: profiles = [] } = useProfiles();
   const { data: meetings = [] } = useMeetings();
@@ -185,17 +186,22 @@ export default function DashboardPage() {
         periodLabel={periodLabel(period)}
         department={dept === ALL ? null : dept}
         nameOf={nameOf}
-        onSelect={(t) => setDetailId(t.id)}
-        onClose={() => setOpenMetric(null)}
-      />
-      <TaskDetailPanel
-        taskId={detailId}
-        open={!!detailId}
-        onOpenChange={(v) => {
-          if (!v) setDetailId(null);
+        onSelect={(t) => {
+          setDetailId(t.id);
+          setDetailOpen(true);
         }}
-        meetings={meetings}
-      />
+        onClose={() => {
+          setOpenMetric(null);
+          setDetailOpen(false);
+        }}
+      >
+        <TaskDetailPanel
+          taskId={detailId}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          meetings={meetings}
+        />
+      </MetricSheet>
     </div>
   );
 }

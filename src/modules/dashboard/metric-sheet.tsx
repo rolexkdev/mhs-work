@@ -144,6 +144,7 @@ export function MetricSheet({
   nameOf,
   onSelect,
   onClose,
+  children,
 }: {
   metric: MetricKey | null;
   scope: Scope;
@@ -152,6 +153,8 @@ export function MetricSheet({
   nameOf: (id: string | null) => string;
   onSelect?: (t: Task) => void;
   onClose: () => void;
+  /** Nested overlays (e.g. TaskDetailPanel) rendered inside this dialog's React tree so their close interactions do not dismiss the metric sheet. */
+  children?: ReactNode;
 }) {
   return (
     <Sheet open={!!metric} onOpenChange={(o) => !o && onClose()}>
@@ -170,6 +173,7 @@ export function MetricSheet({
             onSelect={onSelect}
           />
         )}
+        {children}
       </SheetContent>
     </Sheet>
   );
