@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, Search, X } from "lucide-react";
 import { getQuarter, startOfQuarter } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +25,7 @@ import {
   PersonAvatar,
   PersonHoverCard,
 } from "@/modules/dashboard/person";
+import { TaskLink } from "@/modules/dashboard/task-link";
 import type { Task } from "@/types/database";
 
 const PAGE = 20;
@@ -43,6 +43,7 @@ export function CompletedView({
   period,
   onPeriodChange,
   nameOf,
+  onOpenTask,
 }: {
   tasks: Task[];
   scope: Scope;
@@ -50,6 +51,7 @@ export function CompletedView({
   period: Period;
   onPeriodChange: (p: Period) => void;
   nameOf: (id: string | null) => string;
+  onOpenTask?: (t: Task) => void;
 }) {
   const [person, setPerson] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -386,8 +388,9 @@ export function CompletedView({
                     const lead = leadDays(t);
                     return (
                       <li key={t.id}>
-                        <Link
-                          href={`/tasks?task=${t.id}`}
+                        <TaskLink
+                          task={t}
+                          onOpenTask={onOpenTask}
                           className="flex items-center gap-3 rounded-md px-1 py-2.5 text-sm transition-colors hover:bg-muted/50"
                         >
                           <div className="min-w-0 flex-1">
@@ -405,7 +408,7 @@ export function CompletedView({
                             </p>
                             <OnTimeBadge onTime={onTime} />
                           </div>
-                        </Link>
+                        </TaskLink>
                       </li>
                     );
                   })}

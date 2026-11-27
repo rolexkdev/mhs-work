@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -28,7 +27,7 @@ import {
   type DeptRow,
   type DonutSegment,
 } from "@/modules/dashboard/charts";
-import type { MetricKey } from "@/modules/dashboard/drilldown";
+import type { MetricKey, WidgetDrilldown } from "@/modules/dashboard/drilldown";
 import {
   SERIES,
   STATUS_COLOR,
@@ -43,12 +42,13 @@ import {
   PersonHoverCard,
   statusSegments,
 } from "@/modules/dashboard/person";
+import { TaskLink } from "@/modules/dashboard/task-link";
 import {
   DEPARTMENTS,
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
 } from "@/modules/tasks/constants";
-import type { Task } from "@/types/database";
+import type { Task, TaskStatus } from "@/types/database";
 
 export const PREV_LABEL: Record<PeriodMode, string> = {
   week: "tuần trước",
@@ -174,6 +174,8 @@ export function OverviewView({
   onOpenPerson,
   onShowPeople,
   onOpenMetric,
+  onOpenWidget,
+  onOpenTask,
 }: {
   scope: Scope;
   people: PersonStats[];
@@ -182,6 +184,8 @@ export function OverviewView({
   onOpenPerson: (id: string) => void;
   onShowPeople: () => void;
   onOpenMetric?: (key: MetricKey) => void;
+  onOpenWidget?: (w: WidgetDrilldown) => void;
+  onOpenTask?: (t: Task) => void;
 }) {
   const prevLabel = PREV_LABEL[mode];
   const { rows, completed, open, overdue, series, buckets } = scope;
@@ -198,6 +202,7 @@ export function OverviewView({
     .map((key) => {
       const list = rows.filter((r) => (r.department ?? null) === key);
       return {
+        key,
         label: key ?? "Chưa phân phòng",
         total: list.length,
         done: list.filter((r) => r.status === "done").length,
@@ -356,7 +361,22 @@ export function OverviewView({
                 ]}
               />
             </div>
-            <ThroughputChart series={series} />
+            <ThroughputChart
+              series={series}
+              onSelect={
+                onOpenWidget
+                  ? (i) => {
+                      if (i !== null) {
+                        onOpenWidget({
+                          kind: "bucket",
+                          index: i,
+                          label: buckets[i]?.label ?? "",
+                        });
+                      }
+                    }
+                  : undefined
+              }
+            />
           </CardContent>
         </Card>
 
@@ -368,7 +388,19 @@ export function OverviewView({
                 Rê vào từng phần để xem chi tiết
               </p>
             </div>
-            <StatusDonut segments={segments} total={rows.length} />
+            <StatusDonut
+              segments={segments}
+              total={rows.length}
+              onSelect={
+                onOpenWidget
+                  ? (k) =>
+                      onOpenWidget({
+                        kind: "status",
+                        status: k as TaskStatus,
+                      })
+                  : undefined
+              }
+            />
           </CardContent>
         </Card>
       </div>
@@ -440,7 +472,15 @@ export function OverviewView({
         <Card>
           <CardContent className="space-y-3 p-5">
             <p className="font-medium">Tiến độ theo phòng</p>
-            <DeptProgressBars rows={deptRows} />
+            <DeptProgressBars
+              rows={deptRows}
+              onSelect={
+                onOpenWidget
+                  ? (department) =>
+                      onOpenWidget({ kind: "department", department })
+                  : undefined
+              }
+            />
           </CardContent>
         </Card>
 
@@ -467,6 +507,7 @@ export function OverviewView({
                   nameOf={nameOf}
                   tone="text-red-600"
                   empty="Không có việc quá hạn 🎉"
+                  onOpenTask={onOpenTask}
                 />
               </TabsContent>
               <TabsContent value="soon">
@@ -475,6 +516,7 @@ export function OverviewView({
                   nameOf={nameOf}
                   tone="text-amber-600"
                   empty="Không có việc sắp đến hạn."
+                  onOpenTask={onOpenTask}
                 />
               </TabsContent>
             </Tabs>
@@ -490,11 +532,13 @@ function AttentionList({
   nameOf,
   tone,
   empty,
+  onOpenTask,
 }: {
   tasks: Task[];
   nameOf: (id: string | null) => string;
   tone: string;
   empty: string;
+  onOpenTask?: (t: Task) => void;
 }) {
   if (tasks.length === 0)
     return (
@@ -504,8 +548,9 @@ function AttentionList({
     <ul className="max-h-[272px] divide-y overflow-y-auto">
       {tasks.map((t) => (
         <li key={t.id}>
-          <Link
-            href={`/tasks?task=${t.id}`}
+          <TaskLink
+            task={t}
+            onOpenTask={onOpenTask}
             className="flex items-center gap-3 rounded-md px-1 py-2 text-sm transition-colors hover:bg-muted/50"
           >
             <div className="min-w-0 flex-1">
@@ -518,7 +563,7 @@ function AttentionList({
             <span className={cn("shrink-0 text-xs font-medium", tone)}>
               {dueLabel(t.due_date).text}
             </span>
-          </Link>
+          </TaskLink>
         </li>
       ))}
     </ul>

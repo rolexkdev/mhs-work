@@ -21,14 +21,17 @@ import { TaskDetailPanel } from "@/modules/tasks/components/task-detail-panel";
 import {
   UNASSIGNED,
   computeScope,
+  emptyPersonStats,
   personStats,
 } from "@/modules/dashboard/metrics";
+import type { Task } from "@/types/database";
 import { OverviewView } from "@/modules/dashboard/overview-view";
 import { PeopleView } from "@/modules/dashboard/people-view";
 import { CompletedView } from "@/modules/dashboard/completed-view";
 import { PersonSheet } from "@/modules/dashboard/person";
 import { MetricSheet } from "@/modules/dashboard/metric-sheet";
-import type { MetricKey } from "@/modules/dashboard/drilldown";
+import { WidgetSheet } from "@/modules/dashboard/widget-sheet";
+import type { MetricKey, WidgetDrilldown } from "@/modules/dashboard/drilldown";
 
 type View = "overview" | "people" | "completed";
 const VIEWS: { value: View; label: string; icon: typeof Users }[] = [
@@ -49,6 +52,7 @@ export default function DashboardPage() {
   const [view, setView] = useState<View>("overview");
   const [openPerson, setOpenPerson] = useState<string | null>(null);
   const [openMetric, setOpenMetric] = useState<MetricKey | null>(null);
+  const [openWidget, setOpenWidget] = useState<WidgetDrilldown | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const { data: allTasks = [], isLoading } = useTasks();
@@ -92,7 +96,39 @@ export default function DashboardPage() {
     return (id: string | null) => (id ? (m.get(id) ?? "") : "Chưa giao");
   }, [profiles]);
 
-  const selected = people.find((p) => p.id === openPerson) ?? null;
+  const selected = openPerson
+    ? (people.find((p) => p.id === openPerson) ??
+      emptyPersonStats(openPerson, profiles, scope.buckets))
+    : null;
+
+  const openTask = (t: Task) => {
+    setDetailId(t.id);
+    setDetailOpen(true);
+  };
+  const handleOpenPerson = (id: string) => {
+    setOpenMetric(null);
+    setOpenWidget(null);
+    setOpenPerson(id);
+  };
+  const handleOpenMetric = (key: MetricKey) => {
+    setOpenPerson(null);
+    setOpenWidget(null);
+    setOpenMetric(key);
+  };
+  const handleOpenWidget = (w: WidgetDrilldown) => {
+    setOpenPerson(null);
+    setOpenMetric(null);
+    setOpenWidget(w);
+  };
+
+  const detailPanel = (
+    <TaskDetailPanel
+      taskId={detailId}
+      open={detailOpen}
+      onOpenChange={setDetailOpen}
+      meetings={meetings}
+    />
+  );
 
   return (
     <div className="min-w-0 space-y-5 sm:space-y-6">
@@ -151,16 +187,18 @@ export default function DashboardPage() {
               people={people}
               mode={period.mode}
               nameOf={nameOf}
-              onOpenPerson={setOpenPerson}
+              onOpenPerson={handleOpenPerson}
               onShowPeople={() => changeView("people")}
-              onOpenMetric={setOpenMetric}
+              onOpenMetric={handleOpenMetric}
+              onOpenWidget={handleOpenWidget}
+              onOpenTask={openTask}
             />
           ) : view === "people" ? (
             <PeopleView
               scope={scope}
               people={people}
               profiles={staff}
-              onOpenPerson={setOpenPerson}
+              onOpenPerson={handleOpenPerson}
             />
           ) : (
             <CompletedView
@@ -170,6 +208,7 @@ export default function DashboardPage() {
               period={period}
               onPeriodChange={setPeriod}
               nameOf={nameOf}
+              onOpenTask={openTask}
             />
           )}
         </div>
@@ -178,8 +217,14 @@ export default function DashboardPage() {
       <PersonSheet
         p={selected}
         buckets={scope.buckets}
-        onClose={() => setOpenPerson(null)}
-      />
+        onOpenTask={openTask}
+        onClose={() => {
+          setOpenPerson(null);
+          setDetailOpen(false);
+        }}
+      >
+        {selected && detailPanel}
+      </PersonSheet>
       <MetricSheet
         metric={openMetric}
         scope={scope}
@@ -187,22 +232,29 @@ export default function DashboardPage() {
         periodMode={period.mode}
         department={dept === ALL ? null : dept}
         nameOf={nameOf}
-        onSelect={(t) => {
-          setDetailId(t.id);
-          setDetailOpen(true);
-        }}
+        onSelect={openTask}
         onClose={() => {
           setOpenMetric(null);
           setDetailOpen(false);
         }}
       >
-        <TaskDetailPanel
-          taskId={detailId}
-          open={detailOpen}
-          onOpenChange={setDetailOpen}
-          meetings={meetings}
-        />
+        {!selected && openMetric && detailPanel}
       </MetricSheet>
+      <WidgetSheet
+        widget={openWidget}
+        scope={scope}
+        periodLabel={periodLabel(period)}
+        department={dept === ALL ? null : dept}
+        nameOf={nameOf}
+        onSelect={openTask}
+        onClose={() => {
+          setOpenWidget(null);
+          setDetailOpen(false);
+        }}
+      >
+        {!selected && !openMetric && openWidget && detailPanel}
+      </WidgetSheet>
+      {!selected && !openMetric && !openWidget && detailPanel}
     </div>
   );
 }

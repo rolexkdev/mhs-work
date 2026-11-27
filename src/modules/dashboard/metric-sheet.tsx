@@ -37,7 +37,7 @@ export const METRIC_TITLE: Record<MetricKey, string> = {
   overdue: "Quá hạn",
 };
 
-function rowMeta(metric: MetricKey): (t: Task) => ReactNode {
+export function rowMeta(metric: MetricKey): (t: Task) => ReactNode {
   return (t) => {
     if (metric === "onTimeRate") {
       const doneAt = completedDate(t);
@@ -84,6 +84,43 @@ function rowMeta(metric: MetricKey): (t: Task) => ReactNode {
       </span>
     );
   };
+}
+
+export function StatusGroupedTaskRows({
+  tasks,
+  nameOf,
+  onSelect,
+  meta,
+}: {
+  tasks: Task[];
+  nameOf: (id: string | null) => string;
+  onSelect?: (t: Task) => void;
+  meta: (t: Task) => ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      {groupByStatus(tasks).map((group) => (
+        <section key={group.status} className="space-y-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <span
+              className={cn(
+                "h-2 w-2 shrink-0 rounded-full",
+                TASK_STATUS_META[group.status].dot,
+              )}
+            />
+            <span>{TASK_STATUS_META[group.status].label}</span>
+            <span className="tabular-nums">({group.tasks.length})</span>
+          </div>
+          <TaskRows
+            tasks={group.tasks}
+            nameOf={nameOf}
+            onSelect={onSelect}
+            meta={meta}
+          />
+        </section>
+      ))}
+    </div>
+  );
 }
 
 export function MetricSheetBody({
@@ -202,28 +239,12 @@ export function MetricSheetBody({
       )}
 
       {metric === "open" && tasks.length > 0 ? (
-        <div className="space-y-4">
-          {groupByStatus(tasks).map((group) => (
-            <section key={group.status} className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <span
-                  className={cn(
-                    "h-2 w-2 shrink-0 rounded-full",
-                    TASK_STATUS_META[group.status].dot,
-                  )}
-                />
-                <span>{TASK_STATUS_META[group.status].label}</span>
-                <span className="tabular-nums">({group.tasks.length})</span>
-              </div>
-              <TaskRows
-                tasks={group.tasks}
-                nameOf={nameOf}
-                onSelect={onSelect}
-                meta={meta}
-              />
-            </section>
-          ))}
-        </div>
+        <StatusGroupedTaskRows
+          tasks={tasks}
+          nameOf={nameOf}
+          onSelect={onSelect}
+          meta={meta}
+        />
       ) : isRate && tasks.length > 0 ? (
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">

@@ -43,7 +43,7 @@ export function useTooltip() {
         )
       : null;
 
-  return { bind, node, active: tip?.key ?? null };
+  return { bind, node, active: tip?.key ?? null, clear: () => setTip(null) };
 }
 
 export type TipRow = { color?: string; label: string; value: ReactNode };

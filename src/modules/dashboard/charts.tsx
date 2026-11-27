@@ -32,10 +32,12 @@ export function StatusDonut({
   segments,
   total,
   unit = "công việc",
+  onSelect,
 }: {
   segments: DonutSegment[];
   total: number;
   unit?: string;
+  onSelect?: (key: string) => void;
 }) {
   const [hover, setHover] = useState<string | null>(null);
   const size = 188;
@@ -81,9 +83,36 @@ export function StatusDonut({
                 strokeDasharray={`${Math.max(len - gap, 0.5)} ${c}`}
                 strokeDashoffset={-acc}
                 transform={`rotate(-90 ${center} ${center})`}
-                className="cursor-pointer transition-all duration-200"
+                role={onSelect ? "button" : undefined}
+                tabIndex={onSelect ? 0 : undefined}
+                aria-label={onSelect ? `${s.label} (${s.value})` : undefined}
+                className={cn(
+                  "cursor-pointer outline-none transition-all duration-200",
+                  onSelect && "focus-visible:opacity-100",
+                )}
                 style={{ opacity: hover && hover !== s.key ? 0.35 : 1 }}
                 onPointerEnter={() => setHover(s.key)}
+                onFocus={onSelect ? () => setHover(s.key) : undefined}
+                onBlur={onSelect ? () => setHover(null) : undefined}
+                onClick={
+                  onSelect
+                    ? () => {
+                        setHover(null);
+                        onSelect(s.key);
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  onSelect
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setHover(null);
+                          onSelect(s.key);
+                        }
+                      }
+                    : undefined
+                }
               />
             );
             acc += len;
@@ -112,16 +141,9 @@ export function StatusDonut({
       <ul className="w-full min-w-0 flex-1 space-y-0.5">
         {segments.map((s) => {
           const p = total > 0 ? Math.round((s.value / total) * 100) : 0;
-          return (
-            <li
-              key={s.key}
-              onPointerEnter={() => setHover(s.key)}
-              onPointerLeave={() => setHover(null)}
-              className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                hover === s.key && "bg-muted",
-              )}
-            >
+          const clickable = !!onSelect && s.value > 0;
+          const rowInner = (
+            <>
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-sm"
                 style={{ backgroundColor: s.color }}
@@ -131,6 +153,40 @@ export function StatusDonut({
               <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
                 {p}%
               </span>
+            </>
+          );
+          return (
+            <li
+              key={s.key}
+              onPointerEnter={() => setHover(s.key)}
+              onPointerLeave={() => setHover(null)}
+            >
+              {clickable ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHover(null);
+                    onSelect(s.key);
+                  }}
+                  onFocus={() => setHover(s.key)}
+                  onBlur={() => setHover(null)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                    hover === s.key && "bg-muted",
+                  )}
+                >
+                  {rowInner}
+                </button>
+              ) : (
+                <div
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                    hover === s.key && "bg-muted",
+                  )}
+                >
+                  {rowInner}
+                </div>
+              )}
             </li>
           );
         })}
@@ -334,10 +390,11 @@ export function ThroughputChart({
           <div className="absolute inset-0 flex">
             {series.map((s, i) => {
               const done = s.onTime + s.late;
+              const hasActivity = done > 0 || (showCreated && s.created > 0);
               const key = String(i);
               const active = tip.active === key;
               const isSelected = !!onSelect && selected === i;
-              const selectable = !!onSelect && (done > 0 || isSelected);
+              const selectable = !!onSelect && (hasActivity || isSelected);
               const dimmed =
                 !!onSelect &&
                 selected !== null &&
@@ -352,7 +409,10 @@ export function ThroughputChart({
                   aria-label={selectable ? s.bucket.label : undefined}
                   onClick={
                     selectable
-                      ? () => onSelect(isSelected ? null : i)
+                      ? () => {
+                          tip.clear();
+                          onSelect(isSelected ? null : i);
+                        }
                       : undefined
                   }
                   onKeyDown={
@@ -360,6 +420,7 @@ export function ThroughputChart({
                       ? (e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
+                            tip.clear();
                             onSelect(isSelected ? null : i);
                           }
                         }
@@ -514,6 +575,7 @@ export function ChartLegend({
 // ------------------------------------------------------------------- Dept bars
 
 export type DeptRow = {
+  key?: string | null;
   label: string;
   total: number;
   done: number;
@@ -522,7 +584,13 @@ export type DeptRow = {
 };
 
 /** Tiến độ theo phòng — rê vào dòng để xem cơ cấu trạng thái. */
-export function DeptProgressBars({ rows }: { rows: DeptRow[] }) {
+export function DeptProgressBars({
+  rows,
+  onSelect,
+}: {
+  rows: DeptRow[];
+  onSelect?: (key: string | null) => void;
+}) {
   const tip = useTooltip();
   if (rows.length === 0)
     return (
@@ -535,12 +603,31 @@ export function DeptProgressBars({ rows }: { rows: DeptRow[] }) {
     <div className="space-y-1">
       {rows.map((r) => {
         const p = r.total > 0 ? Math.round((r.done / r.total) * 100) : 0;
+        const handleSelect = onSelect
+          ? () => {
+              tip.clear();
+              onSelect(r.key ?? null);
+            }
+          : undefined;
         return (
           <div
             key={r.label}
             tabIndex={0}
+            role={onSelect ? "button" : undefined}
+            onClick={handleSelect}
+            onKeyDown={
+              handleSelect
+                ? (e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSelect();
+                    }
+                  }
+                : undefined
+            }
             className={cn(
               "rounded-md px-2 py-1.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+              onSelect && "cursor-pointer hover:bg-muted/70",
               tip.active === r.label && "bg-muted/70",
             )}
             {...tip.bind(
