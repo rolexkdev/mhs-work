@@ -20,3 +20,6 @@ supabase/.temp/
 # Generated files
 *.tsbuildinfo
 .cc-history/
+
+# Production dumps for the local DB (contain employee data)
+supabase/.dumps/

@@ -48,6 +48,35 @@ Stack: **Next.js (App Router) + Supabase**, không cần backend server riêng.
    npm run dev
    ```
 
+## Local test database
+
+Test new features against a local Supabase running in Docker, filled with a copy of
+production data, instead of testing on production.
+
+```bash
+npm run db:start     # start local Supabase (first run downloads the Docker images)
+npm run db:pull      # dump production roles/schema/data to supabase/.dumps/ (read-only)
+npm run db:restore   # rebuild the local DB from the latest dump
+npm run db:stop      # stop the containers (data is kept)
+```
+
+- `db:pull` asks for the production database password (Dashboard → Project Settings →
+  Database), or reads `SUPABASE_DB_PASSWORD`, or uses `SUPABASE_DB_URL` if set.
+  The dump contains employee data: `supabase/.dumps/` is git-ignored, never share it.
+- `db:restore` wipes the **local** DB only, restores the dump, then runs
+  `supabase/local/post-restore.sql`. That script recreates the `auth.users` trigger and
+  the storage policies (not part of the dump), removes Zalo OA tokens and cron jobs (so
+  the local copy can never message employees or rotate production's Zalo token), and
+  sets every password to `taskapp123` (`-KeepPasswords` keeps the production ones).
+- Migrations are disabled in `supabase/config.jsonc`, so the local schema mirrors what
+  production actually has. To test a new migration, run it in the local Studio SQL
+  Editor (http://127.0.0.1:54323) first, then in production.
+- Point the app at the local stack: put the `API_URL`, `ANON_KEY` and `SERVICE_ROLE_KEY`
+  from `npx supabase status` into `.env.development.local` (it overrides `.env.local`
+  for `npm run dev`; delete or rename it to go back to production).
+- Storage files are not copied (only their metadata), so old attachments return 404
+  locally; new uploads work.
+
 ## Cấu trúc thư mục
 
 ```
