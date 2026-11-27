@@ -28,6 +28,7 @@ import {
   type DeptRow,
   type DonutSegment,
 } from "@/modules/dashboard/charts";
+import type { MetricKey } from "@/modules/dashboard/drilldown";
 import {
   SERIES,
   STATUS_COLOR,
@@ -87,6 +88,7 @@ function StatTile({
   delta,
   prevLabel,
   sub,
+  onClick,
   children,
 }: {
   label: string;
@@ -96,13 +98,34 @@ function StatTile({
   delta?: Delta | null;
   prevLabel: string;
   sub?: React.ReactNode;
+  onClick?: () => void;
   children?: React.ReactNode;
 }) {
   return (
-    <Card className="group relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md">
+    <Card
+      onClick={onClick}
+      className={cn(
+        "group relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md",
+        onClick &&
+          "cursor-pointer focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+      )}
+    >
       <CardContent className="flex h-full flex-col gap-2 p-4">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          {onClick ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick();
+              }}
+              className="text-left text-xs font-medium text-muted-foreground outline-none hover:text-foreground"
+            >
+              {label}
+            </button>
+          ) : (
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          )}
           <span
             className={cn(
               "flex h-7 w-7 items-center justify-center rounded-lg",
@@ -150,6 +173,7 @@ export function OverviewView({
   nameOf,
   onOpenPerson,
   onShowPeople,
+  onOpenMetric,
 }: {
   scope: Scope;
   people: PersonStats[];
@@ -157,6 +181,7 @@ export function OverviewView({
   nameOf: (id: string | null) => string;
   onOpenPerson: (id: string) => void;
   onShowPeople: () => void;
+  onOpenMetric?: (key: MetricKey) => void;
 }) {
   const prevLabel = PREV_LABEL[mode];
   const { rows, completed, open, overdue, series, buckets } = scope;
@@ -205,6 +230,7 @@ export function OverviewView({
           delta={deltaOf(completed.length, scope.prevCompleted?.length, true)}
           prevLabel={prevLabel}
           sub={prevLabel && `so với ${prevLabel}`}
+          onClick={onOpenMetric ? () => onOpenMetric("completed") : undefined}
         >
           <Sparkline
             values={series.map((s) => s.onTime + s.late)}
@@ -241,6 +267,7 @@ export function OverviewView({
           delta={deltaOf(scope.created.length, scope.prevCreated?.length, null)}
           prevLabel={prevLabel}
           sub={prevLabel && `so với ${prevLabel}`}
+          onClick={onOpenMetric ? () => onOpenMetric("created") : undefined}
         >
           <Sparkline
             values={series.map((s) => s.created)}
@@ -271,6 +298,7 @@ export function OverviewView({
           iconTone="bg-red-100 text-red-600 dark:bg-red-500/15"
           prevLabel={prevLabel}
           sub={`${pct(overdue.length, open.length)}% số việc đang mở`}
+          onClick={onOpenMetric ? () => onOpenMetric("overdue") : undefined}
         >
           <div className="flex -space-x-1.5">
             {[...new Set(overdue.flatMap((t) => t.assignee_ids))]
@@ -281,7 +309,10 @@ export function OverviewView({
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => onOpenPerson(p.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenPerson(p.id);
+                    }}
                     title={p.name}
                   >
                     <PersonAvatar

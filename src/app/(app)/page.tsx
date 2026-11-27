@@ -25,6 +25,8 @@ import { OverviewView } from "@/modules/dashboard/overview-view";
 import { PeopleView } from "@/modules/dashboard/people-view";
 import { CompletedView } from "@/modules/dashboard/completed-view";
 import { PersonSheet } from "@/modules/dashboard/person";
+import { MetricSheet } from "@/modules/dashboard/metric-sheet";
+import type { MetricKey } from "@/modules/dashboard/drilldown";
 
 type View = "overview" | "people" | "completed";
 const VIEWS: { value: View; label: string; icon: typeof Users }[] = [
@@ -44,6 +46,7 @@ export default function DashboardPage() {
   const [dept, setDept] = useState<string>(ALL);
   const [view, setView] = useState<View>("overview");
   const [openPerson, setOpenPerson] = useState<string | null>(null);
+  const [openMetric, setOpenMetric] = useState<MetricKey | null>(null);
   const { data: allTasks = [], isLoading } = useTasks();
   const { data: profiles = [] } = useProfiles();
 
@@ -145,6 +148,7 @@ export default function DashboardPage() {
               nameOf={nameOf}
               onOpenPerson={setOpenPerson}
               onShowPeople={() => changeView("people")}
+              onOpenMetric={setOpenMetric}
             />
           ) : view === "people" ? (
             <PeopleView
@@ -170,6 +174,14 @@ export default function DashboardPage() {
         p={selected}
         buckets={scope.buckets}
         onClose={() => setOpenPerson(null)}
+      />
+      <MetricSheet
+        metric={openMetric}
+        scope={scope}
+        periodLabel={periodLabel(period)}
+        department={dept === ALL ? null : dept}
+        nameOf={nameOf}
+        onClose={() => setOpenMetric(null)}
       />
     </div>
   );
