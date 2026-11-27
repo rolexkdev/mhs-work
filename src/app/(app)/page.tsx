@@ -21,8 +21,10 @@ import { TaskDetailPanel } from "@/modules/tasks/components/task-detail-panel";
 import {
   UNASSIGNED,
   computeScope,
+  emptyPersonStats,
   personStats,
 } from "@/modules/dashboard/metrics";
+import type { Task } from "@/types/database";
 import { OverviewView } from "@/modules/dashboard/overview-view";
 import { PeopleView } from "@/modules/dashboard/people-view";
 import { CompletedView } from "@/modules/dashboard/completed-view";
@@ -92,7 +94,32 @@ export default function DashboardPage() {
     return (id: string | null) => (id ? (m.get(id) ?? "") : "Chưa giao");
   }, [profiles]);
 
-  const selected = people.find((p) => p.id === openPerson) ?? null;
+  const selected = openPerson
+    ? (people.find((p) => p.id === openPerson) ??
+      emptyPersonStats(openPerson, profiles, scope.buckets))
+    : null;
+
+  const openTask = (t: Task) => {
+    setDetailId(t.id);
+    setDetailOpen(true);
+  };
+  const handleOpenPerson = (id: string) => {
+    setOpenMetric(null);
+    setOpenPerson(id);
+  };
+  const handleOpenMetric = (key: MetricKey) => {
+    setOpenPerson(null);
+    setOpenMetric(key);
+  };
+
+  const detailPanel = (
+    <TaskDetailPanel
+      taskId={detailId}
+      open={detailOpen}
+      onOpenChange={setDetailOpen}
+      meetings={meetings}
+    />
+  );
 
   return (
     <div className="min-w-0 space-y-5 sm:space-y-6">
@@ -151,16 +178,17 @@ export default function DashboardPage() {
               people={people}
               mode={period.mode}
               nameOf={nameOf}
-              onOpenPerson={setOpenPerson}
+              onOpenPerson={handleOpenPerson}
               onShowPeople={() => changeView("people")}
-              onOpenMetric={setOpenMetric}
+              onOpenMetric={handleOpenMetric}
+              onOpenTask={openTask}
             />
           ) : view === "people" ? (
             <PeopleView
               scope={scope}
               people={people}
               profiles={staff}
-              onOpenPerson={setOpenPerson}
+              onOpenPerson={handleOpenPerson}
             />
           ) : (
             <CompletedView
@@ -170,6 +198,7 @@ export default function DashboardPage() {
               period={period}
               onPeriodChange={setPeriod}
               nameOf={nameOf}
+              onOpenTask={openTask}
             />
           )}
         </div>
@@ -178,8 +207,14 @@ export default function DashboardPage() {
       <PersonSheet
         p={selected}
         buckets={scope.buckets}
-        onClose={() => setOpenPerson(null)}
-      />
+        onOpenTask={openTask}
+        onClose={() => {
+          setOpenPerson(null);
+          setDetailOpen(false);
+        }}
+      >
+        {selected && detailPanel}
+      </PersonSheet>
       <MetricSheet
         metric={openMetric}
         scope={scope}
@@ -187,22 +222,15 @@ export default function DashboardPage() {
         periodMode={period.mode}
         department={dept === ALL ? null : dept}
         nameOf={nameOf}
-        onSelect={(t) => {
-          setDetailId(t.id);
-          setDetailOpen(true);
-        }}
+        onSelect={openTask}
         onClose={() => {
           setOpenMetric(null);
           setDetailOpen(false);
         }}
       >
-        <TaskDetailPanel
-          taskId={detailId}
-          open={detailOpen}
-          onOpenChange={setDetailOpen}
-          meetings={meetings}
-        />
+        {!selected && openMetric && detailPanel}
       </MetricSheet>
+      {!selected && !openMetric && detailPanel}
     </div>
   );
 }

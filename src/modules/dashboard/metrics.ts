@@ -258,6 +258,34 @@ export type PersonStats = {
   trend: number[];
 };
 
+export function emptyPersonStats(
+  id: string,
+  profiles: Profile[],
+  buckets: Bucket[],
+): PersonStats {
+  const p = profiles.find((x) => x.id === id);
+  return {
+    id,
+    name:
+      id === UNASSIGNED
+        ? "Chưa giao"
+        : p?.full_name || p?.email || "Không rõ",
+    email: p?.email ?? null,
+    avatarUrl: p?.avatar_url ?? null,
+    rows: [],
+    open: [],
+    completed: [],
+    overdue: [],
+    byStatus: { todo: 0, in_progress: 0, blocked: 0, review: 0, done: 0 },
+    total: 0,
+    completionRate: 0,
+    onTimeRate: null,
+    avgProgress: null,
+    avgLeadDays: null,
+    trend: buckets.map(() => 0),
+  };
+}
+
 export function personStats(scope: Scope, profiles: Profile[]): PersonStats[] {
   const profileById = new Map(profiles.map((p) => [p.id, p]));
   // Việc có nhiều người phụ trách được tính cho từng người.

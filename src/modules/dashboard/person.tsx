@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Timer, Target } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -38,6 +37,7 @@ import {
   type PersonStats,
   type SeriesPoint,
 } from "@/modules/dashboard/metrics";
+import { TaskLink } from "@/modules/dashboard/task-link";
 import { TASK_STATUS_META, TASK_STATUS_ORDER } from "@/modules/tasks/constants";
 import type { Task } from "@/types/database";
 
@@ -205,11 +205,15 @@ function TaskMiniList({
 export function PersonSheet({
   p,
   buckets,
+  onOpenTask,
   onClose,
+  children,
 }: {
   p: PersonStats | null;
   buckets: Bucket[];
+  onOpenTask?: (t: Task) => void;
   onClose: () => void;
+  children?: ReactNode;
 }) {
   return (
     <Sheet open={!!p} onOpenChange={(o) => !o && onClose()}>
@@ -218,13 +222,22 @@ export function PersonSheet({
         // Không tự focus vào cột biểu đồ đầu tiên (sẽ bật tooltip ngay khi mở)
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        {p && <PersonDetail p={p} buckets={buckets} />}
+        {p && <PersonDetail p={p} buckets={buckets} onOpenTask={onOpenTask} />}
+        {children}
       </SheetContent>
     </Sheet>
   );
 }
 
-function PersonDetail({ p, buckets }: { p: PersonStats; buckets: Bucket[] }) {
+function PersonDetail({
+  p,
+  buckets,
+  onOpenTask,
+}: {
+  p: PersonStats;
+  buckets: Bucket[];
+  onOpenTask?: (t: Task) => void;
+}) {
   const series = useMemo<SeriesPoint[]>(() => {
     const s = buckets.map((bucket) => ({
       bucket,
@@ -338,13 +351,13 @@ function PersonDetail({ p, buckets }: { p: PersonStats; buckets: Bucket[] }) {
           <TabsTrigger value="done">Đã xong ({done.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="open">
-          <TaskRows tasks={p.open} />
+          <TaskRows tasks={p.open} onOpenTask={onOpenTask} />
         </TabsContent>
         <TabsContent value="overdue">
-          <TaskRows tasks={p.overdue} />
+          <TaskRows tasks={p.overdue} onOpenTask={onOpenTask} />
         </TabsContent>
         <TabsContent value="done">
-          <TaskRows tasks={done} />
+          <TaskRows tasks={done} onOpenTask={onOpenTask} />
         </TabsContent>
       </Tabs>
     </div>
@@ -369,11 +382,13 @@ export function OnTimeBadge({ onTime }: { onTime: boolean }) {
 export function TaskRows({
   tasks,
   onSelect,
+  onOpenTask,
   nameOf,
   meta,
 }: {
   tasks: Task[];
   onSelect?: (t: Task) => void;
+  onOpenTask?: (t: Task) => void;
   nameOf?: (id: string | null) => string;
   meta?: (t: Task) => ReactNode;
 }) {
@@ -455,9 +470,9 @@ export function TaskRows({
                 {content}
               </button>
             ) : (
-              <Link href={`/tasks?task=${t.id}`} className={rowClass}>
+              <TaskLink task={t} onOpenTask={onOpenTask} className={rowClass}>
                 {content}
-              </Link>
+              </TaskLink>
             )}
           </li>
         );

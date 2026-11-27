@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -43,6 +42,7 @@ import {
   PersonHoverCard,
   statusSegments,
 } from "@/modules/dashboard/person";
+import { TaskLink } from "@/modules/dashboard/task-link";
 import {
   DEPARTMENTS,
   TASK_STATUS_META,
@@ -174,6 +174,7 @@ export function OverviewView({
   onOpenPerson,
   onShowPeople,
   onOpenMetric,
+  onOpenTask,
 }: {
   scope: Scope;
   people: PersonStats[];
@@ -182,6 +183,7 @@ export function OverviewView({
   onOpenPerson: (id: string) => void;
   onShowPeople: () => void;
   onOpenMetric?: (key: MetricKey) => void;
+  onOpenTask?: (t: Task) => void;
 }) {
   const prevLabel = PREV_LABEL[mode];
   const { rows, completed, open, overdue, series, buckets } = scope;
@@ -467,6 +469,7 @@ export function OverviewView({
                   nameOf={nameOf}
                   tone="text-red-600"
                   empty="Không có việc quá hạn 🎉"
+                  onOpenTask={onOpenTask}
                 />
               </TabsContent>
               <TabsContent value="soon">
@@ -475,6 +478,7 @@ export function OverviewView({
                   nameOf={nameOf}
                   tone="text-amber-600"
                   empty="Không có việc sắp đến hạn."
+                  onOpenTask={onOpenTask}
                 />
               </TabsContent>
             </Tabs>
@@ -490,11 +494,13 @@ function AttentionList({
   nameOf,
   tone,
   empty,
+  onOpenTask,
 }: {
   tasks: Task[];
   nameOf: (id: string | null) => string;
   tone: string;
   empty: string;
+  onOpenTask?: (t: Task) => void;
 }) {
   if (tasks.length === 0)
     return (
@@ -504,8 +510,9 @@ function AttentionList({
     <ul className="max-h-[272px] divide-y overflow-y-auto">
       {tasks.map((t) => (
         <li key={t.id}>
-          <Link
-            href={`/tasks?task=${t.id}`}
+          <TaskLink
+            task={t}
+            onOpenTask={onOpenTask}
             className="flex items-center gap-3 rounded-md px-1 py-2 text-sm transition-colors hover:bg-muted/50"
           >
             <div className="min-w-0 flex-1">
@@ -518,7 +525,7 @@ function AttentionList({
             <span className={cn("shrink-0 text-xs font-medium", tone)}>
               {dueLabel(t.due_date).text}
             </span>
-          </Link>
+          </TaskLink>
         </li>
       ))}
     </ul>

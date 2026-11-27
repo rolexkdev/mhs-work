@@ -64,6 +64,19 @@ export function groupByStatus(
   return groups;
 }
 
+/** Returns true for an unmodified primary-button click (lets Ctrl/Cmd/Shift/middle click navigate natively). */
+export function isPlainClick(e: {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): boolean {
+  return (
+    e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
+  );
+}
+
 /** Filters completed tasks by on-time/late type and/or chart bucket index without mutating input. */
 export function filterCompleted(
   tasks: Task[],
