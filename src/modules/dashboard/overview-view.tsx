@@ -251,6 +251,7 @@ export function OverviewView({
           }
           prevLabel={prevLabel}
           sub={`${lateN} việc xong trễ hạn`}
+          onClick={onOpenMetric ? () => onOpenMetric("onTimeRate") : undefined}
         >
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div

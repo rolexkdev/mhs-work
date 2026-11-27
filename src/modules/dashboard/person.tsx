@@ -351,6 +351,21 @@ function PersonDetail({ p, buckets }: { p: PersonStats; buckets: Bucket[] }) {
   );
 }
 
+export function OnTimeBadge({ onTime }: { onTime: boolean }) {
+  return (
+    <span
+      className={cn(
+        "inline-block rounded-full px-1.5 py-px text-[10px] font-medium",
+        onTime
+          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"
+          : "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400",
+      )}
+    >
+      {onTime ? "✓ Đúng hạn" : "⏱ Trễ hạn"}
+    </span>
+  );
+}
+
 export function TaskRows({
   tasks,
   onSelect,

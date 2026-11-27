@@ -21,7 +21,11 @@ import {
   type PersonStats,
   type Scope,
 } from "@/modules/dashboard/metrics";
-import { PersonAvatar, PersonHoverCard } from "@/modules/dashboard/person";
+import {
+  OnTimeBadge,
+  PersonAvatar,
+  PersonHoverCard,
+} from "@/modules/dashboard/person";
 import type { Task } from "@/types/database";
 
 const PAGE = 20;
@@ -399,16 +403,7 @@ export function CompletedView({
                             <p className="text-xs tabular-nums">
                               {formatDate(at.toISOString())}
                             </p>
-                            <span
-                              className={cn(
-                                "inline-block rounded-full px-1.5 py-px text-[10px] font-medium",
-                                onTime
-                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"
-                                  : "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400",
-                              )}
-                            >
-                              {onTime ? "✓ Đúng hạn" : "⏱ Trễ hạn"}
-                            </span>
+                            <OnTimeBadge onTime={onTime} />
                           </div>
                         </Link>
                       </li>

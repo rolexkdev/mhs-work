@@ -184,6 +184,7 @@ export default function DashboardPage() {
         metric={openMetric}
         scope={scope}
         periodLabel={periodLabel(period)}
+        periodMode={period.mode}
         department={dept === ALL ? null : dept}
         nameOf={nameOf}
         onSelect={(t) => {
