@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Sheet,
   SheetContent,
@@ -12,11 +12,14 @@ import { dueLabel, formatDate } from "@/lib/format";
 import type { PeriodMode } from "@/lib/period";
 import { ThroughputChart } from "@/modules/dashboard/charts";
 import {
+  filterCompleted,
   groupByStatus,
   metricTasks,
   type MetricKey,
+  type RateTypeFilter,
 } from "@/modules/dashboard/drilldown";
 import {
+  SERIES,
   completedDate,
   isOnTime,
   isOverdue,
@@ -100,9 +103,35 @@ export function MetricSheetBody({
   nameOf: (id: string | null) => string;
   onSelect?: (t: Task) => void;
 }) {
+  const [rateType, setRateType] = useState<RateTypeFilter>(null);
+  const [selectedBucket, setSelectedBucket] = useState<number | null>(null);
+
   const tasks = metricTasks(scope, metric);
   const title = METRIC_TITLE[metric];
   const meta = rowMeta(metric);
+
+  const activeBucket =
+    selectedBucket !== null && selectedBucket < scope.buckets.length
+      ? selectedBucket
+      : null;
+
+  const isRate = metric === "onTimeRate";
+  const onTimeCount = isRate ? tasks.filter(isOnTime).length : 0;
+  const lateCount = isRate ? tasks.length - onTimeCount : 0;
+  const rateTasks = isRate
+    ? filterCompleted(tasks, scope.buckets, {
+        type: rateType,
+        bucket: activeBucket,
+      })
+    : tasks;
+
+  const rateFilterParts = [
+    rateType === "onTime" ? "Đúng hạn" : rateType === "late" ? "Trễ hạn" : null,
+    activeBucket !== null ? scope.buckets[activeBucket]?.label : null,
+  ].filter(Boolean);
+  const rateHeading = rateFilterParts.length
+    ? `${rateFilterParts.join(" · ")} (${rateTasks.length})`
+    : `Tất cả việc hoàn thành (${rateTasks.length})`;
 
   return (
     <div className="space-y-5 p-5 sm:p-6">
@@ -116,12 +145,52 @@ export function MetricSheetBody({
         </SheetDescription>
       </div>
 
-      {metric === "onTimeRate" && tasks.length > 0 && (
-        <div className="space-y-2">
+      {isRate && tasks.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={rateType === "onTime"}
+              onClick={() =>
+                setRateType((v) => (v === "onTime" ? null : "onTime"))
+              }
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted",
+                rateType === "onTime"
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"
+                  : "text-muted-foreground",
+              )}
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-sm"
+                style={{ backgroundColor: SERIES.onTime }}
+              />
+              Đúng hạn ({onTimeCount})
+            </button>
+            <button
+              type="button"
+              aria-pressed={rateType === "late"}
+              onClick={() => setRateType((v) => (v === "late" ? null : "late"))}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted",
+                rateType === "late"
+                  ? "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400"
+                  : "text-muted-foreground",
+              )}
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-sm"
+                style={{ backgroundColor: SERIES.late }}
+              />
+              Trễ hạn ({lateCount})
+            </button>
+          </div>
           <ThroughputChart
             series={scope.series}
             showCreated={false}
             height={170}
+            selected={activeBucket}
+            onSelect={setSelectedBucket}
           />
           {periodMode === "all" && (
             <p className="text-[11px] text-muted-foreground">
@@ -154,6 +223,18 @@ export function MetricSheetBody({
               />
             </section>
           ))}
+        </div>
+      ) : isRate && tasks.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            {rateHeading}
+          </p>
+          <TaskRows
+            tasks={rateTasks}
+            nameOf={nameOf}
+            onSelect={onSelect}
+            meta={meta}
+          />
         </div>
       ) : (
         <TaskRows

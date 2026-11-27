@@ -1,4 +1,10 @@
-import { completedDate, type Scope } from "@/modules/dashboard/metrics";
+import {
+  bucketIndex,
+  completedDate,
+  isOnTime,
+  type Bucket,
+  type Scope,
+} from "@/modules/dashboard/metrics";
 import { TASK_STATUS_ORDER } from "@/modules/tasks/constants";
 import type { Task, TaskStatus } from "@/types/database";
 
@@ -8,6 +14,8 @@ export type MetricKey =
   | "created"
   | "open"
   | "overdue";
+
+export type RateTypeFilter = "onTime" | "late" | null;
 
 function compareDueAsc(a: Task, b: Task): number {
   if (a.due_date && b.due_date) {
@@ -54,4 +62,21 @@ export function groupByStatus(
     if (list && list.length > 0) groups.push({ status, tasks: list });
   }
   return groups;
+}
+
+/** Filters completed tasks by on-time/late type and/or chart bucket index without mutating input. */
+export function filterCompleted(
+  tasks: Task[],
+  buckets: Bucket[],
+  filter: { type: RateTypeFilter; bucket: number | null },
+): Task[] {
+  return tasks.filter((t) => {
+    if (filter.type === "onTime" && !isOnTime(t)) return false;
+    if (filter.type === "late" && isOnTime(t)) return false;
+    if (filter.bucket !== null) {
+      const done = completedDate(t);
+      if (!done || bucketIndex(done, buckets) !== filter.bucket) return false;
+    }
+    return true;
+  });
 }
