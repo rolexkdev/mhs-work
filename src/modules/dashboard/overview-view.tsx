@@ -27,7 +27,7 @@ import {
   type DeptRow,
   type DonutSegment,
 } from "@/modules/dashboard/charts";
-import type { MetricKey } from "@/modules/dashboard/drilldown";
+import type { MetricKey, WidgetDrilldown } from "@/modules/dashboard/drilldown";
 import {
   SERIES,
   STATUS_COLOR,
@@ -48,7 +48,7 @@ import {
   TASK_STATUS_META,
   TASK_STATUS_ORDER,
 } from "@/modules/tasks/constants";
-import type { Task } from "@/types/database";
+import type { Task, TaskStatus } from "@/types/database";
 
 export const PREV_LABEL: Record<PeriodMode, string> = {
   week: "tuần trước",
@@ -174,6 +174,7 @@ export function OverviewView({
   onOpenPerson,
   onShowPeople,
   onOpenMetric,
+  onOpenWidget,
   onOpenTask,
 }: {
   scope: Scope;
@@ -183,6 +184,7 @@ export function OverviewView({
   onOpenPerson: (id: string) => void;
   onShowPeople: () => void;
   onOpenMetric?: (key: MetricKey) => void;
+  onOpenWidget?: (w: WidgetDrilldown) => void;
   onOpenTask?: (t: Task) => void;
 }) {
   const prevLabel = PREV_LABEL[mode];
@@ -200,6 +202,7 @@ export function OverviewView({
     .map((key) => {
       const list = rows.filter((r) => (r.department ?? null) === key);
       return {
+        key,
         label: key ?? "Chưa phân phòng",
         total: list.length,
         done: list.filter((r) => r.status === "done").length,
@@ -370,7 +373,19 @@ export function OverviewView({
                 Rê vào từng phần để xem chi tiết
               </p>
             </div>
-            <StatusDonut segments={segments} total={rows.length} />
+            <StatusDonut
+              segments={segments}
+              total={rows.length}
+              onSelect={
+                onOpenWidget
+                  ? (k) =>
+                      onOpenWidget({
+                        kind: "status",
+                        status: k as TaskStatus,
+                      })
+                  : undefined
+              }
+            />
           </CardContent>
         </Card>
       </div>
@@ -442,7 +457,15 @@ export function OverviewView({
         <Card>
           <CardContent className="space-y-3 p-5">
             <p className="font-medium">Tiến độ theo phòng</p>
-            <DeptProgressBars rows={deptRows} />
+            <DeptProgressBars
+              rows={deptRows}
+              onSelect={
+                onOpenWidget
+                  ? (department) =>
+                      onOpenWidget({ kind: "department", department })
+                  : undefined
+              }
+            />
           </CardContent>
         </Card>
 

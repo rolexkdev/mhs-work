@@ -17,6 +17,10 @@ export type MetricKey =
 
 export type RateTypeFilter = "onTime" | "late" | null;
 
+export type WidgetDrilldown =
+  | { kind: "status"; status: TaskStatus }
+  | { kind: "department"; department: string | null };
+
 function compareDueAsc(a: Task, b: Task): number {
   if (a.due_date && b.due_date) {
     return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
@@ -24,6 +28,33 @@ function compareDueAsc(a: Task, b: Task): number {
   if (a.due_date) return -1;
   if (b.due_date) return 1;
   return 0;
+}
+
+function compareCompletedDesc(a: Task, b: Task): number {
+  return completedDate(b)!.getTime() - completedDate(a)!.getTime();
+}
+
+/** Returns tasks in scope.rows matching a status, ordered per spec without mutating scope. */
+export function statusTasks(scope: Scope, status: TaskStatus): Task[] {
+  const list = scope.rows.filter((t) => t.status === status);
+  return status === "done"
+    ? list.sort(compareCompletedDesc)
+    : list.sort(compareDueAsc);
+}
+
+/** Returns tasks in scope.rows matching a department (null = unassigned), ordered per status. */
+export function departmentTasks(
+  scope: Scope,
+  department: string | null,
+): Task[] {
+  return scope.rows
+    .filter((t) => (t.department ?? null) === department)
+    .sort((a, b) => {
+      if (a.status === "done" && b.status === "done") {
+        return compareCompletedDesc(a, b);
+      }
+      return compareDueAsc(a, b);
+    });
 }
 
 /** Returns the tasks backing a dashboard stat tile, ordered per spec, without mutating scope. */
