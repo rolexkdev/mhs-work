@@ -14,8 +14,10 @@ import {
 import { PeriodPicker } from "@/components/period-picker";
 import { type Period, periodLabel } from "@/lib/period";
 import { useTasks } from "@/modules/tasks/hooks";
+import { useMeetings } from "@/modules/meetings/hooks";
 import { useProfiles } from "@/modules/auth/use-profiles";
 import { TASK_DEPARTMENTS } from "@/modules/tasks/constants";
+import { TaskDetailPanel } from "@/modules/tasks/components/task-detail-panel";
 import {
   UNASSIGNED,
   computeScope,
@@ -25,6 +27,8 @@ import { OverviewView } from "@/modules/dashboard/overview-view";
 import { PeopleView } from "@/modules/dashboard/people-view";
 import { CompletedView } from "@/modules/dashboard/completed-view";
 import { PersonSheet } from "@/modules/dashboard/person";
+import { MetricSheet } from "@/modules/dashboard/metric-sheet";
+import type { MetricKey } from "@/modules/dashboard/drilldown";
 
 type View = "overview" | "people" | "completed";
 const VIEWS: { value: View; label: string; icon: typeof Users }[] = [
@@ -44,8 +48,12 @@ export default function DashboardPage() {
   const [dept, setDept] = useState<string>(ALL);
   const [view, setView] = useState<View>("overview");
   const [openPerson, setOpenPerson] = useState<string | null>(null);
+  const [openMetric, setOpenMetric] = useState<MetricKey | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const { data: allTasks = [], isLoading } = useTasks();
   const { data: profiles = [] } = useProfiles();
+  const { data: meetings = [] } = useMeetings();
 
   // Nhớ tab xem lần trước — sếp hay mở lại đúng tab quen dùng.
   useEffect(() => {
@@ -145,6 +153,7 @@ export default function DashboardPage() {
               nameOf={nameOf}
               onOpenPerson={setOpenPerson}
               onShowPeople={() => changeView("people")}
+              onOpenMetric={setOpenMetric}
             />
           ) : view === "people" ? (
             <PeopleView
@@ -171,6 +180,29 @@ export default function DashboardPage() {
         buckets={scope.buckets}
         onClose={() => setOpenPerson(null)}
       />
+      <MetricSheet
+        metric={openMetric}
+        scope={scope}
+        periodLabel={periodLabel(period)}
+        periodMode={period.mode}
+        department={dept === ALL ? null : dept}
+        nameOf={nameOf}
+        onSelect={(t) => {
+          setDetailId(t.id);
+          setDetailOpen(true);
+        }}
+        onClose={() => {
+          setOpenMetric(null);
+          setDetailOpen(false);
+        }}
+      >
+        <TaskDetailPanel
+          taskId={detailId}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          meetings={meetings}
+        />
+      </MetricSheet>
     </div>
   );
 }

@@ -276,10 +276,14 @@ export function ThroughputChart({
   series,
   showCreated = true,
   height = 220,
+  selected = null,
+  onSelect,
 }: {
   series: SeriesPoint[];
   showCreated?: boolean;
   height?: number;
+  selected?: number | null;
+  onSelect?: (index: number | null) => void;
 }) {
   const tip = useTooltip();
   const n = series.length;
@@ -332,13 +336,40 @@ export function ThroughputChart({
               const done = s.onTime + s.late;
               const key = String(i);
               const active = tip.active === key;
+              const isSelected = !!onSelect && selected === i;
+              const selectable = !!onSelect && (done > 0 || isSelected);
+              const dimmed =
+                !!onSelect &&
+                selected !== null &&
+                selected !== undefined &&
+                !isSelected;
               return (
                 <div
                   key={i}
                   tabIndex={0}
+                  role={selectable ? "button" : undefined}
+                  aria-pressed={selectable ? isSelected : undefined}
+                  aria-label={selectable ? s.bucket.label : undefined}
+                  onClick={
+                    selectable
+                      ? () => onSelect(isSelected ? null : i)
+                      : undefined
+                  }
+                  onKeyDown={
+                    selectable
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onSelect(isSelected ? null : i);
+                          }
+                        }
+                      : undefined
+                  }
                   className={cn(
-                    "relative flex h-full flex-1 cursor-default items-end justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                    active && "bg-muted/70",
+                    "relative flex h-full flex-1 items-end justify-center rounded-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                    selectable ? "cursor-pointer" : "cursor-default",
+                    active && !isSelected && "bg-muted/70",
+                    isSelected && "bg-primary/10 ring-2 ring-primary",
                   )}
                   {...tip.bind(
                     key,
@@ -369,7 +400,10 @@ export function ThroughputChart({
                   )}
                 >
                   <div
-                    className="flex w-[58%] max-w-[30px] flex-col-reverse gap-[2px] transition-all duration-500"
+                    className={cn(
+                      "flex w-[58%] max-w-[30px] flex-col-reverse gap-[2px] transition-all duration-500",
+                      dimmed && "opacity-35",
+                    )}
                     style={{ height: `${(done / max) * 100}%` }}
                   >
                     {s.onTime > 0 && (
