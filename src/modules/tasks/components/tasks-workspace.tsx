@@ -233,7 +233,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const {
     data: categories = [],
     isLoading: categoriesLoading,
-    isError: categoriesError,
+    isLoadingError: categoriesError,
     refetch: refetchCategories,
   } = useTaskCategories();
   const canManageCategories = useCanManageCategories();
@@ -387,6 +387,10 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
 
   const statSheetOpen =
     scope === "overview" && !categoriesError && openStat !== null;
+
+  useEffect(() => {
+    if (scope !== "overview" || categoriesError) setOpenStat(null);
+  }, [scope, categoriesError]);
 
   const detailPanel = (
     <TaskDetailPanel
@@ -604,13 +608,13 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
         />
       )}
 
-      {isLoading || (scope === "overview" && categoriesLoading) ? (
+      {isLoading || (scope !== "all" && categoriesLoading) ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-11 w-full" />
           ))}
         </div>
-      ) : scope === "overview" && categoriesError ? (
+      ) : scope !== "all" && categoriesError ? (
         <div className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 py-12 text-center">
           <p className="text-sm text-destructive">
             Không thể tải danh sách hạng mục. Vui lòng thử lại.
