@@ -197,124 +197,128 @@ begin
   end;
 end $$;
 
--- ---------- seed: initial categories ----------
-insert into public.task_categories (department, name, sort_order, created_by)
-select v.department, v.name, v.sort_order, null
-from (values
-  ('Cây xanh', 'Bảo dưỡng cây xanh', 1),
-  ('Cây xanh', 'Thi công, cải tạo cảnh quan', 2),
-  ('Cây xanh', 'Hồ sơ, dữ liệu cây xanh', 3),
-  ('Cây xanh', 'Hợp đồng, nhà thầu, nhà cung cấp', 4),
-  ('Cây xanh', 'Thanh lý, xử lý cây xanh', 5),
-  ('Cây xanh', 'Kiểm tra, xử lý phát sinh hiện trường', 6),
-  ('Hạ tầng', 'Thi công, xây lắp mới', 1),
-  ('Hạ tầng', 'Mua sắm, trang bị', 2),
-  ('Hạ tầng', 'Cấp nước, đường ống', 3),
-  ('Hạ tầng', 'Hồ sơ pháp lý, nghiệm thu', 4),
-  ('Môi trường', 'Pháp lý môi trường và quy định quản lý', 1),
-  ('Môi trường', 'Quản lý nước thải doanh nghiệp', 2),
-  ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 3),
-  ('Môi trường', 'Vận hành nhà máy xử lý nước thải', 4),
-  ('NM Cấp nước', 'Chất lượng nước, kiểm định', 1),
-  ('NM Cấp nước', 'Vận hành, xử lý', 2),
-  ('NM Cấp nước', 'Đầu tư, nguồn nước', 3),
-  ('Hành chính', 'Quy chế, quy định nội bộ', 1),
-  ('Hành chính', 'Mua sắm, trang bị', 2),
-  ('PCCC', 'Mua sắm, trang bị', 1),
-  ('PCCC', 'Nhân sự, đào tạo', 2),
-  ('IT', 'Phát triển phần mềm nội bộ', 1),
-  ('IT', 'Mua sắm, trang bị', 2),
-  ('IT', 'Hạ tầng, dịch vụ', 3)
-) as v (department, name, sort_order)
-on conflict (department, lower(btrim(name))) do nothing;
+-- ---------- seed (first run only) ----------
+-- Guarded so rerunning this migration never restores renamed/deleted
+-- categories, overwrites leaders' color choices, or relinks tasks.
+do $$
+begin
+  if not exists (select 1 from public.task_categories) then
+    -- Initial categories
+    insert into public.task_categories (department, name, sort_order, created_by)
+    select v.department, v.name, v.sort_order, null
+    from (values
+      ('Cây xanh', 'Bảo dưỡng cây xanh', 1),
+      ('Cây xanh', 'Thi công, cải tạo cảnh quan', 2),
+      ('Cây xanh', 'Hồ sơ, dữ liệu cây xanh', 3),
+      ('Cây xanh', 'Hợp đồng, nhà thầu, nhà cung cấp', 4),
+      ('Cây xanh', 'Thanh lý, xử lý cây xanh', 5),
+      ('Cây xanh', 'Kiểm tra, xử lý phát sinh hiện trường', 6),
+      ('Hạ tầng', 'Thi công, xây lắp mới', 1),
+      ('Hạ tầng', 'Mua sắm, trang bị', 2),
+      ('Hạ tầng', 'Cấp nước, đường ống', 3),
+      ('Hạ tầng', 'Hồ sơ pháp lý, nghiệm thu', 4),
+      ('Môi trường', 'Pháp lý môi trường và quy định quản lý', 1),
+      ('Môi trường', 'Quản lý nước thải doanh nghiệp', 2),
+      ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 3),
+      ('Môi trường', 'Vận hành nhà máy xử lý nước thải', 4),
+      ('NM Cấp nước', 'Chất lượng nước, kiểm định', 1),
+      ('NM Cấp nước', 'Vận hành, xử lý', 2),
+      ('NM Cấp nước', 'Đầu tư, nguồn nước', 3),
+      ('Hành chính', 'Quy chế, quy định nội bộ', 1),
+      ('Hành chính', 'Mua sắm, trang bị', 2),
+      ('PCCC', 'Mua sắm, trang bị', 1),
+      ('PCCC', 'Nhân sự, đào tạo', 2),
+      ('IT', 'Phát triển phần mềm nội bộ', 1),
+      ('IT', 'Mua sắm, trang bị', 2),
+      ('IT', 'Hạ tầng, dịch vụ', 3)
+    ) as v (department, name, sort_order)
+    on conflict (department, lower(btrim(name))) do nothing;
 
--- ---------- colors ----------
--- Categories without a color get one of the palette in sort order, so the
--- categories of a department start out distinct. Same order as
--- CATEGORY_PALETTE in src/modules/tasks/constants.ts.
-with ranked as (
-  select id,
-         row_number() over (partition by department order by sort_order, name) as rn
-  from public.task_categories
-  where color is null
-)
-update public.task_categories c
-set color = (array['blue','orange','purple','green','pink','teal',
-                   'yellow','sky','brown','red'])[((r.rn - 1) % 10) + 1]
-from ranked r
-where r.id = c.id;
+    -- Assign distinct colors per department in sort order.
+    -- Same order as CATEGORY_PALETTE in src/modules/tasks/constants.ts.
+    with ranked as (
+      select id,
+             row_number() over (partition by department order by sort_order, name) as rn
+      from public.task_categories
+    )
+    update public.task_categories c
+    set color = (array['blue','orange','purple','green','pink','teal',
+                       'yellow','sky','brown','red'])[((r.rn - 1) % 10) + 1]
+    from ranked r
+    where r.id = c.id;
 
+    -- Link existing tasks by title (only active, uncategorised, same department).
+    update public.tasks t
+    set category_id = c.id
+    from (values
+      ('Cây xanh', 'Bảo dưỡng cây xanh', 'Bảo dưỡng cây xanh KCN'),
+      ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Hợp đồng mua cây, thi công trồng cây Sơn Liễu'),
+      ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Hợp đồng mua cây, thi công trồng Hoa trang'),
+      ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Hợp đồng thi công trồng cây sao KCN'),
+      ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Đánh chuyển Cây Sao'),
+      ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Đánh chuyển Cây Sao (đã hoàn thành)'),
+      ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Khảo sát, mua vật tư, thi công hệ thống tưới tự động'),
+      ('Cây xanh', 'Hợp đồng, nhà thầu, nhà cung cấp', 'Mua xe cắt cỏ KCN'),
+      ('Cây xanh', 'Thanh lý, xử lý cây xanh', 'Thanh lý gỗ cây Sao'),
+      ('Cây xanh', 'Kiểm tra, xử lý phát sinh hiện trường', 'Cày cỏ dại PCCC Nhà máy Nguyễn Vũ'),
+      ('Hạ tầng', 'Thi công, xây lắp mới', 'Thi công trạm BTS (SL:06)'),
+      ('Hạ tầng', 'Thi công, xây lắp mới', 'Bổ sung hệ thống biển báo và cảnh báo'),
+      ('Hạ tầng', 'Mua sắm, trang bị', 'Mua vật tư nước (D400, D630, D710)'),
+      ('Hạ tầng', 'Cấp nước, đường ống', 'Tuyến ống 630'),
+      ('Hạ tầng', 'Hồ sơ pháp lý, nghiệm thu', 'GPXD Kho bùn/rác'),
+      ('Hạ tầng', 'Hồ sơ pháp lý, nghiệm thu', 'Hồ sơ Nghiệm thu hệ thống PCCC KCN'),
+      ('Môi trường', 'Pháp lý môi trường và quy định quản lý', 'GPMT KCN điều chỉnh với Thuận Phước'),
+      ('Môi trường', 'Pháp lý môi trường và quy định quản lý', 'Quy định về thu hồi lưu lượng xả thải'),
+      ('Môi trường', 'Quản lý nước thải doanh nghiệp', 'Rà soát, xử lý nước mưa xâm nhập'),
+      ('Môi trường', 'Quản lý nước thải doanh nghiệp', 'Làm việc với All Seven về tăng lưu lượng tiếp nhận, giảm Clorua'),
+      ('Môi trường', 'Quản lý nước thải doanh nghiệp', 'Phối hợp, giám sát hệ thống QTTD nước thải của doanh nghiệp: Chenkai, Tân Phong'),
+      ('Môi trường', 'Quản lý nước thải doanh nghiệp', 'Hệ thống QTTD nước thải Youde'),
+      ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 'Kiểm định hiệu chuẩn trạm QTTD'),
+      ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 'Thay thế thiết bị quan trắc tự động (hệ kim loại)'),
+      ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 'Sửa chữa thiết bị đo Amoni'),
+      ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 'Truyền dữ liệu Scada và kích lấy mẫu từ xa'),
+      ('Môi trường', 'Vận hành nhà máy xử lý nước thải', 'Máy phát điện trạm bơm nhà máy XLNT'),
+      ('Môi trường', 'Vận hành nhà máy xử lý nước thải', 'Phân định bùn lần 2/2026'),
+      ('Môi trường', 'Vận hành nhà máy xử lý nước thải', 'Hạ cao độ ống thoát hồ hoàn thiện'),
+      ('NM Cấp nước', 'Chất lượng nước, kiểm định', 'Nội kiểm nước sinh hoạt, tờ trình, hợp đồng'),
+      ('NM Cấp nước', 'Vận hành, xử lý', 'Xả cặn, xả khí'),
+      ('NM Cấp nước', 'Đầu tư, nguồn nước', 'Hệ thống quan trắc tự động cho giếng nước NMNC'),
+      ('NM Cấp nước', 'Đầu tư, nguồn nước', 'Tờ trình phương án khoan giếng'),
+      ('Hành chính', 'Quy chế, quy định nội bộ', 'Checklist nội dung ủy quyền'),
+      ('Hành chính', 'Quy chế, quy định nội bộ', 'Quy chế chế độ làm việc, trực (lễ, Tết), nghỉ bù và trực Hotline'),
+      ('Hành chính', 'Quy chế, quy định nội bộ', 'Ban hành và công bố Nội quy quản lý nội khu (giao thông)'),
+      ('Hành chính', 'Mua sắm, trang bị', 'Đồ bảo hộ cho nhân viên Ban QLKCN'),
+      ('PCCC', 'Mua sắm, trang bị', 'Theo dõi 02 xe PCCC theo hợp đồng mua bán xe'),
+      ('PCCC', 'Nhân sự, đào tạo', 'Lái xe PCCC & xe cẩu: rà soát nhân sự nội bộ có bằng B2, C'),
+      ('IT', 'Phát triển phần mềm nội bộ', 'Tờ trình SikicoAtlas'),
+      ('IT', 'Phát triển phần mềm nội bộ', 'Phát triển tính năng quản lý quy trình gửi hồ sơ trên website nội bộ'),
+      ('IT', 'Phát triển phần mềm nội bộ', 'Tính năng thông báo trên trang báo cáo công việc'),
+      ('IT', 'Phát triển phần mềm nội bộ', 'Tính năng theo dõi hoạt động của tài khoản'),
+      ('IT', 'Phát triển phần mềm nội bộ', 'Nghiên cứu mở rộng bộ nhớ lưu trữ file'),
+      ('IT', 'Mua sắm, trang bị', 'Mua 2 màn hình máy tính'),
+      ('IT', 'Mua sắm, trang bị', 'Mua bộ PC cho nhân viên IT mới'),
+      ('IT', 'Mua sắm, trang bị', 'Mua CPU để kết nối TV phòng họp'),
+      ('IT', 'Mua sắm, trang bị', 'Tìm hiểu màn hình cảm ứng phòng họp'),
+      ('IT', 'Hạ tầng, dịch vụ', 'Gia hạn gói internet cho ban quản lý'),
+      ('IT', 'Hạ tầng, dịch vụ', 'Đề xuất gia hạn hợp đồng thuê máy photocopy')
+    ) as v (department, category, title)
+    join public.task_categories c
+      on c.department = v.department
+     and lower(btrim(c.name)) = lower(btrim(v.category))
+    where t.department = v.department
+      and lower(btrim(t.title)) = lower(btrim(v.title))
+      and t.category_id is null
+      and t.deleted_at is null;
+  end if;
+end $$;
+
+-- ---------- color constraints ----------
 alter table public.task_categories alter column color set default 'blue';
 alter table public.task_categories alter column color set not null;
 alter table public.task_categories drop constraint if exists task_categories_color_check;
 alter table public.task_categories add constraint task_categories_color_check
 check (color in ('gray','blue','green','orange','red','crimson','purple',
                  'brown','pink','sky','yellow','teal'));
-
--- ---------- seed: link existing tasks by title ----------
--- Only tasks still uncategorised, active, in the same department and with
--- the same title (case and surrounding spaces ignored).
-update public.tasks t
-set category_id = c.id
-from (values
-  ('Cây xanh', 'Bảo dưỡng cây xanh', 'Bảo dưỡng cây xanh KCN'),
-  ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Hợp đồng mua cây, thi công trồng cây Sơn Liễu'),
-  ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Hợp đồng mua cây, thi công trồng Hoa trang'),
-  ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Hợp đồng thi công trồng cây sao KCN'),
-  ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Đánh chuyển Cây Sao'),
-  ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Đánh chuyển Cây Sao (đã hoàn thành)'),
-  ('Cây xanh', 'Thi công, cải tạo cảnh quan', 'Khảo sát, mua vật tư, thi công hệ thống tưới tự động'),
-  ('Cây xanh', 'Hợp đồng, nhà thầu, nhà cung cấp', 'Mua xe cắt cỏ KCN'),
-  ('Cây xanh', 'Thanh lý, xử lý cây xanh', 'Thanh lý gỗ cây Sao'),
-  ('Cây xanh', 'Kiểm tra, xử lý phát sinh hiện trường', 'Cày cỏ dại PCCC Nhà máy Nguyễn Vũ'),
-  ('Hạ tầng', 'Thi công, xây lắp mới', 'Thi công trạm BTS (SL:06)'),
-  ('Hạ tầng', 'Thi công, xây lắp mới', 'Bổ sung hệ thống biển báo và cảnh báo'),
-  ('Hạ tầng', 'Mua sắm, trang bị', 'Mua vật tư nước (D400, D630, D710)'),
-  ('Hạ tầng', 'Cấp nước, đường ống', 'Tuyến ống 630'),
-  ('Hạ tầng', 'Hồ sơ pháp lý, nghiệm thu', 'GPXD Kho bùn/rác'),
-  ('Hạ tầng', 'Hồ sơ pháp lý, nghiệm thu', 'Hồ sơ Nghiệm thu hệ thống PCCC KCN'),
-  ('Môi trường', 'Pháp lý môi trường và quy định quản lý', 'GPMT KCN điều chỉnh với Thuận Phước'),
-  ('Môi trường', 'Pháp lý môi trường và quy định quản lý', 'Quy định về thu hồi lưu lượng xả thải'),
-  ('Môi trường', 'Quản lý nước thải doanh nghiệp', 'Rà soát, xử lý nước mưa xâm nhập'),
-  ('Môi trường', 'Quản lý nước thải doanh nghiệp', 'Làm việc với All Seven về tăng lưu lượng tiếp nhận, giảm Clorua'),
-  ('Môi trường', 'Quản lý nước thải doanh nghiệp', 'Phối hợp, giám sát hệ thống QTTD nước thải của doanh nghiệp: Chenkai, Tân Phong'),
-  ('Môi trường', 'Quản lý nước thải doanh nghiệp', 'Hệ thống QTTD nước thải Youde'),
-  ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 'Kiểm định hiệu chuẩn trạm QTTD'),
-  ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 'Thay thế thiết bị quan trắc tự động (hệ kim loại)'),
-  ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 'Sửa chữa thiết bị đo Amoni'),
-  ('Môi trường', 'Quản lý hệ thống quan trắc tự động NMXLNT', 'Truyền dữ liệu Scada và kích lấy mẫu từ xa'),
-  ('Môi trường', 'Vận hành nhà máy xử lý nước thải', 'Máy phát điện trạm bơm nhà máy XLNT'),
-  ('Môi trường', 'Vận hành nhà máy xử lý nước thải', 'Phân định bùn lần 2/2026'),
-  ('Môi trường', 'Vận hành nhà máy xử lý nước thải', 'Hạ cao độ ống thoát hồ hoàn thiện'),
-  ('NM Cấp nước', 'Chất lượng nước, kiểm định', 'Nội kiểm nước sinh hoạt, tờ trình, hợp đồng'),
-  ('NM Cấp nước', 'Vận hành, xử lý', 'Xả cặn, xả khí'),
-  ('NM Cấp nước', 'Đầu tư, nguồn nước', 'Hệ thống quan trắc tự động cho giếng nước NMNC'),
-  ('NM Cấp nước', 'Đầu tư, nguồn nước', 'Tờ trình phương án khoan giếng'),
-  ('Hành chính', 'Quy chế, quy định nội bộ', 'Checklist nội dung ủy quyền'),
-  ('Hành chính', 'Quy chế, quy định nội bộ', 'Quy chế chế độ làm việc, trực (lễ, Tết), nghỉ bù và trực Hotline'),
-  ('Hành chính', 'Quy chế, quy định nội bộ', 'Ban hành và công bố Nội quy quản lý nội khu (giao thông)'),
-  ('Hành chính', 'Mua sắm, trang bị', 'Đồ bảo hộ cho nhân viên Ban QLKCN'),
-  ('PCCC', 'Mua sắm, trang bị', 'Theo dõi 02 xe PCCC theo hợp đồng mua bán xe'),
-  ('PCCC', 'Nhân sự, đào tạo', 'Lái xe PCCC & xe cẩu: rà soát nhân sự nội bộ có bằng B2, C'),
-  ('IT', 'Phát triển phần mềm nội bộ', 'Tờ trình SikicoAtlas'),
-  ('IT', 'Phát triển phần mềm nội bộ', 'Phát triển tính năng quản lý quy trình gửi hồ sơ trên website nội bộ'),
-  ('IT', 'Phát triển phần mềm nội bộ', 'Tính năng thông báo trên trang báo cáo công việc'),
-  ('IT', 'Phát triển phần mềm nội bộ', 'Tính năng theo dõi hoạt động của tài khoản'),
-  ('IT', 'Phát triển phần mềm nội bộ', 'Nghiên cứu mở rộng bộ nhớ lưu trữ file'),
-  ('IT', 'Mua sắm, trang bị', 'Mua 2 màn hình máy tính'),
-  ('IT', 'Mua sắm, trang bị', 'Mua bộ PC cho nhân viên IT mới'),
-  ('IT', 'Mua sắm, trang bị', 'Mua CPU để kết nối TV phòng họp'),
-  ('IT', 'Mua sắm, trang bị', 'Tìm hiểu màn hình cảm ứng phòng họp'),
-  ('IT', 'Hạ tầng, dịch vụ', 'Gia hạn gói internet cho ban quản lý'),
-  ('IT', 'Hạ tầng, dịch vụ', 'Đề xuất gia hạn hợp đồng thuê máy photocopy')
-) as v (department, category, title)
-join public.task_categories c
-  on c.department = v.department
- and lower(btrim(c.name)) = lower(btrim(v.category))
-where t.department = v.department
-  and lower(btrim(t.title)) = lower(btrim(v.title))
-  and t.category_id is null
-  and t.deleted_at is null;
 
 -- Verification script (run on dev; rolls back). Run after the migration.
 -- begin;
