@@ -234,19 +234,6 @@ begin
     ) as v (department, name, sort_order)
     on conflict (department, lower(btrim(name))) do nothing;
 
-    -- Assign distinct colors per department in sort order.
-    -- Same order as CATEGORY_PALETTE in src/modules/tasks/constants.ts.
-    with ranked as (
-      select id,
-             row_number() over (partition by department order by sort_order, name) as rn
-      from public.task_categories
-    )
-    update public.task_categories c
-    set color = (array['blue','orange','purple','green','pink','teal',
-                       'yellow','sky','brown','red'])[((r.rn - 1) % 10) + 1]
-    from ranked r
-    where r.id = c.id;
-
     -- Link existing tasks by title (only active, uncategorised, same department).
     update public.tasks t
     set category_id = c.id
@@ -312,7 +299,22 @@ begin
   end if;
 end $$;
 
--- ---------- color constraints ----------
+-- ---------- colors ----------
+-- Categories without a color get one of the palette in sort order, so the
+-- categories of a department start out distinct. Same order as
+-- CATEGORY_PALETTE in src/modules/tasks/constants.ts.
+with ranked as (
+  select id,
+         row_number() over (partition by department order by sort_order, name) as rn
+  from public.task_categories
+  where color is null
+)
+update public.task_categories c
+set color = (array['blue','orange','purple','green','pink','teal',
+                   'yellow','sky','brown','red'])[((r.rn - 1) % 10) + 1]
+from ranked r
+where r.id = c.id;
+
 alter table public.task_categories alter column color set default 'blue';
 alter table public.task_categories alter column color set not null;
 alter table public.task_categories drop constraint if exists task_categories_color_check;
