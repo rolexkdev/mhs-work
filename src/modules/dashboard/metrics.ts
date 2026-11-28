@@ -19,6 +19,7 @@ import {
   periodRange,
   shiftPeriod,
 } from "@/lib/period";
+import { isTaskDueSoon, isTaskOverdue } from "@/modules/tasks/dates";
 import type { Profile, Task, TaskStatus } from "@/types/database";
 
 /** Màu trạng thái dùng cho biểu đồ (SVG/inline style cần mã màu). */
@@ -44,9 +45,7 @@ const MON = { weekStartsOn: 1 } as const;
 // ---------------------------------------------------------------- task helpers
 
 export function isOverdue(t: Task, now = Date.now()): boolean {
-  return (
-    t.status !== "done" && !!t.due_date && new Date(t.due_date).getTime() < now
-  );
+  return isTaskOverdue(t, now);
 }
 
 /** Mốc hoàn thành thực tế (null nếu chưa xong). */
@@ -184,11 +183,7 @@ export function computeScope(tasks: Task[], period: Period): Scope {
     .filter((t) => isOverdue(t, now))
     .sort((a, b) => a.due_date!.localeCompare(b.due_date!));
   const dueSoon = open
-    .filter((t) => {
-      if (!t.due_date) return false;
-      const d = new Date(t.due_date).getTime();
-      return d >= now && d <= now + 7 * 86400_000;
-    })
+    .filter((t) => isTaskDueSoon(t, 7, now))
     .sort((a, b) => a.due_date!.localeCompare(b.due_date!));
 
   const leads = completed.map(leadDays).filter((n): n is number => n !== null);

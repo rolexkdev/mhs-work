@@ -20,8 +20,8 @@ import { TaskRows } from "@/modules/dashboard/person";
 import {
   DEPARTMENTS,
   TAG_ACCENT_CLASS,
-  TASK_STATUS_META,
   colorOf,
+  statusLabelPlain,
 } from "@/modules/tasks/constants";
 import {
   DepartmentTaskGroups,
@@ -56,7 +56,7 @@ function WidgetSheetBody({
 
   if (widget.kind === "status") {
     const tasks = statusTasks(scope, widget.status);
-    const title = TASK_STATUS_META[widget.status].label;
+    const title = statusLabelPlain(widget.status);
     const meta = widget.status === "done" ? completedMeta : openMeta;
     return (
       <div className="space-y-5 p-5 sm:p-6">

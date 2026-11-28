@@ -302,6 +302,11 @@ export const TASK_STATUS_META: Record<TaskStatus, Meta> = {
   },
 };
 
+/** Status label without the leading emoji (for places that already show an icon badge). */
+export function statusLabelPlain(status: TaskStatus): string {
+  return TASK_STATUS_META[status].label.replace(/^\S+\s+/, "");
+}
+
 /** Thứ tự trạng thái hiển thị (Chưa bắt đầu → Đang làm → Dừng → Chờ duyệt → Xong). */
 export const TASK_STATUS_ORDER: TaskStatus[] = [
   "todo",

@@ -8,7 +8,6 @@ import {
   Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { dueLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
@@ -24,8 +23,10 @@ import {
   TASK_STATUS_ORDER,
   categoryColor,
   colorOf,
+  statusLabelPlain,
   type TagColor,
 } from "@/modules/tasks/constants";
+import { isTaskOverdue } from "@/modules/tasks/dates";
 import { NO_DEPARTMENT } from "@/modules/tasks/hooks";
 import type { Task, TaskCategory, TaskStatus } from "@/types/database";
 
@@ -43,26 +44,31 @@ export function uncategorizedDepartment(
   return dept === NO_DEPARTMENT ? null : dept;
 }
 
+/** True when a task has no category or its category is not in `deptCategories`. */
+export function isUncategorizedTask(
+  task: Pick<Task, "category_id">,
+  deptCategories: Pick<TaskCategory, "id">[],
+): boolean {
+  if (!task.category_id) return true;
+  return !deptCategories.some((c) => c.id === task.category_id);
+}
+
 /** Tasks of a category key (category id or uncategorizedKey). */
-export function tasksOfCategoryKey(tasks: Task[], key: string): Task[] {
+export function tasksOfCategoryKey(
+  tasks: Task[],
+  key: string,
+  categories: TaskCategory[],
+): Task[] {
   const dept = uncategorizedDepartment(key);
   if (dept === undefined) return tasks.filter((t) => t.category_id === key);
+  const deptCategories = dept
+    ? categories.filter((c) => c.department === dept)
+    : [];
   return tasks.filter(
-    (t) => !t.category_id && (t.department ?? null) === dept,
+    (t) =>
+      (t.department ?? null) === dept && isUncategorizedTask(t, deptCategories),
   );
 }
-
-export function isOverdue(t: Task): boolean {
-  return dueLabel(t.due_date, { done: t.status === "done" }).tone === "overdue";
-}
-
-const SHORT_STATUS: Record<TaskStatus, string> = {
-  todo: "Chưa bắt đầu",
-  in_progress: "Đang làm",
-  blocked: "Tạm dừng",
-  review: "Chờ duyệt",
-  done: "Xong",
-};
 
 type Stats = {
   total: number;
@@ -75,7 +81,7 @@ function statsOf(tasks: Task[]): Stats {
   let overdue = 0;
   for (const t of tasks) {
     byStatus[t.status] += 1;
-    if (isOverdue(t)) overdue += 1;
+    if (isTaskOverdue(t)) overdue += 1;
   }
   return { total: tasks.length, overdue, byStatus };
 }
@@ -126,7 +132,6 @@ function buildSections(
     const showEmpty = departmentFilter !== null;
     if (!deptTasks.length && !deptCategories.length && !showEmpty) continue;
 
-    const known = new Set(deptCategories.map((c) => c.id));
     const cards: Card[] = deptCategories.map((c) => ({
       key: c.id,
       name: c.name,
@@ -135,9 +140,7 @@ function buildSections(
     }));
     // category_id outside this department should not happen (DB trigger),
     // but count such tasks as uncategorized rather than lose them.
-    const rest = deptTasks.filter(
-      (t) => !t.category_id || !known.has(t.category_id),
-    );
+    const rest = deptTasks.filter((t) => isUncategorizedTask(t, deptCategories));
     if (rest.length) {
       cards.push({
         key: uncategorizedKey(department),
@@ -255,7 +258,7 @@ function DepartmentSection({
         {s.stats.overdue > 0 && (
           <span className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-red-600">
             <AlertTriangle className="h-3.5 w-3.5" />
-            {s.stats.overdue} trễ hạn
+            {s.stats.overdue} quá hạn
           </span>
         )}
         {canManage && s.department && (
@@ -318,37 +321,37 @@ const STAT_STYLE: Record<StatKey, StatStyle> = {
     value: "text-primary",
   },
   todo: {
-    label: SHORT_STATUS.todo,
+    label: statusLabelPlain("todo"),
     ...STATUS_BADGE.todo,
     tile: "border-slate-200 bg-slate-50 hover:border-slate-400",
     value: "text-slate-700",
   },
   in_progress: {
-    label: SHORT_STATUS.in_progress,
+    label: statusLabelPlain("in_progress"),
     ...STATUS_BADGE.in_progress,
     tile: "border-blue-200 bg-blue-50 hover:border-blue-400",
     value: "text-blue-700",
   },
   blocked: {
-    label: SHORT_STATUS.blocked,
+    label: statusLabelPlain("blocked"),
     ...STATUS_BADGE.blocked,
     tile: "border-orange-200 bg-orange-50 hover:border-orange-400",
     value: "text-orange-700",
   },
   review: {
-    label: SHORT_STATUS.review,
+    label: statusLabelPlain("review"),
     ...STATUS_BADGE.review,
     tile: "border-amber-200 bg-amber-50 hover:border-amber-400",
     value: "text-amber-700",
   },
   done: {
-    label: SHORT_STATUS.done,
+    label: statusLabelPlain("done"),
     ...STATUS_BADGE.done,
     tile: "border-emerald-200 bg-emerald-50 hover:border-emerald-400",
     value: "text-emerald-700",
   },
   overdue: {
-    label: "Trễ hạn",
+    label: "Quá hạn",
     icon: AlertTriangle,
     tile: "border-red-200 bg-red-50 hover:border-red-400",
     badge: "bg-red-500 text-white",
@@ -366,7 +369,7 @@ function statValue(stats: Stats, key: StatKey): number {
 
 function statTasks(tasks: Task[], key: StatKey): Task[] {
   if (key === "total") return tasks;
-  if (key === "overdue") return tasks.filter(isOverdue);
+  if (key === "overdue") return tasks.filter((t) => isTaskOverdue(t));
   return tasks.filter((t) => t.status === key);
 }
 
@@ -528,7 +531,7 @@ function CategoryCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
             {stats.byStatus.in_progress > 0 && (
               <Metric
                 value={stats.byStatus.in_progress}
-                label="đang làm"
+                label="đang thực hiện"
                 className="bg-blue-50 text-blue-700"
               />
             )}
@@ -542,7 +545,7 @@ function CategoryCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
             {stats.overdue > 0 && (
               <Metric
                 value={stats.overdue}
-                label="trễ hạn"
+                label="quá hạn"
                 className="bg-red-50 font-semibold text-red-600"
               />
             )}

@@ -228,8 +228,12 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
 
   const { data: profiles = [] } = useProfiles();
   const { data: meetings = [] } = useMeetings();
-  const { data: categories = [], isLoading: categoriesLoading } =
-    useTaskCategories();
+  const {
+    data: categories = [],
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+    refetch: refetchCategories,
+  } = useTaskCategories();
   const canManageCategories = useCanManageCategories();
 
   const filters: TaskQueryFilters = {
@@ -269,9 +273,9 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
   const scopedTasks = useMemo(
     () =>
       scope === "category" && categoryKey
-        ? tasksOfCategoryKey(visibleTasks, categoryKey)
+        ? tasksOfCategoryKey(visibleTasks, categoryKey, categories)
         : visibleTasks,
-    [scope, categoryKey, visibleTasks],
+    [scope, categoryKey, visibleTasks, categories],
   );
   const scopeDepartment = activeCategory
     ? activeCategory.department
@@ -591,6 +595,19 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-11 w-full" />
           ))}
+        </div>
+      ) : scope === "overview" && categoriesError ? (
+        <div className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 py-12 text-center">
+          <p className="text-sm text-destructive">
+            Không thể tải danh sách hạng mục. Vui lòng thử lại.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchCategories()}
+          >
+            Thử lại
+          </Button>
         </div>
       ) : scope === "overview" ? (
         <CategoryOverview
