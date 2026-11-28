@@ -39,6 +39,7 @@ import {
   TASK_DEPARTMENTS,
   categoryColor,
   nextCategoryColor,
+  taskDepartmentsFor,
   type TagColor,
 } from "@/modules/tasks/constants";
 import { useTasks } from "@/modules/tasks/hooks";
@@ -101,19 +102,25 @@ export function CategoryManagerDialog({
   const categories = categoriesOf(allCategories, department);
   const addColor = newColor ?? nextCategoryColor(categories);
 
-  async function handleAdd(e: React.FormEvent) {
+  function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     const name = newName.trim();
     if (!name) return;
     const maxOrder = categories.reduce((m, c) => Math.max(m, c.sort_order), 0);
-    await createCategory.mutateAsync({
-      department,
-      name,
-      sort_order: maxOrder + 1,
-      color: addColor,
-    });
-    setNewName("");
-    setNewColor(null);
+    createCategory.mutate(
+      {
+        department,
+        name,
+        sort_order: maxOrder + 1,
+        color: addColor,
+      },
+      {
+        onSuccess: () => {
+          setNewName("");
+          setNewColor(null);
+        },
+      },
+    );
   }
 
   function startEdit(c: TaskCategory) {
@@ -121,14 +128,16 @@ export function CategoryManagerDialog({
     setEditName(c.name);
   }
 
-  async function saveEdit(c: TaskCategory) {
+  function saveEdit(c: TaskCategory) {
     const name = editName.trim();
     if (!name || name === c.name) {
       setEditingId(null);
       return;
     }
-    await updateCategory.mutateAsync({ id: c.id, name });
-    setEditingId(null);
+    updateCategory.mutate(
+      { id: c.id, name },
+      { onSuccess: () => setEditingId(null) },
+    );
   }
 
   function move(index: number, delta: -1 | 1) {
@@ -144,7 +153,15 @@ export function CategoryManagerDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <DialogContent
+          className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
+          onEscapeKeyDown={(e) => {
+            if (editingId) {
+              e.preventDefault();
+              setEditingId(null);
+            }
+          }}
+        >
           <DialogHeader className="border-b px-6 py-4">
             <DialogTitle className="text-lg">Quản lý hạng mục</DialogTitle>
             <p className="text-sm text-muted-foreground">
@@ -165,7 +182,7 @@ export function CategoryManagerDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TASK_DEPARTMENTS.map((d) => (
+                {taskDepartmentsFor(department).map((d) => (
                   <SelectItem key={d.value} value={d.value}>
                     {d.value}
                   </SelectItem>
@@ -189,9 +206,8 @@ export function CategoryManagerDialog({
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
-                              void saveEdit(c);
+                              saveEdit(c);
                             }
-                            if (e.key === "Escape") setEditingId(null);
                           }}
                           className="h-8 flex-1"
                           autoFocus
@@ -201,7 +217,7 @@ export function CategoryManagerDialog({
                           variant="ghost"
                           className="h-8 w-8"
                           aria-label="Lưu"
-                          onClick={() => void saveEdit(c)}
+                          onClick={() => saveEdit(c)}
                           disabled={updateCategory.isPending}
                         >
                           <Check className="h-4 w-4" />

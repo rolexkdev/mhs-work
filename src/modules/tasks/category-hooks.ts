@@ -37,11 +37,12 @@ export function categoriesOf(
 
 function useInvalidate() {
   const qc = useQueryClient();
-  return () => {
-    qc.invalidateQueries({ queryKey: queryKeys.taskCategories });
-    // Deleting a category clears category_id on its tasks.
-    qc.invalidateQueries({ queryKey: ["tasks"] });
-  };
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: queryKeys.taskCategories }),
+      // Deleting a category clears category_id on its tasks.
+      qc.invalidateQueries({ queryKey: ["tasks"] }),
+    ]);
 }
 
 export function useCreateTaskCategory() {
@@ -80,11 +81,15 @@ export function useUpdateTaskCategory() {
       Pick<TaskCategory, "name" | "sort_order" | "color">
     >) => {
       const supabase = createClient();
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("task_categories")
-        .update(patch.name !== undefined ? { ...patch, name: patch.name.trim() } : patch)
-        .eq("id", id);
+        .update(
+          patch.name !== undefined ? { ...patch, name: patch.name.trim() } : patch,
+        )
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!data?.length) throw new Error("Không có quyền chỉnh sửa hạng mục này");
     },
     onSuccess: invalidate,
     onError: (e: Error) => toast.error(friendlyError(e)),
@@ -105,14 +110,19 @@ export function useReorderTaskCategories() {
           supabase
             .from("task_categories")
             .update({ sort_order: order })
-            .eq("id", c.id),
+            .eq("id", c.id)
+            .select("id"),
         ),
       );
       const error = results.find((r) => r.error)?.error;
       if (error) throw error;
+      if (results.some((r) => !r.data?.length)) {
+        throw new Error("Không có quyền sắp xếp hạng mục này");
+      }
     },
-    onSuccess: invalidate,
     onError: (e: Error) => toast.error(friendlyError(e)),
+    // Stay pending until the refetch finishes, including after a partial failure.
+    onSettled: () => invalidate(),
   });
 }
 

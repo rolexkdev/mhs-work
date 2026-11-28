@@ -20,9 +20,13 @@ export function friendlyError(
     return DETAIL_MESSAGES[details];
   }
 
-  // Unique violation, e.g. a category name already used in the department.
-  if (code === "23505") {
-    return "Tên này đã tồn tại, vui lòng chọn tên khác.";
+  // Category unique constraint (department, lower(btrim(name))).
+  if (
+    code === "23505" &&
+    (msg.includes("uq_task_categories_department_name") ||
+      details.includes("uq_task_categories_department_name"))
+  ) {
+    return "Tên hạng mục này đã tồn tại, vui lòng chọn tên khác.";
   }
 
   if (code === "23503") {
