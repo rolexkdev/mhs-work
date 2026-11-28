@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -90,9 +90,22 @@ export function TaskFormDialog({
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
 
-  // Reset form mỗi khi mở
+  const wasOpen = useRef(false);
+  const loadedTaskId = useRef<string | null>(null);
+
+  // Reset only when opening (closed -> open) or switching to a different task,
+  // so changing URL defaults or realtime refetches do not wipe typed input.
   useEffect(() => {
-    if (!open) return;
+    const nextTaskId = task?.id ?? null;
+    if (!open) {
+      wasOpen.current = false;
+      loadedTaskId.current = null;
+      return;
+    }
+    if (wasOpen.current && loadedTaskId.current === nextTaskId) return;
+    wasOpen.current = true;
+    loadedTaskId.current = nextTaskId;
+
     setTitle(task?.title ?? "");
     setDescription(task?.description ?? "");
     setAssignees(task?.assignee_ids ?? []);
