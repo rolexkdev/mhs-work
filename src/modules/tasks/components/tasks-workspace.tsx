@@ -58,6 +58,7 @@ import {
   CategoryOverview,
   tasksOfCategoryKey,
   uncategorizedDepartment,
+  type StatKey,
 } from "@/modules/tasks/components/category-overview";
 import { CategoryManagerDialog } from "@/modules/tasks/components/category-manager-dialog";
 import { useTaskCategories } from "@/modules/tasks/category-hooks";
@@ -157,6 +158,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
+  const [openStat, setOpenStat] = useState<StatKey | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Task | null>(null);
@@ -382,6 +384,18 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
     priorityFilter,
     assigneeFilter,
   ].filter((v) => v !== ALL).length;
+
+  const statSheetOpen =
+    scope === "overview" && !categoriesError && openStat !== null;
+
+  const detailPanel = (
+    <TaskDetailPanel
+      taskId={detailId}
+      open={detailOpen}
+      onOpenChange={handleDetailOpenChange}
+      meetings={meetings}
+    />
+  );
 
   return (
     <div className="space-y-4">
@@ -619,6 +633,12 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           onManage={setManageDepartment}
           nameOf={(id) => nameOf(id) ?? ""}
           onOpenTask={openDetail}
+          openStat={openStat}
+          onOpenStatChange={(s) => {
+            setOpenStat(s);
+            if (!s) handleDetailOpenChange(false);
+          }}
+          statSheetChildren={statSheetOpen ? detailPanel : null}
         />
       ) : scopedTasks.length === 0 ? (
         <div className="rounded-lg border border-dashed py-16 text-center">
@@ -795,12 +815,7 @@ export function TasksWorkspace({ meetingId }: { meetingId?: string }) {
           department={manageDepartment}
         />
       )}
-      <TaskDetailPanel
-        taskId={detailId}
-        open={detailOpen}
-        onOpenChange={handleDetailOpenChange}
-        meetings={meetings}
-      />
+      {!statSheetOpen && detailPanel}
       <ConfirmDialog
         open={!!pendingDelete}
         onOpenChange={(v) => !v && setPendingDelete(null)}

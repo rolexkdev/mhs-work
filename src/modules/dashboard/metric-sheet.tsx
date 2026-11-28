@@ -264,6 +264,13 @@ export function MetricSheetBody({
             meta={meta}
           />
         </div>
+      ) : metric === "open" && tasks.length > 0 ? (
+        <StatusGroupedTaskRows
+          tasks={tasks}
+          nameOf={nameOf}
+          onSelect={onSelect}
+          meta={meta}
+        />
       ) : (
         <DepartmentTaskGroups
           tasks={tasks}

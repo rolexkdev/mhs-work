@@ -133,6 +133,7 @@ export function DepartmentTaskGroups({
               nameOf={nameOf}
               onSelect={onSelect}
               meta={meta}
+              hideDepartment
             />
           </section>
         );

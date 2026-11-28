@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ComponentType } from "react";
+import { useMemo, type ComponentType, type ReactNode } from "react";
 import {
   AlertTriangle,
   ChevronRight,
@@ -163,6 +163,9 @@ export function CategoryOverview({
   onManage,
   nameOf,
   onOpenTask,
+  openStat,
+  onOpenStatChange,
+  statSheetChildren,
 }: {
   /** Tasks after the period / status / assignee filters. */
   tasks: Task[];
@@ -174,8 +177,11 @@ export function CategoryOverview({
   onManage: (department: string | null) => void;
   nameOf: (id: string | null) => string;
   onOpenTask: (t: Task) => void;
+  openStat: StatKey | null;
+  onOpenStatChange: (stat: StatKey | null) => void;
+  /** Nested overlays (e.g. TaskDetailPanel) rendered inside the stat sheet so closing them keeps the list open. */
+  statSheetChildren?: ReactNode;
 }) {
-  const [openStat, setOpenStat] = useState<StatKey | null>(null);
   const sections = useMemo(
     () => buildSections(tasks, categories, departmentFilter),
     [tasks, categories, departmentFilter],
@@ -184,18 +190,16 @@ export function CategoryOverview({
 
   return (
     <div className="space-y-6">
-      <SummaryStrip stats={total} onOpen={setOpenStat} />
+      <SummaryStrip stats={total} onOpen={onOpenStatChange} />
       <StatSheet
         stat={openStat}
         tasks={tasks}
         nameOf={nameOf}
-        onClose={() => setOpenStat(null)}
-        onOpenTask={(t) => {
-          // Close first: a second sheet on top would dismiss this one anyway.
-          setOpenStat(null);
-          onOpenTask(t);
-        }}
-      />
+        onClose={() => onOpenStatChange(null)}
+        onOpenTask={onOpenTask}
+      >
+        {statSheetChildren}
+      </StatSheet>
 
       {sections.length === 0 && (
         <div className="rounded-lg border border-dashed py-16 text-center text-sm text-muted-foreground">
@@ -298,7 +302,7 @@ function percentDone(stats: Stats): number {
   return stats.total ? Math.round((stats.byStatus.done / stats.total) * 100) : 0;
 }
 
-type StatKey = "total" | TaskStatus | "overdue";
+export type StatKey = "total" | TaskStatus | "overdue";
 
 type StatStyle = {
   label: string;
@@ -445,12 +449,14 @@ function StatSheet({
   nameOf,
   onClose,
   onOpenTask,
+  children,
 }: {
   stat: StatKey | null;
   tasks: Task[];
   nameOf: (id: string | null) => string;
   onClose: () => void;
   onOpenTask: (t: Task) => void;
+  children?: ReactNode;
 }) {
   const list = useMemo(
     () =>
@@ -486,6 +492,7 @@ function StatSheet({
             />
           </div>
         )}
+        {children}
       </SheetContent>
     </Sheet>
   );
