@@ -19,8 +19,8 @@ export default async function TasksPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Công việc</h1>
           <p className="hidden text-sm text-muted-foreground sm:block">
-            Quản lý toàn bộ công việc — kéo thả thẻ giữa các cột để đổi trạng
-            thái.
+            Xem theo hạng mục của từng phòng/nhóm — bấm vào hạng mục để xem
+            các công việc bên trong.
           </p>
         </div>
         {isAdmin && (

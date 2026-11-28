@@ -1,12 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { BarChart3, Building2 } from "lucide-react";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   bucketTasks,
@@ -21,7 +17,17 @@ import {
   StatusGroupedTaskRows,
 } from "@/modules/dashboard/metric-sheet";
 import { TaskRows } from "@/modules/dashboard/person";
-import { TASK_STATUS_META } from "@/modules/tasks/constants";
+import {
+  DEPARTMENTS,
+  TAG_ACCENT_CLASS,
+  colorOf,
+  statusLabelPlain,
+} from "@/modules/tasks/constants";
+import {
+  DepartmentTaskGroups,
+  STATUS_BADGE,
+  TaskSheetHeading,
+} from "@/modules/tasks/components/department-task-groups";
 import type { Task } from "@/types/database";
 
 const completedMeta = rowMeta("completed");
@@ -46,22 +52,21 @@ function WidgetSheetBody({
   nameOf: (id: string | null) => string;
   onSelect?: (t: Task) => void;
 }) {
+  const description = `${periodLabel}${department ? ` · ${department}` : ""}`;
+
   if (widget.kind === "status") {
     const tasks = statusTasks(scope, widget.status);
-    const title = TASK_STATUS_META[widget.status].label;
+    const title = statusLabelPlain(widget.status);
     const meta = widget.status === "done" ? completedMeta : openMeta;
     return (
       <div className="space-y-5 p-5 sm:p-6">
-        <div className="space-y-1 pr-10">
-          <SheetTitle className="truncate text-lg">
-            {title} ({tasks.length})
-          </SheetTitle>
-          <SheetDescription className="truncate">
-            {periodLabel}
-            {department ? ` · ${department}` : ""}
-          </SheetDescription>
-        </div>
-        <TaskRows
+        <TaskSheetHeading
+          icon={STATUS_BADGE[widget.status].icon}
+          badge={STATUS_BADGE[widget.status].badge}
+          title={`${title} (${tasks.length})`}
+          description={description}
+        />
+        <DepartmentTaskGroups
           tasks={tasks}
           nameOf={nameOf}
           onSelect={onSelect}
@@ -76,13 +81,12 @@ function WidgetSheetBody({
     const title = scope.buckets[widget.index]?.label ?? widget.label;
     return (
       <div className="space-y-5 p-5 sm:p-6">
-        <div className="space-y-1 pr-10">
-          <SheetTitle className="truncate text-lg">{title}</SheetTitle>
-          <SheetDescription className="truncate">
-            {periodLabel}
-            {department ? ` · ${department}` : ""}
-          </SheetDescription>
-        </div>
+        <TaskSheetHeading
+          icon={BarChart3}
+          badge="bg-indigo-500 text-white"
+          title={title}
+          description={description}
+        />
         <Tabs
           key={widget.index}
           defaultValue={defaultBucketTab(completed.length)}
@@ -95,16 +99,16 @@ function WidgetSheetBody({
               Mới giao ({created.length})
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="completed">
-            <TaskRows
+          <TabsContent value="completed" className="mt-4">
+            <DepartmentTaskGroups
               tasks={completed}
               nameOf={nameOf}
               onSelect={onSelect}
               meta={rateMeta}
             />
           </TabsContent>
-          <TabsContent value="created">
-            <TaskRows
+          <TabsContent value="created" className="mt-4">
+            <DepartmentTaskGroups
               tasks={created}
               nameOf={nameOf}
               onSelect={onSelect}
@@ -118,17 +122,19 @@ function WidgetSheetBody({
 
   const tasks = departmentTasks(scope, widget.department);
   const title = widget.department ?? "Chưa phân phòng";
+  // One department: keep the status grouping, badge in the department color.
+  const deptAccent =
+    TAG_ACCENT_CLASS[
+      widget.department ? colorOf(DEPARTMENTS, widget.department) : "gray"
+    ];
   return (
     <div className="space-y-5 p-5 sm:p-6">
-      <div className="space-y-1 pr-10">
-        <SheetTitle className="truncate text-lg">
-          {title} ({tasks.length})
-        </SheetTitle>
-        <SheetDescription className="truncate">
-          {periodLabel}
-          {department ? ` · ${department}` : ""}
-        </SheetDescription>
-      </div>
+      <TaskSheetHeading
+        icon={Building2}
+        badge={deptAccent.header}
+        title={`${title} (${tasks.length})`}
+        description={description}
+      />
       {tasks.length > 0 ? (
         <StatusGroupedTaskRows
           tasks={tasks}

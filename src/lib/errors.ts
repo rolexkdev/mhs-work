@@ -20,6 +20,15 @@ export function friendlyError(
     return DETAIL_MESSAGES[details];
   }
 
+  // Category unique constraint (department, lower(btrim(name))).
+  if (
+    code === "23505" &&
+    (msg.includes("uq_task_categories_department_name") ||
+      details.includes("uq_task_categories_department_name"))
+  ) {
+    return "Tên hạng mục này đã tồn tại, vui lòng chọn tên khác.";
+  }
+
   if (code === "23503") {
     return "Không thể xoá vì dữ liệu này đang được sử dụng.";
   }

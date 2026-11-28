@@ -385,12 +385,15 @@ export function TaskRows({
   onOpenTask,
   nameOf,
   meta,
+  hideDepartment,
 }: {
   tasks: Task[];
   onSelect?: (t: Task) => void;
   onOpenTask?: (t: Task) => void;
   nameOf?: (id: string | null) => string;
   meta?: (t: Task) => ReactNode;
+  /** Hide department from the row subtitle (e.g. when already grouped by department). */
+  hideDepartment?: boolean;
 }) {
   if (tasks.length === 0)
     return (
@@ -410,9 +413,10 @@ export function TaskRows({
           ? t.assignee_ids.map((id) => nameOf(id)).filter(Boolean).join(", ") ||
             "Chưa giao"
           : null;
+        const dept = hideDepartment ? null : t.department;
         const subtitle = nameOf
-          ? [assignees, t.department].filter(Boolean).join(" · ")
-          : t.department;
+          ? [assignees, dept].filter(Boolean).join(" · ")
+          : dept;
         const content = (
           <>
             <span

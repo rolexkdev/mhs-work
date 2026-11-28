@@ -90,6 +90,8 @@ export type Task = Timestamps & {
   due_date: string | null;
   // Trường theo "Công việc KCN" (Notion)
   department: string | null;
+  /** Category (Hạng mục) of the task's department (0031); null = uncategorised. */
+  category_id: string | null;
   latest_update: string | null;
   note: string | null;
   /** Việc lặp lại: luôn hiện ở mọi tuần. */
@@ -105,6 +107,18 @@ export type Task = Timestamps & {
 };
 
 export type TaskRecurrence = "none" | "daily" | "weekly";
+
+/** Category (Hạng mục) of a department; leaders and admins manage them (0031). */
+export type TaskCategory = Timestamps & {
+  id: string;
+  department: string;
+  name: string;
+  sort_order: number;
+  /** TagColor key (src/modules/tasks/constants.ts); DB check keeps it valid. */
+  color: string;
+  created_by: string | null;
+  updated_at: string;
+};
 
 export type TaskComment = Timestamps & {
   id: string;
@@ -330,6 +344,7 @@ export interface Database {
           | "start_date"
           | "due_date"
           | "department"
+          | "category_id"
           | "latest_update"
           | "note"
           | "recurrence"
@@ -339,6 +354,20 @@ export interface Database {
           | "deleted_by"
         >;
         Update: Update<Task>;
+        Relationships: Rel[];
+      };
+      task_categories: {
+        Row: Row<TaskCategory>;
+        Insert: Insert<
+          TaskCategory,
+          | "id"
+          | "created_at"
+          | "updated_at"
+          | "created_by"
+          | "sort_order"
+          | "color"
+        >;
+        Update: Update<TaskCategory>;
         Relationships: Rel[];
       };
       task_comments: {

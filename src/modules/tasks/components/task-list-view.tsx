@@ -33,6 +33,7 @@ import {
   DEPARTMENTS,
   taskDepartmentsFor,
   TAG_COLOR_CLASS,
+  categoryColor,
   colorOf,
   type TagColor,
 } from "@/modules/tasks/constants";
@@ -43,11 +44,18 @@ import {
   type AssigneeOption,
   type Person,
 } from "@/modules/tasks/components/assignee-stack";
-import type { Task, TaskStatus, Profile, Meeting } from "@/types/database";
+import type {
+  Task,
+  TaskStatus,
+  Profile,
+  Meeting,
+  TaskCategory,
+} from "@/types/database";
 
 export type GroupBy =
   | "none"
   | "department"
+  | "category"
   | "assignee"
   | "status"
   | "meeting";
@@ -104,9 +112,21 @@ const STATUS_BORDER: Record<TaskStatus, string> = {
 function groupAccent(
   groupBy: GroupBy,
   key: string,
+  categories: TaskCategory[],
 ): { bar: string; dot: string; border: string } {
-  if (groupBy === "department" && key !== "__none__") {
-    const c = colorOf(DEPARTMENTS, key);
+  // A category group takes the color the leader picked for it.
+  const category =
+    groupBy === "category" ? categories.find((c) => c.id === key) : undefined;
+  if (category) {
+    const c = categoryColor(category);
+    return {
+      bar: cn(TAG_COLOR_CLASS[c], "hover:brightness-95"),
+      ...ACCENT_CLASS[c],
+    };
+  }
+  const dept = groupBy === "department" ? key : "__none__";
+  if (dept !== "__none__") {
+    const c = colorOf(DEPARTMENTS, dept);
     return {
       bar: cn(TAG_COLOR_CLASS[c], "hover:brightness-95"),
       ...ACCENT_CLASS[c],
@@ -134,6 +154,7 @@ function buildGroups(
   groupBy: GroupBy,
   profiles: Profile[],
   meetings: Meeting[],
+  categories: TaskCategory[],
 ): Group[] {
   if (groupBy === "none") return [{ key: "all", label: "", tasks }];
 
@@ -146,6 +167,7 @@ function buildGroups(
   for (const t of tasks) {
     if (groupBy === "status") push(t.status, t);
     else if (groupBy === "department") push(t.department ?? "__none__", t);
+    else if (groupBy === "category") push(t.category_id ?? "__none__", t);
     else if (groupBy === "assignee") {
       // Nhiều người phụ trách: việc hiện ở nhóm của từng người
       for (const id of t.assignee_ids.length ? t.assignee_ids : ["__none__"]) {
@@ -161,6 +183,11 @@ function buildGroups(
       if (groupBy === "assignee") return "Chưa giao";
       if (groupBy === "department") return "Chưa phân phòng";
       if (groupBy === "meeting") return "Không gắn họp";
+      if (groupBy === "category") return "Chưa phân hạng mục";
+    }
+    if (groupBy === "category") {
+      const c = categories.find((x) => x.id === key);
+      return c ? `${c.department} · ${c.name}` : "Hạng mục đã xoá";
     }
     if (groupBy === "status") return TASK_STATUS_META[key as TaskStatus].label;
     if (groupBy === "assignee")
@@ -176,6 +203,23 @@ function buildGroups(
     order = [...DEPARTMENTS.map((d) => d.value), "__none__"];
   else if (groupBy === "meeting")
     order = [...meetings.map((m) => m.id), "__none__"];
+  else if (groupBy === "category") {
+    // Department order of DEPARTMENTS, then the category order inside it.
+    const deptIndex = (d: string) => {
+      const i = DEPARTMENTS.findIndex((x) => x.value === d);
+      return i < 0 ? DEPARTMENTS.length : i;
+    };
+    order = [
+      ...[...categories]
+        .sort(
+          (a, b) =>
+            deptIndex(a.department) - deptIndex(b.department) ||
+            a.sort_order - b.sort_order,
+        )
+        .map((c) => c.id),
+      "__none__",
+    ];
+  }
   else order = [...profiles.map((p) => p.id), "__none__"];
 
   const groups: Group[] = [];
@@ -196,6 +240,7 @@ export function TaskListView({
   groupBy,
   profiles,
   meetings,
+  categories = [],
   nameOf,
   onOpen,
   onDelete,
@@ -208,6 +253,8 @@ export function TaskListView({
   groupBy: GroupBy;
   profiles: Profile[];
   meetings: Meeting[];
+  /** Needed for grouping by category. */
+  categories?: TaskCategory[];
   nameOf: (id: string | null) => string | null;
   onOpen: (t: Task) => void;
   onDelete: (t: Task) => void;
@@ -218,8 +265,8 @@ export function TaskListView({
   onUnlinkMeeting?: (t: Task) => void;
 }) {
   const groups = useMemo(
-    () => buildGroups(tasks, groupBy, profiles, meetings),
-    [tasks, groupBy, profiles, meetings],
+    () => buildGroups(tasks, groupBy, profiles, meetings, categories),
+    [tasks, groupBy, profiles, meetings, categories],
   );
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (k: string) =>
@@ -259,7 +306,7 @@ export function TaskListView({
   const renderGroupHeader = (g: Group) => {
     const isCollapsed = collapsed.has(g.key);
     const done = g.tasks.filter((t) => t.status === "done").length;
-    const accent = groupAccent(groupBy, g.key);
+    const accent = groupAccent(groupBy, g.key, categories);
     return (
       <button
         onClick={() => toggle(g.key)}
@@ -302,7 +349,7 @@ export function TaskListView({
       {/* ── Điện thoại: mỗi việc là một thẻ, chạm để mở chi tiết ── */}
       <div className="space-y-3 md:hidden">
         {groups.map((g) => {
-          const accent = groupAccent(groupBy, g.key);
+          const accent = groupAccent(groupBy, g.key, categories);
           return (
             <div
               key={g.key}
@@ -360,7 +407,7 @@ export function TaskListView({
 
         {groups.map((g) => {
           const isCollapsed = collapsed.has(g.key);
-          const accent = groupAccent(groupBy, g.key);
+          const accent = groupAccent(groupBy, g.key, categories);
           return (
             <div
               key={g.key}

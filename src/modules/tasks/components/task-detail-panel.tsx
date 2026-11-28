@@ -19,6 +19,7 @@ import {
   History,
   Repeat,
   Link2,
+  FolderOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,10 @@ import {
 } from "@/modules/tasks/constants";
 import { ProgressDial } from "@/modules/tasks/components/progress-dial";
 import { useTask, useUpdateTask } from "@/modules/tasks/hooks";
+import {
+  categoriesOf,
+  useTaskCategories,
+} from "@/modules/tasks/category-hooks";
 import {
   useChecklists,
   useAddChecklist,
@@ -185,6 +190,8 @@ export function TaskDetailPanel({
   function patch(p: Partial<Task>) {
     if (task) update.mutate({ id: task.id, ...p });
   }
+  const { data: allCategories = [] } = useTaskCategories();
+  const categoryOptions = categoriesOf(allCategories, task?.department ?? null);
   /** Saves a start/due date unless it would put the start after the due date. */
   function patchDate(field: "start_date" | "due_date", value: string | null) {
     if (!task) return;
@@ -386,9 +393,12 @@ export function TaskDetailPanel({
                 <Row icon={Building2} label="Phòng/Nhóm">
                   <Select
                     value={task.department ?? "__none__"}
-                    onValueChange={(v) =>
-                      patch({ department: v === "__none__" ? null : v })
-                    }
+                    onValueChange={(v) => {
+                      const department = v === "__none__" ? null : v;
+                      // Categories belong to a department (DB trigger agrees).
+                      if (department !== task.department)
+                        patch({ department, category_id: null });
+                    }}
                   >
                     <SelectTrigger className="h-8">
                       <SelectValue />
@@ -398,6 +408,32 @@ export function TaskDetailPanel({
                       {taskDepartmentsFor(task.department).map((d) => (
                         <SelectItem key={d.value} value={d.value}>
                           {d.value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Row>
+
+                <Row icon={FolderOpen} label="Hạng mục">
+                  <Select
+                    value={task.category_id ?? "__none__"}
+                    onValueChange={(v) =>
+                      patch({ category_id: v === "__none__" ? null : v })
+                    }
+                    disabled={categoryOptions.length === 0}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">
+                        {task.department
+                          ? "Chưa phân hạng mục"
+                          : "Chọn phòng/nhóm trước"}
+                      </SelectItem>
+                      {categoryOptions.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
