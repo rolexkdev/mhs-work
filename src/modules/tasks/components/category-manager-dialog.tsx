@@ -151,186 +151,186 @@ export function CategoryManagerDialog({
   const pendingCount = pendingDelete ? taskCountOf(pendingDelete.id) : 0;
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
-          onEscapeKeyDown={(e) => {
-            if (editingId) {
-              e.preventDefault();
-              setEditingId(null);
-            }
-          }}
-        >
-          <DialogHeader className="border-b px-6 py-4">
-            <DialogTitle className="text-lg">Quản lý hạng mục</DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              Mỗi phòng/nhóm có danh sách hạng mục riêng. Nhân viên tự xếp công
-              việc vào hạng mục phù hợp.
-            </p>
-          </DialogHeader>
-
-          <div className="space-y-4 overflow-y-auto px-6 py-5">
-            <Select
-              value={department}
-              onValueChange={(v) => {
-                setDepartment(v);
-                setNewColor(null);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {taskDepartmentsFor(department).map((d) => (
-                  <SelectItem key={d.value} value={d.value}>
-                    {d.value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {categories.length === 0 ? (
-              <p className="rounded-md border border-dashed py-6 text-center text-sm text-muted-foreground">
-                Phòng/nhóm này chưa có hạng mục nào.
-              </p>
-            ) : (
-              <ul className="divide-y rounded-md border">
-                {categories.map((c, index) => (
-                  <li key={c.id} className="flex items-center gap-1 px-2 py-1.5">
-                    {editingId === c.id ? (
-                      <>
-                        <Input
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              saveEdit(c);
-                            }
-                          }}
-                          className="h-8 flex-1"
-                          autoFocus
-                        />
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          aria-label="Lưu"
-                          onClick={() => saveEdit(c)}
-                          disabled={updateCategory.isPending}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          aria-label="Huỷ"
-                          onClick={() => setEditingId(null)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <ColorPicker
-                          value={categoryColor(c)}
-                          onChange={(color) =>
-                            updateCategory.mutate({ id: c.id, color })
-                          }
-                          disabled={updateCategory.isPending}
-                        />
-                        <span className="min-w-0 flex-1 truncate px-1 text-sm">
-                          {c.name}
-                        </span>
-                        <span className="shrink-0 px-1 text-xs tabular-nums text-muted-foreground">
-                          {taskCountOf(c.id)} việc
-                        </span>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          aria-label="Lên"
-                          disabled={index === 0 || reorder.isPending}
-                          onClick={() => move(index, -1)}
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          aria-label="Xuống"
-                          disabled={
-                            index === categories.length - 1 || reorder.isPending
-                          }
-                          onClick={() => move(index, 1)}
-                        >
-                          <ArrowDown className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          aria-label="Đổi tên"
-                          onClick={() => startEdit(c)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          aria-label="Xoá"
-                          onClick={() => setPendingDelete(c)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <form onSubmit={handleAdd} className="flex items-center gap-2">
-              <ColorPicker value={addColor} onChange={setNewColor} large />
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Tên hạng mục mới"
-                className="flex-1"
-              />
-              <Button
-                type="submit"
-                disabled={!newName.trim() || createCategory.isPending}
-              >
-                <Plus className="h-4 w-4" /> Thêm
-              </Button>
-            </form>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmDialog
-        open={!!pendingDelete}
-        onOpenChange={(v) => !v && setPendingDelete(null)}
-        title="Xoá hạng mục?"
-        description={
-          pendingDelete
-            ? pendingCount > 0
-              ? `"${pendingDelete.name}" đang có ${pendingCount} công việc. Các công việc này sẽ chuyển về "Chưa phân hạng mục", không bị xoá.`
-              : `"${pendingDelete.name}" sẽ bị xoá.`
-            : undefined
-        }
-        confirmLabel="Xoá"
-        destructive
-        onConfirm={() => {
-          if (pendingDelete) deleteCategory.mutate(pendingDelete.id);
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
+        onEscapeKeyDown={(e) => {
+          if (editingId) {
+            e.preventDefault();
+            setEditingId(null);
+          }
         }}
-      />
-    </>
+      >
+        <DialogHeader className="border-b px-6 py-4">
+          <DialogTitle className="text-lg">Quản lý hạng mục</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Mỗi phòng/nhóm có danh sách hạng mục riêng. Nhân viên tự xếp công
+            việc vào hạng mục phù hợp.
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-4 overflow-y-auto px-6 py-5">
+          <Select
+            value={department}
+            onValueChange={(v) => {
+              setDepartment(v);
+              setNewColor(null);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {taskDepartmentsFor(department).map((d) => (
+                <SelectItem key={d.value} value={d.value}>
+                  {d.value}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {categories.length === 0 ? (
+            <p className="rounded-md border border-dashed py-6 text-center text-sm text-muted-foreground">
+              Phòng/nhóm này chưa có hạng mục nào.
+            </p>
+          ) : (
+            <ul className="divide-y rounded-md border">
+              {categories.map((c, index) => (
+                <li key={c.id} className="flex items-center gap-1 px-2 py-1.5">
+                  {editingId === c.id ? (
+                    <>
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            saveEdit(c);
+                          }
+                        }}
+                        className="h-8 flex-1"
+                        autoFocus
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label="Lưu"
+                        onClick={() => saveEdit(c)}
+                        disabled={updateCategory.isPending}
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label="Huỷ"
+                        onClick={() => setEditingId(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <ColorPicker
+                        value={categoryColor(c)}
+                        onChange={(color) =>
+                          updateCategory.mutate({ id: c.id, color })
+                        }
+                        disabled={updateCategory.isPending}
+                      />
+                      <span className="min-w-0 flex-1 truncate px-1 text-sm">
+                        {c.name}
+                      </span>
+                      <span className="shrink-0 px-1 text-xs tabular-nums text-muted-foreground">
+                        {taskCountOf(c.id)} việc
+                      </span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label="Lên"
+                        disabled={index === 0 || reorder.isPending}
+                        onClick={() => move(index, -1)}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label="Xuống"
+                        disabled={
+                          index === categories.length - 1 || reorder.isPending
+                        }
+                        onClick={() => move(index, 1)}
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        aria-label="Đổi tên"
+                        onClick={() => startEdit(c)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        aria-label="Xoá"
+                        onClick={() => setPendingDelete(c)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form onSubmit={handleAdd} className="flex items-center gap-2">
+            <ColorPicker value={addColor} onChange={setNewColor} large />
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Tên hạng mục mới"
+              className="flex-1"
+            />
+            <Button
+              type="submit"
+              disabled={!newName.trim() || createCategory.isPending}
+            >
+              <Plus className="h-4 w-4" /> Thêm
+            </Button>
+          </form>
+        </div>
+
+        {/* Must stay inside DialogContent: as a sibling, a click on its
+            buttons counts as an outside click and closes the manager. */}
+        <ConfirmDialog
+          open={!!pendingDelete}
+          onOpenChange={(v) => !v && setPendingDelete(null)}
+          title="Xoá hạng mục?"
+          description={
+            pendingDelete
+              ? pendingCount > 0
+                ? `"${pendingDelete.name}" đang có ${pendingCount} công việc. Các công việc này sẽ chuyển về "Chưa phân hạng mục", không bị xoá.`
+                : `"${pendingDelete.name}" sẽ bị xoá.`
+              : undefined
+          }
+          confirmLabel="Xoá"
+          destructive
+          onConfirm={() => {
+            if (pendingDelete) deleteCategory.mutate(pendingDelete.id);
+          }}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
 
